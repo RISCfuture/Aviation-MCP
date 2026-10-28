@@ -10,7 +10,8 @@ and fresh staging. See the implementation progress ledger for other open work.
 - `APP_ROLE=stage` enables offline source parsing commands without opening a
   database connection. Run these in ingestion jobs, not serving processes.
 - `APP_ROLE=ingest` uses `INGEST_DATABASE_URL` for migrations, publication and
-  purge commands.
+  purge commands. Its pools retain connections until the bounded job exits,
+  keeping the database awake through distribution normalization and publication.
 - `APP_ROLE=serve` uses `DATABASE_URL` and exposes `/mcp`, `/health`, `/ready`
   and `/metrics`. This is the default role.
 

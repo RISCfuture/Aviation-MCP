@@ -44,8 +44,10 @@ The measured initial serving image is about 152 MB uncompressed. Both database
 and application reside in San Jose to avoid inter-region connection latency.
 
 Database acquisition waits up to `DATABASE_WAIT_SECONDS` (15 by default), so
-an on-demand database has time to start. Idle connections are pruned after one
-minute. This is a bounded wait, not a guarantee of startup latency. MCP tool
+an on-demand database has time to start. Serving connections are pruned after one
+idle minute. Ingestion retains its connections for the bounded job's lifetime,
+so the database stays awake during normalization and publication. This is a
+bounded wait, not a guarantee of startup latency. MCP tool
 execution and SQL statements retain their separate timeouts.
 
 Before production traffic, run `scripts/measure-cold-start.sh`. It stops the

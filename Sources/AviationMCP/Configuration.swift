@@ -18,7 +18,8 @@ public func configure(_ app: Application) throws {
     try .postgres(
       url: settings.databaseURL, maxConnectionsPerEventLoop: 2,
       connectionPoolTimeout: .seconds(Int64(settings.databaseWaitSeconds)),
-      pruneInterval: .seconds(30), maxIdleTimeBeforePruning: .seconds(60)), as: .psql)
+      pruneInterval: settings.role == "serve" ? .seconds(30) : nil,
+      maxIdleTimeBeforePruning: .seconds(60)), as: .psql)
   app.migrations.add(AviationSchema())
   guard settings.role == "serve" else {
     app.asyncCommands.use(RemoteIngestionCommand(), as: "ingest-sources")

@@ -2,6 +2,30 @@
 
 ## Final review rulings (2026-10-28)
 
+- Linux release build and all 34 tests passed for f47bfee. Its 141 MB image is
+  `registry.fly.io/aviation-mcp-ingest@sha256:24a7091c6afde38497cdfb3b880fcca28699a981258468be23f0c73d6df739d5`.
+  Fly's API returned intermittent HTTP 503 before a successful build/push.
+- The production DOF retry normalized 656,884 records in 14 minutes, then
+  stalled during publication. The database had stopped while normalization ran.
+  Its cold-start proxy restarted immediately after accepting the publication
+  connection; PostgreSQL logged an unexpected EOF in an open transaction.
+  A separate fresh purge process connected and completed successfully.
+- Ruling: ingestion pools retain connections until job exit; only serving pools
+  prune idle connections. This avoids a database cold start between normalization
+  and publication. The cost is database runtime throughout bounded ingestion;
+  this does not establish recovery from every possible mid-transaction failure.
+- A Linux disconnect probe confirmed that the SQL query throws but Fluent's
+  rollback remains pending on the closed connection. The phase marker was
+  `query failed; rollback pending`; PostgreSQL TCP sockets were already closed.
+  The reproduction is documented in postgres-nio's local package directory as
+  `AVIATION-MCP-BUGS.md`. No upstream code was changed. The user was asked whether
+  to fix it upstream or use a server-side workaround. Public deployment remains
+  gated on connection-loss handling and full cold-start verification.
+- Stopped and removed stalled DOF machine 811093f94de668. Its normalized data
+  was never published. The lifecycle mitigation still requires a full Fly import.
+- All 34 tests pass on macOS and Linux release mode with the lifecycle change;
+  Swift format, SwiftLint and Markdown lint pass. The temporary fault-injection
+  probe is kept in ignored evidence, not the shipped test suite.
 - Fresh-context whole-branch review completed against aa73690. All three
   findings were reproduced in existing tests before their fixes; all 34 macOS
   tests pass after the fixes and fixture extraction. Swift format and SwiftLint
