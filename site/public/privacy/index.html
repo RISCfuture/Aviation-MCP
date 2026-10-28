@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#07110f" />
+    <title>Privacy — Aviation MCP</title>
+    <link rel="stylesheet" href="/information.css" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="canonical" href="https://aviation-mcp.org/privacy" />
+  </head>
+  <body>
+    <main>
+      <a class="brand" href="/">AVIATION / MCP</a>
+      <p>Aviation MCP is operated by Tim Morgan.</p>
+      <h1>Privacy</h1>
+      <p class="updated">Updated October 28, 2026</p>
+      <p>
+        Aviation MCP processes the arguments your assistant sends to its tools.
+        These can include airport and aircraft identifiers, dates, weather
+        reports, coordinates, routes, and procedure names. It does not request
+        your conversation history, account password, or personal files.
+      </p>
+      <h2>How requests are used</h2>
+      <p>
+        Requests are used to look up aviation data, perform calculations,
+        retrieve weather and terrain, and return results to your assistant. The
+        hosted service does not require an Aviation MCP account. Avoid sending
+        personal or confidential information that is unnecessary for your query.
+      </p>
+      <h2>Hosting and data providers</h2>
+      <p>
+        Cloudflare handles website and MCP traffic, and Fly.io hosts the server
+        and PostgreSQL database. These services process connection information
+        such as IP addresses and request metadata. Weather requests can send
+        station identifiers, coordinates, requested fields, and times to the
+        Aviation Weather Center and Open-Meteo. Terrain requests retrieve
+        geographic tiles from the public Copernicus DEM distribution on AWS.
+        Your ChatGPT or Claude provider processes the conversation under its own
+        policies.
+      </p>
+      <h2>Storage and retention</h2>
+      <p>
+        The service stores IP-based rate-limit state. Scheduled cleanup removes
+        entries inactive for more than one hour; deletion depends on the cleanup
+        job completing. Weather responses are cached with a default freshness of
+        15 minutes and become eligible for cleanup after expiration and
+        outstanding fetch or retry periods. Terrain answers may be reused for
+        five minutes; terrain answers and downloaded blocks remain in a
+        size-limited cache until eviction. Cache freshness is not a deletion
+        guarantee.
+      </p>
+      <p>
+        Operational logs can contain request metadata, timestamps, and error
+        information. Infrastructure logs and backups follow the hosting
+        provider's configured retention. The service does not maintain user
+        accounts or a conversation-history database. The website uses
+        self-hosted fonts and does not include an advertising or analytics
+        script.
+      </p>
+      <h2>Questions</h2>
+      <p>
+        Use our <a href="/support">support page</a> for questions about data
+        handling. Do not include private information in a public GitHub issue.
+      </p>
+      <nav aria-label="Information">
+        <a href="/privacy">Privacy</a><a href="/terms">Terms</a
+        ><a href="/support">Support</a>
+      </nav>
+    </main>
+  </body>
+</html>

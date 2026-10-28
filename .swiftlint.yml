@@ -1,0 +1,13 @@
+included:
+  - Sources
+  - Tests
+  - Package.swift
+excluded:
+  - .build
+type_name:
+  allowed_symbols:
+    - ' '
+opening_brace:
+  ignore_multiline_function_signatures: true
+  ignore_multiline_type_headers: true
+  ignore_multiline_statement_conditions: true

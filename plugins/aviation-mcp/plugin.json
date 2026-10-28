@@ -1,0 +1,101 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "aviation-mcp",
+  "version": "1.0.0",
+  "description": "Query U.S. aviation data and worldwide terrain with source cycles, provenance, and explicit coverage gaps.",
+  "author": {
+    "name": "Tim Morgan",
+    "url": "https://aviation-mcp.org"
+  },
+  "homepage": "https://aviation-mcp.org",
+  "repository": "https://github.com/RISCfuture/Aviation-MCP",
+  "keywords": ["aviation", "airports", "weather", "notams", "terrain"],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Aviation Data",
+        "shortDescription": "Aviation data and terrain",
+        "longDescription": "Look up U.S. airports, runways, navigation, airspace, instrument procedures, obstacles, aircraft characteristics, aviation weather, and NOTAMs. Analyze worldwide Copernicus terrain and compute geographic distances and bearings. Results identify source cycles, units, altitude datums, provenance, and coverage gaps. No Aviation MCP account is required. For research and planning; not certified navigation, dispatch, or obstacle-clearance approval.",
+        "developerName": "Tim Morgan",
+        "category": "Productivity",
+        "capabilities": [
+          "Airport and procedure lookup",
+          "Weather and NOTAM queries",
+          "Obstacle and terrain analysis"
+        ],
+        "websiteURL": "https://aviation-mcp.org",
+        "supportURL": "https://aviation-mcp.org/support",
+        "privacyPolicyURL": "https://aviation-mcp.org/privacy",
+        "termsOfServiceURL": "https://aviation-mcp.org/terms",
+        "defaultPrompt": [
+          "Show Denver’s (KDEN) runways, lengths, and surface types.",
+          "On Boston’s (KBOS) ILS RWY 4R, what altitude is published at GOSHI?",
+          "What NOTAMs affect Chicago O’Hare (KORD) over the next six hours?"
+        ],
+        "brandColor": "#07110F",
+        "brandColorDark": "#C9F66B",
+        "composerIcon": "./assets/icon.svg",
+        "logo": "./assets/icon.svg"
+      },
+      "review": {
+        "test_cases": {
+          "positive": [
+            {
+              "description": "Airport runways",
+              "prompt": "Show Denver’s (KDEN) runways, lengths, and surface types.",
+              "tools_triggered": "get_airport",
+              "expected_behavior": "Return the current KDEN runway records with lengths in feet and source surface materials. In the verified 2026-10-29 cycle, six concrete runways are published: five at 12,000 ft and 16R/34L at 16,000 ft. Preserve source cycles and parsing warnings."
+            },
+            {
+              "description": "Approach altitude",
+              "prompt": "On Boston’s (KBOS) ILS RWY 4R, what altitude is published at GOSHI?",
+              "tools_triggered": "find_procedures, get_procedure",
+              "expected_behavior": "Resolve I04R and the GOSHI transition, retain leg constraints and altitude datum, and return the published altitude. The verified cycle has GOSHI at 6,000 ft MSL. Do not infer chart minima or clearance."
+            },
+            {
+              "description": "Route weather comparison",
+              "prompt": "Compare the latest METARs along KATL–KCLT–KRDU. Where are the lowest ceilings, poorest visibility, and strongest winds?",
+              "tools_triggered": "get_weather",
+              "expected_behavior": "Fetch current aviation reports for all three stations and compare cloud ceilings, visibility, and winds with observation times and provenance. Actual values vary; do not treat FEW or SCT as a ceiling or modeled forecasts as observations. Report unavailable fields."
+            },
+            {
+              "description": "NOTAM time overlap",
+              "prompt": "What NOTAMs affect Chicago O’Hare (KORD) over the next six hours?",
+              "tools_triggered": "query_notams",
+              "expected_behavior": "Use an explicit current six-hour window, follow pagination, summarize matching current notices, and retain original text, validity, freshness, and any uncertain schedule or context warnings. Counts change with live ingestion."
+            },
+            {
+              "description": "Terrain corridor",
+              "prompt": "What’s the highest terrain within 1 NM on either side of a direct route from Truckee (KTRK) to Mammoth Yosemite (KMMH)?",
+              "tools_triggered": "get_airport, query_terrain",
+              "expected_behavior": "Resolve both airport positions and query a 1 NM half-width corridor. Report the maximum elevation and location with EGM2008 datum, source and coverage. Do not claim clearance or completeness when geometry or budget limits leave gaps."
+            }
+          ],
+          "negative": [
+            {
+              "description": "Unsupported flight-plan submission",
+              "prompt": "Using only this aviation plugin, file an IFR flight plan for me from KDEN to KBOS.",
+              "expected_behavior": "Explain that Aviation MCP only queries data and computes results; it cannot file or amend flight plans. Do not claim submission."
+            },
+            {
+              "description": "Missing airport context",
+              "prompt": "What is the tallest obstacle within 5 NM of the departure end of runway 29?",
+              "expected_behavior": "Ask which airport before resolving the runway departure end. Do not silently pick an airport or substitute the airport reference point."
+            },
+            {
+              "description": "Unsupported safety certification",
+              "prompt": "Use terrain data to certify that my planned climb is safe and clears every obstacle.",
+              "expected_behavior": "Explain that terrain and obstacle queries cannot certify flight safety or regulatory clearance. Offer bounded data analysis only when route, datum, and other necessary inputs are supplied; retain coverage gaps."
+            }
+          ]
+        },
+        "commerce": false,
+        "commerce_description": "The plugin does not sell products, accept payments, or modify user accounts.",
+        "demo_recording_url": "https://aviation-mcp.org/review/aviation-data-demo.mp4"
+      },
+      "publication": {
+        "release_notes": "Initial public release exposing 17 read-only aviation, terrain, and geographic tools."
+      }
+    }
+  }
+}

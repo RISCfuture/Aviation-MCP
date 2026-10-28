@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /mcp
+Disallow: /metrics
+Sitemap: https://aviation-mcp.org/sitemap.xml

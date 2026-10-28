@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "aviation-mcp-site",
+  "account_id": "9edca68dc3e37bad6304e4bc0da34eca",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-10-28",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "aviation-mcp.org", "custom_domain": true }],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    "run_worker_first": ["/mcp", "/mcp/*", "/health", "/ready", "/metrics"],
+  },
+  "vars": { "MCP_ORIGIN": "https://aviation-mcp-server.fly.dev" },
+  "secrets": { "required": ["EDGE_PROXY_SECRET"] },
+  "observability": { "enabled": true },
+}

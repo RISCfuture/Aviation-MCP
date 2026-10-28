@@ -1,0 +1,41 @@
+{
+  "name": "aviation-mcp-site",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.4.2",
+  "engines": {
+    "node": ">=26.7.0"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "pnpm type-check && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "type-check": "wrangler types && tsc --noEmit",
+    "lint": "eslint . && stylelint '{src,public}/**/*.css'",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test:unit": "vitest run",
+    "test:e2e": "playwright test",
+    "deploy": "wrangler deploy",
+    "types": "wrangler types"
+  },
+  "dependencies": {
+    "@fontsource-variable/space-grotesk": "^5.2.10",
+    "@fontsource/ibm-plex-mono": "^5.2.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.1",
+    "eslint": "^10.10.0",
+    "globals": "^17.11.0",
+    "prettier": "^3.9.6",
+    "stylelint": "^17.15.0",
+    "stylelint-config-standard": "^40.0.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.70.0",
+    "vite": "^8.3.0",
+    "vitest": "^4.1.11",
+    "wrangler": "^4.132.0"
+  }
+}

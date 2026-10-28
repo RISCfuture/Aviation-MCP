@@ -1,0 +1,11 @@
+*
+!Package.swift
+!Package.resolved
+!Sources/
+!Sources/**
+!Tests/
+!Tests/**
+!Dockerfile
+!terrain/
+!terrain/*.py
+!terrain/requirements.txt

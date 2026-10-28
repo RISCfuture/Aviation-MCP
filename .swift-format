@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "indentSwitchCaseLabels": false,
+  "lineLength": 100,
+  "multiElementCollectionTrailingCommas": false
+}

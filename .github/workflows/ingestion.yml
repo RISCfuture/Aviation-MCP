@@ -1,0 +1,154 @@
+name: Source checks and ingestion
+
+on:
+  push:
+    paths:
+      - '.github/workflows/ingestion.yml'
+      - 'Sources/AviationMCP/Data/SourceChecks.swift'
+      - 'Sources/AviationMCP/Data/SourceDiscovery.swift'
+      - 'scripts/CheckSource.swift'
+      - 'scripts/run-ingestion-job.sh'
+      - 'scripts/ingest-checked-sources.sh'
+      - '.github/scripts/ingestion-alerts*'
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: source-ingestion
+  cancel-in-progress: false
+
+jobs:
+  test-alerts:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - run: node --test .github/scripts/ingestion-alerts.test.cjs
+
+  check:
+    runs-on: ubuntu-24.04
+    container: swift:6.4.1-noble
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        source: [nasr, cifp, dof, aircraft]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile source checker
+        run: >-
+          swiftc Sources/AviationMCP/Data/SourceDiscovery.swift
+          Sources/AviationMCP/Data/SourceChecks.swift scripts/CheckSource.swift
+          -o /tmp/check-source
+      - name: Check published releases
+        env:
+          SOURCE: ${{ matrix.source }}
+        run: /tmp/check-source "$SOURCE" "$SOURCE.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: source-${{ matrix.source }}
+          path: ${{ matrix.source }}.json
+          retention-days: 1
+
+  ingest:
+    needs: [check, test-alerts]
+    if: >-
+      ${{ always() && !cancelled() && needs.test-alerts.result == 'success'
+        && github.event_name != 'push' && vars.AVIATION_INGEST_IMAGE != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        source: [navigation, dof, aircraft]
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_INGEST_API_TOKEN }}
+      AVIATION_INGEST_IMAGE: ${{ vars.AVIATION_INGEST_IMAGE }}
+      SOURCE: ${{ matrix.source }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: source-*
+          path: checked
+          merge-multiple: true
+      - name: Dispatch available publications
+        run: bash scripts/ingest-checked-sources.sh "$SOURCE" checked "reports/$SOURCE.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ingestion-results-${{ matrix.source }}
+          path: reports/*.json
+          retention-days: 7
+
+  alert:
+    needs: [check, ingest]
+    if: ${{ always() && github.event_name != 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: source-*
+          path: checked
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ingestion-results-*
+          path: reports
+          merge-multiple: true
+      - name: Inspect current and next published coverage
+        if: always()
+        run: >-
+          curl --fail --silent --show-error --max-time 60 --retry 2
+          https://aviation-mcp.org/mcp
+          --header 'Content-Type: application/json'
+          --header 'Accept: application/json, text/event-stream'
+          --data '{"jsonrpc":"2.0","id":"cycle-alert","method":"tools/call","params":{"name":"get_data_status"}}'
+          --output published-status.json
+      - name: Notify owner of failed or incomplete release validation
+        if: always()
+        uses: actions/github-script@v8
+        env:
+          CHECK_RESULT: ${{ needs.check.result }}
+          INGEST_RESULT: ${{ needs.ingest.result }}
+        with:
+          script: |
+            const { notify } = require('./.github/scripts/ingestion-alerts.cjs');
+            await notify({ github, context, core });
+
+  terrain:
+    if: ${{ github.event_name != 'push' && vars.AVIATION_INGEST_IMAGE != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate and publish terrain catalogs
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_INGEST_API_TOKEN }}
+          AVIATION_INGEST_IMAGE: ${{ vars.AVIATION_INGEST_IMAGE }}
+        run: scripts/run-ingestion-job.sh import-terrain
+
+  purge:
+    needs: ingest
+    if: ${{ always() && !cancelled() && github.event_name != 'push' && vars.AVIATION_INGEST_IMAGE != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Purge expired data and caches
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_INGEST_API_TOKEN }}
+          AVIATION_INGEST_IMAGE: ${{ vars.AVIATION_INGEST_IMAGE }}
+        run: scripts/run-ingestion-job.sh purge

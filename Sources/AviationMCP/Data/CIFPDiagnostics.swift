@@ -1,0 +1,52 @@
+import Foundation
+import MCP
+import SwiftCIFP
+
+struct CIFPDiagnostics {
+  var errors = ImportDiagnostics()
+  private var procedures: [String: [Value]] = [:]
+
+  mutating func record(_ error: any Error, line: Int?, sourceLine: Substring?) {
+    let bytes = sourceLine.map { Array($0.utf8) } ?? []
+    let procedure =
+      bytes.count >= 19 && bytes[4] == UInt8(ascii: "P")
+      && "DEF".utf8.contains(bytes[12])
+    let identity: String?
+    if procedure {
+      let airport = String(bytes: bytes[6..<10], encoding: .ascii) ?? ""
+      let name = (String(bytes: bytes[13..<19], encoding: .ascii) ?? "")
+        .trimmingCharacters(in: .whitespaces)
+      identity = airport + "/" + name
+    } else if let error = error as? CIFPError,
+      case .aggregationError(_, let identifier, _) = error
+    {
+      identity = identifier
+    } else {
+      identity = nil
+    }
+    let diagnostic = errors.record(
+      error, kind: procedure ? "procedure" : nil, recordID: identity, line: line,
+      details: [
+        "phase": line == nil ? "aggregation" : "record",
+        "source_excerpt": sourceLine.map { .string(String($0.prefix(160))) } ?? .null
+      ])
+    if procedure, let identity { procedures[identity, default: []].append(diagnostic) }
+  }
+
+  func applying(to records: [AviationRecord]) -> [AviationRecord] {
+    records.map { original in
+      guard original.kind == "procedure", let airport = original.airport,
+        let issues = procedures[airport + "/" + original.identifier]
+      else { return original }
+      var record = original
+      record.data["source_warnings"] = .array(issues)
+      record.supplemental["parser_diagnostics"] = .array(issues)
+      record.geometry = nil
+      record.data["missed_approach_geometry"] = nil
+      record.data["geometry_scope"] = "unavailable_due_to_parse_errors"
+      record.data["geometry_gaps"] = .array(
+        (record.data["geometry_gaps"]?.arrayValue ?? []) + issues)
+      return record
+    }
+  }
+}

@@ -1,0 +1,39 @@
+name: Linux aviation libraries
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.library }} on Linux
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        library:
+          - SwiftNASR
+          - SwiftCIFP
+          - SwiftDOF
+          - SwiftACD
+          - SwiftMETAR
+          - SwiftGeographic
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pull Swift toolchain
+        run: docker pull swift:6.4.1-noble
+      - name: Build pinned library
+        run: scripts/verify-linux-libraries.sh "${LIBRARY}"
+        env:
+          LIBRARY: ${{ matrix.library }}
+      - name: Preserve build evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.library }}
+          path: .build/linux-libraries/
