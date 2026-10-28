@@ -1,0 +1,59 @@
+import Fluent
+import Foundation
+
+struct IngestionService: Sendable {
+  let store: AviationStore
+
+  func ingest(
+    source: String, checksum: String, parserRevision: String,
+    operation: @Sendable () async throws -> StagedImport
+  ) async throws {
+    let run = IngestionRun(source: source, checksum: checksum, parserRevision: parserRevision)
+    try await run.create(on: store.database)
+    do {
+      let staged = try await operation()
+      try await store.publish(staged.versions, records: staged.records)
+      run.outcome = "published"
+      run.details = [
+        "records": String(staged.records.count),
+        "versions": staged.versions.map { $0.id.uuidString }.joined(separator: ",")
+      ]
+    } catch {
+      run.outcome = "failed"
+      run.details = [
+        "reason": String(
+          ((error as? any LocalizedError)?.failureReason ?? String(describing: error)).prefix(2048))
+      ]
+      run.finishedAt = .now
+      try await run.update(on: store.database)
+      throw error
+    }
+    run.finishedAt = .now
+    try await run.update(on: store.database)
+  }
+}
+
+// Each mutable Fluent model instance belongs to one ingestion operation.
+final class IngestionRun: Model, @unchecked Sendable {
+  static let schema = "ingestion_runs"
+
+  @ID(key: .id) var id: UUID?
+  @Field(key: "source") var source: String
+  @Field(key: "checksum") var checksum: String
+  @Field(key: "parser_revision") var parserRevision: String
+  @Timestamp(key: "started_at", on: .create) var startedAt: Date?
+  @OptionalField(key: "finished_at") var finishedAt: Date?
+  @Field(key: "outcome") var outcome: String
+  @Field(key: "details") var details: [String: String]
+
+  init() {}
+
+  init(source: String, checksum: String, parserRevision: String) {
+    id = UUID()
+    self.source = source
+    self.checksum = checksum
+    self.parserRevision = parserRevision
+    outcome = "staging"
+    details = [:]
+  }
+}

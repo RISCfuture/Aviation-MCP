@@ -1,0 +1,15 @@
+app = "aviation-mcp-ingest"
+primary_region = "sjc"
+kill_signal = "SIGTERM"
+kill_timeout = "120s"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  APP_ROLE = "ingest"
+
+[[vm]]
+  memory = "8gb"
+  cpu_kind = "shared"
+  cpus = 4

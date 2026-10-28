@@ -1,0 +1,64 @@
+name: Server verification
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    container: swift:6.4.1-noble
+    services:
+      postgres:
+        image: postgis/postgis:17-3.5
+        env:
+          POSTGRES_PASSWORD: aviation-ci-test
+          POSTGRES_DB: aviation_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://postgres:aviation-ci-test@postgres:5432/aviation_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: .build
+          key: swift-linux-6.4.1-${{ hashFiles('Package.resolved') }}
+      - name: Release build
+        run: swift build --build-system native -c release --product aviation-mcp --jobs 4
+      - name: Swift Testing with PostGIS
+        run: swift test --build-system native -c release --jobs 4
+      - name: Swift format
+        run: swift format lint --strict --recursive Sources Tests Package.swift
+
+  lint:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install linters
+        run: brew install swiftlint actionlint hadolint shellcheck yamllint markdownlint-cli2
+      - run: swiftlint lint --strict
+      - run: actionlint
+      - run: hadolint Dockerfile
+      - run: shellcheck scripts/*.sh
+      - run: yamllint -c .yamllint.yml .github .swiftlint.yml
+      - run: markdownlint-cli2 --config .markdownlint-cli2.jsonc '**/*.md'
+
+  container:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build deployment image
+        run: docker build --tag aviation-mcp:ci .
+      - name: Verify runtime linkage and staging commands
+        run: docker run --rm --env APP_ROLE=stage aviation-mcp:ci --help

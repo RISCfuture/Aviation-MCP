@@ -1,0 +1,5 @@
+.build/
+.superpowers/
+.swiftpm/
+.env
+.DS_Store

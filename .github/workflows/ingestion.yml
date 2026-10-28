@@ -1,0 +1,86 @@
+name: Source checks and ingestion
+
+on:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: source-ingestion
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    container: swift:6.4.1-noble
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        source: [nasr, cifp, dof, aircraft]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile source checker
+        run: >-
+          swiftc Sources/AviationMCP/Data/SourceDiscovery.swift
+          Sources/AviationMCP/Data/SourceChecks.swift scripts/CheckSource.swift
+          -o /tmp/check-source
+      - name: Check published releases
+        env:
+          SOURCE: ${{ matrix.source }}
+        run: /tmp/check-source "$SOURCE" "$SOURCE.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: source-${{ matrix.source }}
+          path: ${{ matrix.source }}.json
+          retention-days: 1
+
+  ingest:
+    needs: check
+    if: ${{ always() && !cancelled() && vars.AVIATION_INGEST_IMAGE != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        source: [navigation, dof, aircraft]
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_INGEST_API_TOKEN }}
+      AVIATION_INGEST_IMAGE: ${{ vars.AVIATION_INGEST_IMAGE }}
+      SOURCE: ${{ matrix.source }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: source-*
+          path: checked
+          merge-multiple: true
+      - name: Dispatch available publications
+        run: |
+          if [[ "$SOURCE" == navigation ]]; then
+            jq -cn --slurpfile nasr checked/nasr.json --slurpfile cifp checked/cifp.json '
+              $nasr[0][] as $n | $cifp[0][] | select(.effectiveFrom == $n.effectiveFrom
+                and .effectiveUntil == $n.effectiveUntil) | [$n, .] | @base64
+            ' > plans.jsonl
+          else
+            jq -c '.[] | [.] | @base64' "checked/$SOURCE.json" > plans.jsonl
+          fi
+          while IFS= read -r plan; do
+            scripts/run-ingestion-job.sh ingest-sources "$(jq -r . <<< "$plan")"
+          done < plans.jsonl
+
+  purge:
+    needs: ingest
+    if: ${{ always() && !cancelled() && vars.AVIATION_INGEST_IMAGE != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Purge expired data and caches
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_INGEST_API_TOKEN }}
+          AVIATION_INGEST_IMAGE: ${{ vars.AVIATION_INGEST_IMAGE }}
+        run: scripts/run-ingestion-job.sh purge

@@ -1,0 +1,103 @@
+import MCP
+
+enum DomainGroup: String, CaseIterable, Sendable {
+  case airports, navigation, airspace, procedures, obstacles, aircraft, weather, notams, geography,
+    status
+}
+
+enum ToolDefinition: String, CaseIterable, Sendable {
+  case findAirports = "find_airports"
+  case getAirport = "get_airport"
+  case findNavigation = "find_navigation"
+  case getAirway = "get_airway"
+  case findRoutes = "find_routes"
+  case queryAirspace = "query_airspace"
+  case findProcedures = "find_procedures"
+  case getProcedure = "get_procedure"
+  case queryObstacles = "query_obstacles"
+  case getAircraft = "get_aircraft"
+  case getWeather = "get_weather"
+  case parseWeather = "parse_weather"
+  case queryNOTAMs = "query_notams"
+  case convertCoordinates = "convert_coordinates"
+  case computeGeometry = "compute_geometry"
+  case getDataStatus = "get_data_status"
+
+  var group: DomainGroup {
+    switch self {
+    case .findAirports, .getAirport: .airports
+    case .findNavigation, .getAirway, .findRoutes: .navigation
+    case .queryAirspace: .airspace
+    case .findProcedures, .getProcedure: .procedures
+    case .queryObstacles: .obstacles
+    case .getAircraft: .aircraft
+    case .getWeather, .parseWeather: .weather
+    case .queryNOTAMs: .notams
+    case .convertCoordinates, .computeGeometry: .geography
+    case .getDataStatus: .status
+    }
+  }
+
+  var description: String {
+    switch self {
+    case .findAirports:
+      "Find current airports by identifier, name, location or minimum runway length."
+    case .getAirport: "Get an airport and its runways; ambiguous identifiers return candidates."
+    case .findNavigation:
+      "Find navaids, fixes, ILS, holds, FSS and AWOS records in the effective cycle."
+    case .getAirway: "Get an airway with ordered source segments and restrictions."
+    case .findRoutes: "Find preferred and coded departure routes in the effective cycle."
+    case .queryAirspace: "Find airspace and ARTCC geometry near a coordinate."
+    case .findProcedures: "Find departures, arrivals and approaches by airport and identifier."
+    case .getProcedure: "Get procedure transitions, leg restrictions and geometry coverage gaps."
+    case .queryObstacles:
+      "Find obstacles near coordinates, a route, an airport/runway departure end or an exact procedure_id; "
+        + "highest ordering uses MSL elevation."
+    case .getAircraft:
+      "Find published aircraft characteristics and performance by ICAO type identifier."
+    case .getWeather:
+      "Get aviation weather with AWC priority and modeled Open-Meteo supplements; sources are selectable."
+    case .parseWeather:
+      "Parse supplied METAR, TAF or winds-aloft text with an explicit reference date."
+    case .queryNOTAMs:
+      "Find overlapping NOTAMs; preserve schedules and include uncertain runway or procedure matches."
+    case .convertCoordinates: "Convert WGS84 latitude/longitude, UTM, UPS and MGRS coordinates."
+    case .computeGeometry:
+      "Compute WGS84 geodesic routes, distances, true bearings or destination coordinates."
+    case .getDataStatus: "Report effective source cycles, availability and provenance."
+    }
+  }
+
+  var tool: Tool {
+    Tool(
+      name: rawValue, description: description, inputSchema: ToolSchemas.input(self),
+      annotations: .init(
+        readOnlyHint: true, destructiveHint: false, idempotentHint: true,
+        openWorldHint: group == .weather || group == .notams), outputSchema: ToolSchemas.output)
+  }
+
+  var periodicSources: [SourceName] {
+    switch group {
+    case .airports, .navigation: [.nasr]
+    case .airspace: [.nasr, .cifp]
+    case .procedures: [.cifp]
+    case .obstacles: [.dof]
+    case .aircraft: [.aircraft]
+    default: []
+    }
+  }
+
+  var kinds: [String] {
+    switch self {
+    case .findAirports, .getAirport: ["airport"]
+    case .findNavigation: ["navaid", "fix", "ils", "hold", "fss", "awos"]
+    case .getAirway: ["airway"]
+    case .findRoutes: ["preferred_route", "coded_departure_route"]
+    case .queryAirspace: ["airspace", "artcc", "artcc_boundary", "parachute_area", "military_route"]
+    case .findProcedures, .getProcedure: ["procedure"]
+    case .queryObstacles: ["obstacle"]
+    case .getAircraft: ["aircraft"]
+    default: []
+    }
+  }
+}
