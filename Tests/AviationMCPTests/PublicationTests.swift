@@ -90,22 +90,17 @@ struct `Transactional publication` {
   @Test
   func `orders obstacles by MSL and binds pagination to source versions`() async throws {
     try await withDatabase { store in
-      let version = Self.version(.dof)
-      var low = AviationRecord.fixture(version)
-      low = AviationRecord(
-        versionID: version.id, kind: "obstacle", id: "low", identifier: "LOW", name: "Low")
-      low.elevationMSLFeet = 100
-      low.heightAGLFeet = 90
-      low.geometry = .object([
-        "type": "Point", "coordinates": .array([.double(-122.2), .double(37.7)])
-      ])
-      var high = AviationRecord(
-        versionID: version.id, kind: "obstacle", id: "high", identifier: "HIGH", name: "High")
-      high.elevationMSLFeet = 200
-      high.heightAGLFeet = 20
-      high.geometry = low.geometry
-      try await store.publish([version], records: [low, high])
+      let position = try await Self.publishObstacles(store)
       let queries = PeriodicQueries(store: store)
+      for context: [String: Value] in [
+        ["airport": "KOAK", "radius_nm": 5],
+        ["airport": "KOAK", "latitude": 37.7, "longitude": -122.2, "radius_nm": 5]
+      ] {
+        await #expect(throws: MCPError.self) {
+          try await queries.search(
+            kinds: ["obstacle"], sources: [.dof], arguments: ToolArguments(context))
+        }
+      }
       var args: [String: Value] = [
         "latitude": .double(37.7), "longitude": .double(-122.2),
         "radius_nm": 5, "order": "highest", "limit": 1
@@ -117,7 +112,7 @@ struct `Transactional publication` {
       let second = try await queries.search(
         kinds: ["obstacle"], sources: [.dof], arguments: ToolArguments(args))
       #expect(second.results.first?.objectValue?["identifier"]?.stringValue == "LOW")
-      try await Self.publishDepartureAirport(store, position: low.geometry ?? .null)
+      try await Self.publishDepartureAirport(store, position: position)
       let departure = try await queries.search(
         kinds: ["obstacle"], sources: [.dof, .nasr],
         arguments: ToolArguments([

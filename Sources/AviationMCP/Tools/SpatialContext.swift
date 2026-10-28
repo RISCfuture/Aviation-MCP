@@ -12,6 +12,9 @@ struct SpatialContext {
   ) async throws -> Self {
     let coordinate = try arguments.coordinate()
     let runway = try arguments.string("runway")
+    guard try arguments.string("airport") == nil || runway != nil else {
+      throw MCPError.invalidParams("An airport obstacle context requires a runway departure end")
+    }
     let procedure = try arguments.string("procedure_id")
     let route = arguments.values["route"]
     guard

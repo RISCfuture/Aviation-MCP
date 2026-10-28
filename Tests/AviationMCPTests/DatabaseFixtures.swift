@@ -16,6 +16,25 @@ extension AviationRecord {
 }
 
 extension `Transactional publication` {
+  static func publishObstacles(_ store: AviationStore) async throws -> Value {
+    let version = Self.version(.dof)
+    let position: Value = .object([
+      "type": "Point", "coordinates": .array([.double(-122.2), .double(37.7)])
+    ])
+    var low = AviationRecord(
+      versionID: version.id, kind: "obstacle", id: "low", identifier: "LOW", name: "Low")
+    low.elevationMSLFeet = 100
+    low.heightAGLFeet = 90
+    low.geometry = position
+    var high = AviationRecord(
+      versionID: version.id, kind: "obstacle", id: "high", identifier: "HIGH", name: "High")
+    high.elevationMSLFeet = 200
+    high.heightAGLFeet = 20
+    high.geometry = position
+    try await store.publish([version], records: [low, high])
+    return position
+  }
+
   static func publishDepartureAirport(_ store: AviationStore, position: Value) async throws {
     let nasr = Self.version(.nasr)
     let cifp = Self.version(.cifp)

@@ -10,6 +10,42 @@ struct WeatherProviders: Sendable {
   var awcLimits = [BudgetLimit(period: .minute, units: 60)]
 
   func openMeteo(_ query: WeatherQuery) async throws -> WeatherSample {
+    try await withBudget(provider: "open_meteo", limits: openMeteoLimits) {
+      try await openMeteoSample(query)
+    }
+  }
+
+  func awc(_ query: WeatherQuery) async throws -> WeatherSample {
+    try await withBudget(provider: "awc", limits: awcLimits) {
+      try await aviationSample(query)
+    }
+  }
+
+  private func withBudget(
+    provider: String, limits: [BudgetLimit],
+    fetch: () async throws -> WeatherSample
+  ) async throws -> WeatherSample {
+    do {
+      var sample = try await fetch()
+      sample.rateLimit = try await http.budgets.reserve(
+        provider: provider, units: 0, limits: limits)
+      return sample
+    } catch is CancellationError {
+      throw CancellationError()
+    } catch {
+      var failure =
+        error as? WeatherFailure
+        ?? WeatherFailure(
+          provider: provider, reason: "Upstream report or forecast could not be interpreted.")
+      if failure.rateLimits == nil {
+        failure.rateLimits = try? await http.budgets.reserve(
+          provider: provider, units: 0, limits: limits)
+      }
+      throw failure
+    }
+  }
+
+  private func openMeteoSample(_ query: WeatherQuery) async throws -> WeatherSample {
     guard let latitude = query.latitude, let longitude = query.longitude else {
       throw WeatherFailure(
         provider: "open_meteo", reason: "Coordinates are unavailable for this station.")
@@ -38,13 +74,10 @@ struct WeatherProviders: Sendable {
       limits: openMeteoLimits)
     let forecast = try JSONDecoder().decode(
       OpenMeteoForecast.self, from: JSONEncoder().encode(cached.payload))
-    var sample = try forecast.sample(at: query.instant, retrievedAt: cached.retrievedAt)
-    sample.rateLimit = try await http.budgets.reserve(
-      provider: "open_meteo", units: 0, limits: openMeteoLimits)
-    return sample
+    return try forecast.sample(at: query.instant, retrievedAt: cached.retrievedAt)
   }
 
-  func awc(_ query: WeatherQuery) async throws -> WeatherSample {
+  private func aviationSample(_ query: WeatherQuery) async throws -> WeatherSample {
     guard let station = query.station else {
       throw WeatherFailure(
         provider: "awc",
@@ -62,11 +95,8 @@ struct WeatherProviders: Sendable {
       guard let first = taf.groups.first, case .range(let validity) = first.period,
         validity.dateInterval.start <= query.instant, query.instant < validity.dateInterval.end
       else { continue }
-      var sample = try AviationReports.sample(
+      return try AviationReports.sample(
         taf: taf, at: query.instant, retrievedAt: cached.retrievedAt)
-      sample.rateLimit = try await http.budgets.reserve(
-        provider: "awc", units: 0, limits: awcLimits)
-      return sample
     }
     throw WeatherFailure(
       provider: "awc",
@@ -88,10 +118,8 @@ struct WeatherProviders: Sendable {
       })
       .max(by: { $0.date < $1.date })
     else { return nil }
-    var sample = try AviationReports.sample(
+    return try AviationReports.sample(
       metar: report, at: instant, retrievedAt: cached.retrievedAt)
-    sample.rateLimit = try await http.budgets.reserve(provider: "awc", units: 0, limits: awcLimits)
-    return sample
   }
 
   private func fetchAWC(_ product: String, station: String) async throws -> CachedWeather {

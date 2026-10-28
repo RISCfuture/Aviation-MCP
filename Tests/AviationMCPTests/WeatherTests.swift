@@ -31,6 +31,30 @@ struct `Weather selection and provenance` {
     selected.sources = ["open_meteo"]
     let request = selected
     await #expect(throws: MCPError.self) { try await disabled.weather(request) }
+
+    let retry = now.addingTimeInterval(60)
+    let budget = BudgetReport(
+      provider: "open_meteo", allowed: false, requestedUnits: 1,
+      limits: [.init(period: .minute, limit: 600, remaining: 0, resetsAt: retry.ISO8601Format())],
+      retryAt: retry.ISO8601Format(), retrySource: "upstream")
+    let unavailable = WeatherService(
+      awc: { _ in throw WeatherFailure(provider: "awc", reason: "No reporting station.") },
+      openMeteo: { _ in
+        throw WeatherFailure(
+          provider: "open_meteo", reason: "Provider throttled.", retryAt: retry,
+          retrySource: "upstream", rateLimits: budget)
+      })
+    let failure = try await unavailable.weather(query)
+    #expect(failure.completeness == "unavailable")
+    #expect(failure.results.isEmpty)
+    let errors = try #require(failure.error?.objectValue?["providers"]?.arrayValue)
+    #expect(errors.compactMap { $0.objectValue?["provider"]?.stringValue } == ["awc", "open_meteo"])
+    #expect(errors.last?.objectValue?["retrySource"] == "upstream")
+    #expect(errors.last?.objectValue?["retryAt"] != nil)
+    #expect(
+      failure.rateLimits?.arrayValue?.first?.objectValue?["retryAt"]
+        == .string(retry.ISO8601Format()))
+    #expect(try failure.response().isError == true)
   }
 
   @Test

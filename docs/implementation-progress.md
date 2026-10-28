@@ -1,5 +1,36 @@
 # Hosted Aviation MCP implementation
 
+## Final review rulings (2026-10-28)
+
+- Fresh-context whole-branch review completed against aa73690. All three
+  findings were reproduced in existing tests before their fixes; all 34 macOS
+  tests pass after the fixes and fixture extraction. Swift format and SwiftLint
+  pass. Linux release verification is running.
+- Final: fixed ignored airport-only obstacle context, aggregated weather failures
+  and lost provider decoding/coverage budget metadata, each RED to GREEN.
+- Git push and GitHub variable writes now succeed after the user's permission
+  update. aa73690 is published and the ingestion workflow is registered. Its
+  aircraft, CIFP and DOF source checks passed; NASR returned upstream HTTP 503.
+  Push-triggered publication and purge were correctly skipped.
+- Ruling: fix airport-only obstacle context rejection as Important. Silently
+  broadening a local obstacle request to the whole distribution misleads clients.
+- Ruling: fix aggregation of all weather provider failures as Important. Clients
+  need fallback exhaustion and retry information even when the first provider
+  fails for a different reason.
+- Ruling: promote lost decoding/coverage budget metadata to Important. A consumed
+  upstream request must remain visible to clients making retry decisions.
+- Ruling: keep navigation, airport, procedure and airspace groups disabled until
+  the user confirms SwiftCIFP fixes and source parity is verified. Their original
+  example questions remain incomplete; presenting partial coverage as parity
+  would mislead aviation users.
+- Ruling: the separate NOTAM ingestion service owns cancellation/completeness
+  interpretation. This server preserves its records and reports uncertainty and
+  freshness; it cannot establish upstream completeness independently.
+- Ruling: library compilation establishes Linux build compatibility only.
+  External aviation semantics still require fixture and representative-data
+  verification; production DOF, public deployment, cold starts and scheduled
+  activation remain operational acceptance gates.
+
 The supplied hosted-server plan is the implementation specification. The original
 prompt and five acceptance questions were recovered from
 `/Users/tmorgan/Desktop/prompts/aviation-mcp.txt`. The supplied plan supersedes its

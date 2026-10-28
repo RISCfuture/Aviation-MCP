@@ -131,6 +131,23 @@ extension `Transactional publication` {
         #expect(failure?.rateLimits?.limits.first?.remaining == (transportFailure ? 3 : 4))
         #expect(failure?.retryAt != nil)
       }
+      let providers = WeatherProviders(
+        http: WeatherHTTP(
+          cache: WeatherCache(database: store.database),
+          budgets: ProviderBudgets(database: store.database)
+        ) { _ in
+          ClientResponse(status: .ok, body: ByteBuffer(string: "{}"))
+        },
+        openMeteoLimits: [.init(period: .day, units: 5)],
+        awcLimits: [.init(period: .day, units: 5)])
+      let query = WeatherQuery(
+        station: "KOAK", latitude: 37.7, longitude: -122.2,
+        instant: .now.addingTimeInterval(1800), fields: ["temperature_c"], sources: nil)
+      for fetch in [providers.openMeteo, providers.awc] {
+        let failure = await #expect(throws: WeatherFailure.self) { try await fetch(query) }
+        #expect(failure?.rateLimits?.tracking == "local_estimate")
+        #expect(failure?.rateLimits?.limits.first?.remaining == 4)
+      }
     }
   }
 }

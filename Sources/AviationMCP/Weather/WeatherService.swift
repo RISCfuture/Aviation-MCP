@@ -136,10 +136,14 @@ private struct WeatherAggregation {
 
   mutating func response(for query: WeatherQuery, selected: [String]) throws -> ToolResult {
     guard !fields.isEmpty else {
-      throw failures.first
-        ?? WeatherFailure(
-          provider: selected.joined(separator: ","),
-          reason: "No report or forecast covers the requested location and time.")
+      return ToolResult(
+        results: [], sources: sources, completeness: "unavailable",
+        warnings: warnings, rateLimits: try .encoded(budgets),
+        error: .object([
+          "code": "weather_unavailable",
+          "reason": "No report or forecast covers the requested location and time.",
+          "sources": try .encoded(selected), "providers": try .encoded(failures)
+        ]))
     }
     let missing = query.fields.filter { fields[$0] == nil }
     if !missing.isEmpty {
