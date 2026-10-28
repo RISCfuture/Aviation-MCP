@@ -2,6 +2,15 @@
 
 ## Final review rulings (2026-10-28)
 
+- Workaround commit f81e220 is signed and pushed. Its 141 MB release image is
+  `registry.fly.io/aviation-mcp-ingest@sha256:c15de4fa28ee97248724f7698ddf5d3c2a74bd5879dd0a9cea42df7ddd769546`,
+  now configured as GitHub's `AVIATION_INGEST_IMAGE`. Private Fly checks passed
+  for database wake-up/status, B738 characteristics and overlapping KSFO NOTAMs;
+  DOF correctly remains unavailable. The temporary serving machine was removed.
+- Automatic approval review rejected `gh workflow run ingestion.yml` because
+  dispatch requires approval and the session policy is `never`. The user has
+  the exact dispatch command; workflow token/cleanup and full DOF publication
+  acceptance remain pending. Public serving is not deployed.
 - Implemented the user-authorized server-side PostgresNIO workaround without
   modifying upstream code. SQLKit submits encoded queries through a connection
   guard on the PostgreSQL event loop. Closed connections fail immediately;
