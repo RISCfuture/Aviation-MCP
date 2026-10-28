@@ -1,6 +1,13 @@
 name: Source checks and ingestion
 
 on:
+  push:
+    paths:
+      - '.github/workflows/ingestion.yml'
+      - 'Sources/AviationMCP/Data/SourceChecks.swift'
+      - 'Sources/AviationMCP/Data/SourceDiscovery.swift'
+      - 'scripts/CheckSource.swift'
+      - 'scripts/run-ingestion-job.sh'
   schedule:
     - cron: '17 */6 * * *'
   workflow_dispatch:
@@ -40,7 +47,7 @@ jobs:
 
   ingest:
     needs: check
-    if: ${{ always() && !cancelled() && vars.AVIATION_INGEST_IMAGE != '' }}
+    if: ${{ always() && !cancelled() && github.event_name != 'push' && vars.AVIATION_INGEST_IMAGE != '' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     strategy:
@@ -74,7 +81,7 @@ jobs:
 
   purge:
     needs: ingest
-    if: ${{ always() && !cancelled() && vars.AVIATION_INGEST_IMAGE != '' }}
+    if: ${{ always() && !cancelled() && github.event_name != 'push' && vars.AVIATION_INGEST_IMAGE != '' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:

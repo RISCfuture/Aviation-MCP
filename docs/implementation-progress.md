@@ -525,3 +525,34 @@ and `dotfiles/claude/settings.json`) were left untouched.
   version is published. Thread stacks were captured on the disposable job
   machine. A current-code Linux ingestion probe is being prepared to identify
   the phase; neither the import nor public deployment is complete.
+
+## Verified image and full-distribution Linux probe (2026-10-28)
+
+- Signed checkpoint 3c5c587 is on GitHub. All six library jobs passed with the
+  rewritten revisions. The latest server/container jobs are still running and
+  the macOS lint runner is queued.
+- The image for 3c5c587 built and pushed at
+  `registry.fly.io/aviation-mcp-ingest@sha256:d07e73ffe70c7062f2f78bb36a815fc724fbfac20ae324864b7fedd19fb29db0`.
+  Its incremental compile took 182 seconds after the 2,017-second cache fill;
+  the image remains 141 MB. Depot again reported a builder-release timeout
+  after the successful push.
+- Current-code native Linux acquisition/publication completed all 656,884 DOF
+  records in 6m35s and exited zero. The representative 5 NM query used the
+  aviation_geometry index and executed in 106.658 ms.
+- Stopped and removed stalled bootstrap DOF machine 857597a47e4498 and marked
+  its operational run failed. A separate purge command connected successfully;
+  the stall's root cause remains undetermined. A retry omitted APP_ROLE=ingest
+  and failed at startup; that machine was removed. Correctly configured retry
+  811093f94de668 is now normalizing with the verified image and phase logging.
+- Private serving machine 8d9e3ece0d7d78 returned 43 production KSFO NOTAM
+  records through Flycast with correct fractional freshness timestamps and
+  uncertainty warnings, plus the published B738 category D record. A live
+  weather query fell back from an observation older than one hour to TAF wind
+  and modeled temperature/pressure levels, with explicit field provenance.
+  This private helper and its local proxy must be removed after verification.
+- GitHub has the ingestion workflow on its default branch but its workflow
+  endpoint returns 404 and it is absent from the registered-workflow list.
+  Source-check-only push triggers now validate pipeline edits and provide an
+  initial execution path. Publication and purge still require schedule/manual
+  events. Actionlint and YAML lint pass. The image-variable write was rejected
+  by automatic approval review under policy never and is pending user action.
