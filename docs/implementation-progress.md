@@ -2,6 +2,14 @@
 
 ## Final review rulings (2026-10-28)
 
+- Image 30d2651 started DOF normalization successfully on Fly; the aircraft
+  retry confirmed its snapshot was already published and exited normally.
+  DOF normalized 656,884 records in about three minutes and reached validation.
+  Before publication, PostgreSQL statistics still described 388 aircraft rows;
+  an unseen-version validation plan estimated one row and chose an index scan.
+  Refreshing statistics now precedes validation to avoid that underestimated
+  plan on future imports. All 36 tests pass on macOS and Linux release mode
+  after the statement-order change. The active import is allowed to finish.
 - Workflow 40782467475 verified the scoped Fly token, private job creation,
   automatic machine cleanup and purge. NASR still returned HTTP 503. DOF and
   aircraft failed during initial database connection establishment while the

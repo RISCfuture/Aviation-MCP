@@ -51,8 +51,8 @@ struct AviationStore: Sendable {
       for offset in stride(from: 0, to: records.count, by: 1000) {
         try await Self.insert(Array(records[offset..<min(offset + 1000, records.count)]), on: sql)
       }
-      for version in versions { try await Self.recordValidation(version.id, on: sql) }
       try await sql.raw("ANALYZE aviation_records").run()
+      for version in versions { try await Self.recordValidation(version.id, on: sql) }
       let catalog = SourceCatalog(versions: existing + versions)
       let retained = catalog.retained(at: instant)
       let manifestID = UUID()
