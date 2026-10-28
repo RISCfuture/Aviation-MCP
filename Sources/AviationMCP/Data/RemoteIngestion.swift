@@ -30,16 +30,29 @@ struct RemoteIngestionCommand: AsyncCommand {
       return
     }
     let service = IngestionService(store: store)
+    let logger = context.application.logger
     try await service.ingest(
       source: downloads.map(\.source).joined(separator: "+"),
       checksum: Normalization.checksum(data), parserRevision: "source-download-1"
     ) {
       var batch = StagedImport(versions: [], records: [])
       for download in downloads {
+        logger.info(
+          "Downloading and normalizing source",
+          metadata: [
+            "source": "\(download.source)", "cycle": "\(download.cycle)"
+          ])
         let source = try await RemoteIngestion.stage(download)
+        logger.info(
+          "Source normalization completed",
+          metadata: [
+            "source": "\(download.source)", "records": "\(source.records.count)"
+          ])
         batch = StagedImport(
           versions: batch.versions + source.versions, records: batch.records + source.records)
       }
+      logger.info(
+        "Publishing normalized source batch", metadata: ["records": "\(batch.records.count)"])
       return batch
     }
     context.console.info("Source publication completed.")

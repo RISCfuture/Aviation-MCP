@@ -3,7 +3,7 @@ import SwiftNASR
 import Synchronization
 
 enum NASRImporter {
-  static let revision = "nasr-adapter-4/43793427d3ff4cac842981405a38aad62bb15e57"
+  static let revision = "nasr-adapter-4/2391caf97a98bce449c105db7ac75250f7ef5476"
 
   static func parse(_ archive: URL) async throws -> StagedImport {
     let cycle = try await NASRCycle.read(archive)

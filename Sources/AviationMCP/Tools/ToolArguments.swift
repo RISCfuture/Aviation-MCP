@@ -32,7 +32,7 @@ struct ToolArguments: Sendable {
 
   func instant(_ name: String, default fallback: Date? = nil) throws -> Date? {
     guard let text = try string(name) else { return fallback }
-    guard let date = ISO8601DateFormatter().date(from: text) else {
+    guard let date = ISO8601Timestamp.parse(text) else {
       throw MCPError.invalidParams("\(name) must be an ISO 8601 date with a timezone")
     }
     return date

@@ -42,13 +42,8 @@ struct WeatherHTTP: Sendable {
       headers: ["User-Agent": "aviation-mcp.org/0.1", "Accept": "application/json"],
       timeout: .seconds(10))
     let response = try await send(request)
-    if response.status == .tooManyRequests {
-      throw try await throttled(response, provider: provider, report: report)
-    }
     guard (200..<300).contains(response.status.code) else {
-      throw WeatherFailure(
-        provider: provider, reason: "Upstream returned HTTP \(response.status.code).",
-        retryAt: .now.addingTimeInterval(30), rateLimits: report)
+      throw try await upstreamFailure(response, provider: provider, report: report)
     }
     if response.status == .noContent { return .array([]) }
     guard let body = response.body, body.readableBytes <= 2_097_152 else {
@@ -58,15 +53,17 @@ struct WeatherHTTP: Sendable {
     return try JSONDecoder().decode(Value.self, from: Data(body.readableBytesView))
   }
 
-  private func throttled(_ response: ClientResponse, provider: String, report: BudgetReport)
+  private func upstreamFailure(_ response: ClientResponse, provider: String, report: BudgetReport)
     async throws -> WeatherFailure
   {
     let supplied = Self.retryDate(response.headers.first(name: "Retry-After"), now: .now)
     let retry = supplied ?? .now.addingTimeInterval(30)
     let source = supplied == nil ? "local_estimate" : "upstream"
-    try await budgets.coolDown(provider: provider, until: retry, source: source)
+    if response.status == .tooManyRequests || supplied != nil {
+      try await budgets.coolDown(provider: provider, until: retry, source: source)
+    }
     return WeatherFailure(
-      provider: provider, reason: "Upstream returned HTTP 429.", retryAt: retry,
+      provider: provider, reason: "Upstream returned HTTP \(response.status.code).", retryAt: retry,
       retrySource: source, rateLimits: report)
   }
 

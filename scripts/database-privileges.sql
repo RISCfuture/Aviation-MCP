@@ -1,6 +1,7 @@
 \set ON_ERROR_STOP on
 
 BEGIN;
+REVOKE pg_read_all_data, pg_write_all_data FROM aviation_serve, aviation_ingest;
 REVOKE ALL ON DATABASE aviation FROM PUBLIC;
 GRANT CONNECT ON DATABASE aviation TO aviation_serve, aviation_ingest;
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;

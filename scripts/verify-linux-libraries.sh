@@ -40,10 +40,10 @@ esac
 docker image inspect "$image" --format '{{index .RepoDigests 0}}' > "$output/image.txt"
 : > "$output/results.tsv"
 failed=0
-verify_library SwiftNASR 43793427d3ff4cac842981405a38aad62bb15e57
+verify_library SwiftNASR 2391caf97a98bce449c105db7ac75250f7ef5476
 verify_library SwiftCIFP e80a87c3b8edba9cd60ad00bf69b1aa4e164af46
 verify_library SwiftDOF 5630d134e371347c5302f0d0b17440103dbacbf8
 verify_library SwiftACD 9c70df543447d3c886211aa3669fead87ce41258
-verify_library SwiftMETAR 0e7d39936dd0d4c8b3c4f78d09e1a908648fc647
-verify_library SwiftGeographic 49fad28c575a8efd6e8a154fdf579982d2eeebf9
+verify_library SwiftMETAR c50ef10be12bc1a425c02861b44dcb23bf31bfc1
+verify_library SwiftGeographic 2efa7ed75bea27a4a3696abe17b8596d3c023ab6
 exit "$failed"

@@ -453,3 +453,75 @@ and `dotfiles/claude/settings.json`) were left untouched.
   shellcheck, yamllint and Markdown lint checks pass.
 - Agent tooling audit reports unmapped Resend integrations in two unrelated
   repositories; no tooling changes were made there.
+
+## Production bootstrap and signed checkpoint (2026-10-28)
+
+- Signed commit b23d391 was pushed by the user after automatic approval review
+  rejected the agent's Git push under approval policy never. GitHub has the
+  exact signed commit and started the server and six-library workflows.
+- The bootstrap x86 Linux image built and pushed at 141 MB, digest
+  `sha256:354d78d6870652bc2dfdac675b6f26fe9f8d7da4ef86aa570ccc6216b914d16d`.
+  Depot reported a timeout releasing its builder after the successful push.
+  A separate image of b23d391 is building in the ingestion registry with the
+  new Swift cache. The bootstrap image predates the latest result fixes.
+- Production migrations succeeded with the ingestion role. The migration
+  machine was removed. Aircraft acquisition/publication succeeded with 388
+  profiles; that job machine was removed. DOF machine 857597a47e4498 is still
+  importing and must be checked and removed after completion.
+- Post-migration verification exposed Fly-created memberships in
+  pg_read_all_data and pg_write_all_data. The privilege script now revokes
+  both from the serving and ingestion roles. Production checks confirm the
+  serving role can SELECT aviation records, cannot mutate them, can maintain
+  weather caches, and neither application role inherits those broad roles.
+- Private serving startup successfully validated the NOTAM role through the
+  cross-organization Flycast connection. Full private MCP query verification
+  is ongoing; no public serving deployment is claimed.
+- The Fly machine-run tool joins multiple environment entries into one value;
+  use shell exports for the bounded private probes. Its machine-update tool
+  incorrectly dispatched machine-create and rejected --wait-timeout. Failed
+  probe machines were removed, including 2862d2da0dd498 after its query check.
+  GitHub's job connector
+  returns Unknown tool; gh is being used to follow Actions.
+
+## Production NOTAM query correction (2026-10-28)
+
+- The first private MCP NOTAM query failed. PostgreSQL logs identified the
+  cursor generation's whole-table count/max scan hitting its ten-second
+  statement timeout on the 784 MB NOTAM table. Generation now uses the same
+  location/time/scope predicate as the result query. A production EXPLAIN
+  ANALYZE for the restricted aggregate used idx_notams_icao_location and took
+  5.405 ms. The existing pagination test now checks unrelated changes remain
+  resumable and matching-record changes expire the cursor; it failed before
+  the fix and passed afterward.
+- Production poll timestamps have fractional seconds. Timestamp parsing now
+  accepts them for freshness checks and client times. Both related checks
+  failed before the fix. All 34 tests pass on macOS and native Linux.
+- Replayed the 44 captured KSFO overlap records through the current local MCP
+  server using a read-only NOTAM role. Aerodrome scope returned 43 records,
+  including 38 explicitly uncertain scope matches and 34 uncertain runway
+  matches. Schedules and the exact ingestion freshness timestamp are preserved;
+  no service error or spurious freshness warning remains. Hosted verification
+  still needs the updated image.
+- All six independent GitHub Linux library jobs passed. Server/container CI
+  is still running. Ingestion commands now log normalization and publication
+  phases to make full-distribution job progress observable.
+
+## Retry metadata and rewritten dependency revisions (2026-10-28)
+
+- Concurrent commit f8897ee repinned SwiftNASR, SwiftMETAR and SwiftGeographic
+  after their upstream histories were rewritten. The library verification script
+  and NASR provenance stamp now match those revisions; SwiftCIFP remains pinned
+  and blocked pending the user's confirmation.
+- Extended the existing cache/coalescing test to HTTP 503 with Retry-After.
+  It failed because only HTTP 429 honored that header. Non-success responses now
+  preserve supplied retry times and coordinate provider cooldowns; ordinary
+  failures without a supplied retry time retain a bounded local estimate.
+- All 34 tests pass on macOS and native Linux release mode with the revised
+  pins. Swift format, SwiftLint, actionlint, hadolint, shellcheck and YAML lint
+  pass. GitHub's b23d391 Linux server and deployment-container jobs passed; its
+  macOS lint job is still queued.
+- The production DOF job stopped making observable progress before publication.
+  Its temporary source files are gone, its worker threads are idle, and no DOF
+  version is published. Thread stacks were captured on the disposable job
+  machine. A current-code Linux ingestion probe is being prepared to identify
+  the phase; neither the import nor public deployment is complete.

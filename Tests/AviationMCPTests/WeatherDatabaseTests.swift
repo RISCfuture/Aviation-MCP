@@ -89,23 +89,25 @@ extension `Transactional publication` {
       let hit = try await cache.value(key: "fixture", provider: "awc", fetch: fetch)
       #expect(hit.cacheHit)
       #expect(await counter.count == 1)
-      let http = WeatherHTTP(
-        cache: cache, budgets: ProviderBudgets(database: store.database)
-      ) { _ in
-        await counter.increment()
-        return ClientResponse(status: .tooManyRequests, headers: ["Retry-After": "60"])
-      }
-      for _ in 0..<2 {
-        let failure = await #expect(throws: WeatherFailure.self) {
-          try await http.get(
-            provider: "awc", url: "https://example.invalid/weather", units: 1,
-            limits: [.init(period: .minute, units: 5)])
+      for status in [HTTPStatus.tooManyRequests, .serviceUnavailable] {
+        let http = WeatherHTTP(
+          cache: cache, budgets: ProviderBudgets(database: store.database)
+        ) { _ in
+          await counter.increment()
+          return ClientResponse(status: status, headers: ["Retry-After": "60"])
         }
-        #expect(failure?.retrySource == "upstream")
-        #expect(failure?.retryAt.map { $0 > .now } == true)
-        #expect(failure?.rateLimits?.tracking == "local_estimate")
+        for _ in 0..<2 {
+          let failure = await #expect(throws: WeatherFailure.self) {
+            try await http.get(
+              provider: "fixture-\(status.code)", url: "https://example.invalid/weather", units: 1,
+              limits: [.init(period: .minute, units: 5)])
+          }
+          #expect(failure?.retrySource == "upstream")
+          #expect(failure?.retryAt.map { $0 > .now } == true)
+          #expect(failure?.rateLimits?.tracking == "local_estimate")
+        }
       }
-      #expect(await counter.count == 2)
+      #expect(await counter.count == 3)
     }
   }
 

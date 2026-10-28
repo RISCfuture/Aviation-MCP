@@ -65,3 +65,33 @@ extension `Transactional publication` {
     return airport
   }
 }
+
+extension `Transactional publication` {
+  static func prepareNOTAMs(on sql: any SQLDatabase) async throws {
+    try await sql.raw(
+      """
+      CREATE TABLE notams(notam_id text, icao_location text, effective_start timestamptz,
+        effective_end timestamptz, schedule text, notam_text text, scope text,
+        updated_at timestamptz DEFAULT now(), q_line jsonb)
+      """
+    ).run()
+    try await sql.raw(
+      """
+      CREATE TABLE ingestion_state(key text, value text, updated_at timestamptz DEFAULT now())
+      """
+    ).run()
+    try await sql.raw(
+      """
+      INSERT INTO notams VALUES
+        ('A','KSFO','2026-10-28','2026-10-30','DAILY 0800-1000','RWY 28L CLOSED','A',now(),NULL),
+        ('B','KSFO','2026-10-28',NULL,NULL,'APRON CONSTRUCTION',NULL,now(),NULL),
+        ('C','KSFO','2026-10-30',NULL,NULL,'FUTURE WORK','A',now(),NULL)
+      """
+    ).run()
+    let timestamp = ISO8601DateFormatter()
+    timestamp.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    try await sql.raw(
+      "INSERT INTO ingestion_state(key,value) VALUES ('last_poll_time',\(bind: timestamp.string(from: .now)))"
+    ).run()
+  }
+}

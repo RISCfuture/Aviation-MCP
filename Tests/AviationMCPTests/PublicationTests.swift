@@ -177,29 +177,7 @@ extension `Transactional publication` {
   func `includes overlapping NOTAMs and preserves uncertain schedules and context`() async throws {
     try await withDatabase { store in
       let sql = try store.database.sqlDatabase()
-      try await sql.raw(
-        """
-        CREATE TABLE notams(notam_id text, icao_location text, effective_start timestamptz,
-          effective_end timestamptz, schedule text, notam_text text, scope text,
-          updated_at timestamptz DEFAULT now(), q_line jsonb)
-        """
-      ).run()
-      try await sql.raw(
-        """
-        CREATE TABLE ingestion_state(key text, value text, updated_at timestamptz DEFAULT now())
-        """
-      ).run()
-      try await sql.raw(
-        """
-        INSERT INTO notams VALUES
-          ('A','KSFO','2026-10-28','2026-10-30','DAILY 0800-1000','RWY 28L CLOSED','A',now(),NULL),
-          ('B','KSFO','2026-10-28',NULL,NULL,'APRON CONSTRUCTION',NULL,now(),NULL),
-          ('C','KSFO','2026-10-30',NULL,NULL,'FUTURE WORK','A',now(),NULL)
-        """
-      ).run()
-      try await sql.raw(
-        "INSERT INTO ingestion_state(key,value) VALUES ('last_poll_time',\(bind: Date.now.ISO8601Format()))"
-      ).run()
+      try await Self.prepareNOTAMs(on: sql)
       let queries = NOTAMQueries(database: store.database)
       let result = try await queries.search(
         ToolArguments([
@@ -213,6 +191,25 @@ extension `Transactional publication` {
       #expect(result.results.last?.objectValue?["scope_match"] == "uncertain")
       #expect(result.results.last?.objectValue?["scope_explanation"]?.stringValue?.isEmpty == false)
       #expect(result.liveSources.first?.provider == "notams")
+      #expect(!result.warnings.contains { $0.contains("freshness") })
+      var page: [String: Value] = [
+        "location": "KSFO", "start": "2026-10-29T15:00:00.000Z", "end": "2026-10-29T19:00:00Z",
+        "limit": 1
+      ]
+      let first = try await queries.search(ToolArguments(page))
+      page["cursor"] = .string(try #require(first.nextCursor))
+      try await sql.raw(
+        "UPDATE notams SET updated_at = now() + INTERVAL '1 hour' WHERE notam_id = 'C'"
+      ).run()
+      let second = try await queries.search(ToolArguments(page))
+      #expect(second.results.first?.objectValue?["id"] == "B")
+      try await sql.raw(
+        "UPDATE notams SET updated_at = now() + INTERVAL '2 hours' WHERE notam_id = 'B'"
+      ).run()
+      let continuation = page
+      await #expect(throws: StorageError.self) {
+        try await queries.search(ToolArguments(continuation))
+      }
     }
   }
 

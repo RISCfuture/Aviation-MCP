@@ -16,7 +16,7 @@ struct NOTAMQueries: Sendable {
       let poll = try await sql.raw("SELECT value FROM ingestion_state WHERE key = 'last_poll_time'")
         .first(decodingColumn: "value", as: String.self)
       let generation =
-        try await sql.raw("SELECT concat(count(*),':',max(updated_at)) AS token FROM notams")
+        try await sql.raw(filter.generation)
         .first(decodingColumn: "token", as: String.self) ?? "empty"
       let token = (poll ?? "unknown") + generation
       if let cursor = filter.cursor,
@@ -45,7 +45,7 @@ struct NOTAMQueries: Sendable {
   }
 
   private func annotate(_ result: inout ToolResult, filter: NOTAMFilter, poll: String?, now: Date) {
-    if poll.flatMap({ ISO8601DateFormatter().date(from: $0) }).map({
+    if poll.flatMap(ISO8601Timestamp.parse).map({
       now.timeIntervalSince($0) <= freshness
     }) != true {
       result.warnings.append(
@@ -96,13 +96,26 @@ private struct NOTAMFilter: Sendable {
     var query: SQLQueryString = """
       SELECT notam_id, icao_location, effective_start, effective_end, schedule, notam_text, scope,
         q_line::text AS q_line, updated_at
-      FROM notams WHERE icao_location = \(bind: location) AND effective_start < \(bind: end)
+      """
+    query += predicate
+    query += " ORDER BY notam_id LIMIT \(bind: limit + 1) OFFSET \(bind: cursor?.offset ?? 0)"
+    return query
+  }
+
+  var generation: SQLQueryString {
+    var query: SQLQueryString = "SELECT concat(count(*),':',max(updated_at)) AS token"
+    query += predicate
+    return query
+  }
+
+  private var predicate: SQLQueryString {
+    var query: SQLQueryString = """
+       FROM notams WHERE icao_location = \(bind: location) AND effective_start < \(bind: end)
         AND (effective_end IS NULL OR effective_end > \(bind: start))
       """
     if let scope {
       query += " AND (scope IS NULL OR btrim(scope) = '' OR scope LIKE \(bind: "%" + scope + "%"))"
     }
-    query += " ORDER BY notam_id LIMIT \(bind: limit + 1) OFFSET \(bind: cursor?.offset ?? 0)"
     return query
   }
 
