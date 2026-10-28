@@ -35,7 +35,7 @@ struct WeatherCache: Sendable {
   }
 
   private func claim(key: String, provider: String) async throws -> Claim {
-    try await database.transaction { database in
+    try await database.withSQLTransaction { database in
       let sql = try database.sqlDatabase()
       try await sql.raw(
         """

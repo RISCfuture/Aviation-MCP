@@ -14,7 +14,7 @@ struct AdmissionLimiter: Sendable {
   var burst: Double = 20
 
   func admit(key: String) async throws -> AdmissionDecision {
-    try await database.transaction { database in
+    try await database.withSQLTransaction { database in
       let sql = try database.sqlDatabase()
       try await sql.raw("SET LOCAL statement_timeout = '10s'").run()
       try await sql.raw(

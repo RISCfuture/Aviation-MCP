@@ -28,7 +28,7 @@ struct AviationStore: Sendable {
   func withSnapshot<Result: Sendable>(
     _ operation: @escaping @Sendable (any SQLDatabase, SourceSnapshot) async throws -> Result
   ) async throws -> Result {
-    try await database.transaction { database in
+    try await database.withSQLTransaction { database in
       let sql = try database.sqlDatabase()
       try await sql.raw("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY").run()
       try await sql.raw("SET LOCAL statement_timeout = '10s'").run()
@@ -40,7 +40,7 @@ struct AviationStore: Sendable {
 
   func publish(_ versions: [SourceVersion], records: [AviationRecord]) async throws {
     try Self.validate(versions, records: records)
-    try await database.transaction { database in
+    try await database.withSQLTransaction { database in
       let sql = try database.sqlDatabase()
       try await sql.raw("SELECT pg_advisory_xact_lock(13799201)").run()
       let instant = try await Self.instant(on: sql)
@@ -76,7 +76,7 @@ struct AviationStore: Sendable {
   }
 
   func purge() async throws {
-    try await database.transaction { database in
+    try await database.withSQLTransaction { database in
       let sql = try database.sqlDatabase()
       try await sql.raw("SELECT pg_advisory_xact_lock(13799201)").run()
       try await Self.purge(on: sql)

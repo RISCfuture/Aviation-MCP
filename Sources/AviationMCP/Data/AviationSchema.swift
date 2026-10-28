@@ -102,10 +102,3 @@ struct AviationSchema: AsyncMigration {
     """
   ]
 }
-
-extension Database {
-  func sqlDatabase() throws -> any SQLDatabase {
-    guard let sql = self as? any SQLDatabase else { throw StorageError.requiresPostgreSQL }
-    return sql
-  }
-}

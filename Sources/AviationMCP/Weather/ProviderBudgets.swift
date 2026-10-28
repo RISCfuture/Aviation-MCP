@@ -59,7 +59,7 @@ struct ProviderBudgets: Sendable {
       limits.allSatisfy({ $0.units.isFinite && $0.units > 0 }),
       Set(limits.map(\.period)).count == limits.count
     else { throw StorageError.invalidImport("Invalid provider budget configuration.") }
-    return try await database.transaction { database in
+    return try await database.withSQLTransaction { database in
       let sql = try database.sqlDatabase()
       try await sql.raw(
         "SELECT pg_advisory_xact_lock(hashtextextended(\(bind: provider), 13799202))"

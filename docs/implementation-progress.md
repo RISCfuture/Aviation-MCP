@@ -2,6 +2,19 @@
 
 ## Final review rulings (2026-10-28)
 
+- Implemented the user-authorized server-side PostgresNIO workaround without
+  modifying upstream code. SQLKit submits encoded queries through a connection
+  guard on the PostgreSQL event loop. Closed connections fail immediately;
+  SQL transactions preserve the original error when rollback fails and discard
+  the connection. All nine application SQL transaction sites use this path.
+- All 35 tests passed on macOS and Linux release mode, including a closed-query,
+  failed-rollback and pool-recovery check. The abrupt Linux database-kill probe
+  also completed successfully in 2.819 seconds, including application shutdown;
+  the same fault previously left rollback pending indefinitely. No transaction
+  is automatically retried after an uncertain commit outcome.
+- The lifecycle image for 237bc00 built and pushed successfully as
+  `registry.fly.io/aviation-mcp-ingest@sha256:ced463323de3938118e4ee2405a1fd1cd9e8c33a82534a24df9882498741c0b0`.
+  A full Fly import and public cold-start checks remain outstanding.
 - Linux release build and all 34 tests passed for f47bfee. Its 141 MB image is
   `registry.fly.io/aviation-mcp-ingest@sha256:24a7091c6afde38497cdfb3b880fcca28699a981258468be23f0c73d6df739d5`.
   Fly's API returned intermittent HTTP 503 before a successful build/push.
@@ -18,9 +31,9 @@
   rollback remains pending on the closed connection. The phase marker was
   `query failed; rollback pending`; PostgreSQL TCP sockets were already closed.
   The reproduction is documented in postgres-nio's local package directory as
-  `AVIATION-MCP-BUGS.md`. No upstream code was changed. The user was asked whether
-  to fix it upstream or use a server-side workaround. Public deployment remains
-  gated on connection-loss handling and full cold-start verification.
+  `AVIATION-MCP-BUGS.md`. No upstream code was changed. The user selected the
+  server-side workaround described above. Public deployment remains gated on
+  full cold-start verification.
 - Stopped and removed stalled DOF machine 811093f94de668. Its normalized data
   was never published. The lifecycle mitigation still requires a full Fly import.
 - All 34 tests pass on macOS and Linux release mode with the lifecycle change;

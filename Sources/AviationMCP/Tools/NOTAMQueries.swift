@@ -9,7 +9,7 @@ struct NOTAMQueries: Sendable {
 
   func search(_ arguments: ToolArguments) async throws -> ToolResult {
     let filter = try NOTAMFilter(arguments)
-    return try await database.transaction { database in
+    return try await database.withSQLTransaction { database in
       let sql = try database.sqlDatabase()
       try await sql.raw("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY").run()
       try await sql.raw("SET LOCAL statement_timeout = '10s'").run()

@@ -2,6 +2,7 @@ import Fluent
 import FluentPostgresDriver
 import Foundation
 import MCP
+import PostgresKit
 import SQLKit
 import Testing
 import Vapor
@@ -11,6 +12,28 @@ import VaporTesting
 
 @Suite(.serialized, .enabled(if: ProcessInfo.processInfo.environment["TEST_DATABASE_URL"] != nil))
 struct `Transactional publication` {
+  @Test
+  func `returns the original failure when rollback loses its connection`() async throws {
+    try await withDatabase { store async throws in
+      do {
+        try await store.database.withSQLTransaction { database in
+          let postgres = try #require(database as? any PostgresDatabase)
+          try await postgres.withConnection { $0.close() }.get()
+          let sql = try database.sqlDatabase()
+          await #expect(throws: ChannelError.self) {
+            try await sql.raw("SELECT 1").run()
+          }
+          throw CancellationError()
+        }
+        Issue.record("A failed transaction returned successfully")
+      } catch {
+        #expect(error is CancellationError)
+      }
+      let snapshot = try await store.snapshot()
+      #expect(snapshot.versions.isEmpty)
+    }
+  }
+
   @Test
   func `publishes complete source pairs and rolls back invalid batches`() async throws {
     try await withDatabase { store in
