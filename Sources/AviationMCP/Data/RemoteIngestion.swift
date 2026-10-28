@@ -77,8 +77,8 @@ enum RemoteIngestion {
     }
     if sources.contains("cifp") {
       throw StorageError.invalidImport(
-        "The pinned SwiftCIFP parser has unresolved procedure-role, altitude, RNP and airspace defects. "
-          + "Correct the parser and revalidate its adapter before enabling remote publication.")
+        "The updated SwiftCIFP adapter is pending full-distribution acceptance. "
+          + "Resolve all rejected source records before enabling remote publication.")
     }
   }
 

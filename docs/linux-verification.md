@@ -11,12 +11,12 @@ Digest: `sha256:6304481cf2717966b7ba175162e397ea2f2cc3161909f2b2a5cf40036079a0f7
 
 | Library | Revision | Result |
 | --- | --- | --- |
-| SwiftNASR | `43793427d3ff4cac842981405a38aad62bb15e57` | Pass |
-| SwiftCIFP | `e80a87c3b8edba9cd60ad00bf69b1aa4e164af46` | Pass |
-| SwiftDOF | `5630d134e371347c5302f0d0b17440103dbacbf8` | Pass |
-| SwiftACD | `9c70df543447d3c886211aa3669fead87ce41258` | Pass |
-| SwiftMETAR | `0e7d39936dd0d4c8b3c4f78d09e1a908648fc647` | Pass |
-| SwiftGeographic | `49fad28c575a8efd6e8a154fdf579982d2eeebf9` | Pass |
+| SwiftNASR | `a4d56cc686e148460a200eeff5751c2beed36847` | Pass |
+| SwiftCIFP | `d57301f98db1b850b9c57d823c7f7dcf996fc730` | Pass |
+| SwiftDOF | `5afe24c34e7ee72c9f31ae8ac23e754bc6ba1217` | Pass |
+| SwiftACD | `2d01856fb7b78b11fe614e01b5c4c4483add09f6` | Pass |
+| SwiftMETAR | `649e70912e0c1cc21c275545bd26af126bd79326` | Pass |
+| SwiftGeographic | `5b166c0730dc3dd7ba85242ab2696556202d73a9` | Pass |
 
 Command: `scripts/verify-linux-libraries.sh`, with a worker-specific
 `VERIFICATION_OUTPUT` directory under `.build/`.
@@ -25,3 +25,8 @@ Upstream warnings included unsupported processing of string catalogs on Linux,
 unnecessary `unsafe` markers, ZIPFoundation deployment-target deprecations and an
 unused SwiftMETAR package dependency. Builds completed with exit code zero;
 warning-free compatibility is not claimed.
+
+The server also passed all 36 Swift Testing cases against PostGIS in Linux
+release mode and on macOS with these revisions. Full-distribution CIFP staging
+still rejects one record in cycle 2610 and three in 2611; build success does
+not establish complete navigation coverage.

@@ -94,8 +94,8 @@ APP_ROLE=ingest aviation-mcp publish-bundle BUNDLE-JSON
 APP_ROLE=ingest aviation-mcp purge
 ```
 
-Publication inserts the batch, computes source counts, refreshes PostgreSQL
-statistics, swaps the manifest and purges obsolete data in one transaction.
+Publication inserts the batch, refreshes PostgreSQL statistics, computes source
+counts, swaps the manifest and purges obsolete data in one transaction.
 Failed transactions leave the active manifest unchanged and record a failed
 ingestion run. Only current and next versions are retained. Expired data is
 unavailable on queries even if scheduled maintenance has not run; clients must
@@ -117,8 +117,9 @@ If cleanup fails, the script reports the machine ID for operator removal.
 `ingest-sources` verifies download validators and parsed effective dates, records
 download provenance, and skips an unchanged release only when its parser
 revision and source validators match. Remote navigation publication currently
-fails explicitly because of the confirmed SwiftCIFP defects. Correct and verify
-the parser before removing that publication guard. Other sources remain
+fails explicitly while SwiftCIFP rejects the KUIN R31 qualifier in both checked
+cycles and the orphaned KOQU V34 transitions in cycle 2611. Resolve these
+coverage failures before removing the publication guard. Other sources remain
 independent. The workflow also purges expired data, even after ingestion failure.
 
 ## Verification and deployment files

@@ -3,7 +3,7 @@ import MCP
 import SwiftDOF
 
 enum DOFImporter {
-  static let revision = "dof-adapter-2/5630d134e371347c5302f0d0b17440103dbacbf8"
+  static let revision = "dof-adapter-3/5afe24c34e7ee72c9f31ae8ac23e754bc6ba1217"
 
   static func parse(
     _ data: Data, effectiveFrom: Date, effectiveUntil: Date
@@ -11,8 +11,8 @@ enum DOFImporter {
     var failures = 0
     let dof = try DOF(data: data, errorCallback: { _, _ in failures += 1 })
     guard failures == 0, !dof.all.isEmpty,
-      let currency = dof.cycle.firstDate,
-      effectiveFrom >= currency, effectiveUntil > effectiveFrom
+      let currency = dof.cycle.currencyDate,
+      effectiveFrom == dof.cycle.releaseDate, effectiveUntil == dof.cycle.expirationDate
     else {
       throw StorageError.invalidImport(
         "DOF import is empty, has invalid dates or contains \(failures) rejected records.")

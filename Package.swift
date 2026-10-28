@@ -18,25 +18,25 @@ let package = Package(
   dependencies: [
     .package(
       url: "https://github.com/RISCfuture/SwiftNASR.git",
-      revision: "2391caf97a98bce449c105db7ac75250f7ef5476"),
+      revision: "a4d56cc686e148460a200eeff5751c2beed36847"),
     .package(
       url: "https://github.com/RISCfuture/SwiftCIFP.git",
-      revision: "e80a87c3b8edba9cd60ad00bf69b1aa4e164af46"),
+      revision: "d57301f98db1b850b9c57d823c7f7dcf996fc730"),
     .package(
       url: "https://github.com/RISCfuture/SwiftDOF.git",
-      revision: "5630d134e371347c5302f0d0b17440103dbacbf8"),
+      revision: "5afe24c34e7ee72c9f31ae8ac23e754bc6ba1217"),
     .package(
       url: "https://github.com/RISCfuture/SwiftACD.git",
-      revision: "9c70df543447d3c886211aa3669fead87ce41258"),
+      revision: "2d01856fb7b78b11fe614e01b5c4c4483add09f6"),
     .package(
       url: "https://github.com/RISCfuture/SwiftMETAR.git",
-      revision: "c50ef10be12bc1a425c02861b44dcb23bf31bfc1"),
+      revision: "649e70912e0c1cc21c275545bd26af126bd79326"),
     .package(
       url: "https://github.com/RISCfuture/SwiftGeographic.git",
-      revision: "2efa7ed75bea27a4a3696abe17b8596d3c023ab6"),
+      revision: "5b166c0730dc3dd7ba85242ab2696556202d73a9"),
 
     .package(url: "https://github.com/vapor/vapor.git", exact: "4.122.3"),
-    .package(url: "https://github.com/RISCfuture/StreamingCSV.git", exact: "2.1.2"),
+    .package(url: "https://github.com/RISCfuture/StreamingCSV.git", exact: "3.0.0"),
     .package(url: "https://github.com/weichsel/ZIPFoundation.git", exact: "0.9.20"),
     .package(url: "https://github.com/vapor/fluent.git", exact: "4.13.0"),
     .package(url: "https://github.com/vapor/fluent-postgres-driver.git", exact: "2.14.0"),

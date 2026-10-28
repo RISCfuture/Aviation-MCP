@@ -3,16 +3,25 @@ import MCP
 import SwiftCIFP
 
 enum CIFPImporter {
-  static let revision = "cifp-adapter-1/e80a87c3b8edba9cd60ad00bf69b1aa4e164af46"
+  static let revision = "cifp-adapter-2/d57301f98db1b850b9c57d823c7f7dcf996fc730"
 
   static func parse(_ bytes: Data) async throws -> StagedImport {
     var failures = 0
-    let cifp = try CIFP(data: bytes, errorCallback: { _, _ in failures += 1 })
+    var diagnostics: [String] = []
+    let cifp = try CIFP(
+      data: bytes,
+      errorCallback: { error, line in
+        failures += 1
+        if diagnostics.count < 10 {
+          diagnostics.append("Line \(line.map(String.init) ?? "unknown"): \(error)")
+        }
+      })
     guard failures == 0, !cifp.airports.isEmpty,
       let start = cifp.cycle.effectiveDate, let end = cifp.cycle.expirationDate
     else {
       throw StorageError.invalidImport(
-        "CIFP is empty, has invalid dates or contains \(failures) rejected records.")
+        "CIFP is empty, has invalid dates or contains \(failures) rejected records. "
+          + diagnostics.joined(separator: "; "))
     }
     let version = SourceVersion(
       id: UUID(), source: .cifp, cycle: String(start.ISO8601Format().prefix(10)),
@@ -21,7 +30,7 @@ enum CIFPImporter {
       validation: [
         "outcome": "blocked",
         "reason":
-          "The pinned parser has confirmed procedure-role, altitude, RNP and airspace decoding defects."
+          "The updated CIFP adapter is pending full-distribution acceptance."
       ])
     let linked = await cifp.linked()
     var records: [AviationRecord] = []
@@ -39,12 +48,17 @@ enum CIFPImporter {
     for approach in airport.approaches {
       var record = try await ProcedureDefinition(
         identifier: approach.identifier, airport: airport.id, type: "approach",
-        routeType: approach.routeType.map { String($0.rawValue) },
+        routeType: CIFPRestrictions.routeType(approach.routeType),
         transition: approach.transitionId,
         runways: approach.runwayId.map { [$0] } ?? [], legs: approach.legs,
         missed: approach.missedApproachLegs
       ).record(versionID: versionID)
       record.data["approach_type"] = .string(String(approach.approachType.rawValue))
+      record.data["navigation_requirement"] = approach.navigationRequirement.map {
+        .string(String($0.rawValue))
+      }
+      record.data["landing"] = approach.landing.map { .string(String($0.rawValue)) }
+      record.data["levels_of_service"] = approach.levelsOfService.map(CIFPRestrictions.levels)
       record.supplemental = try Normalization.supplemental(approach)
       records.append(record)
     }

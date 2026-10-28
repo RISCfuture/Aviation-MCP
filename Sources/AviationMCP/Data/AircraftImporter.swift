@@ -4,7 +4,7 @@ import SwiftACD
 import Synchronization
 
 enum AircraftImporter {
-  static let revision = "aircraft-adapter-1/9c70df543447d3c886211aa3669fead87ce41258"
+  static let revision = "aircraft-adapter-2/2d01856fb7b78b11fe614e01b5c4c4483add09f6"
 
   static func parse(
     directory: URL, release: String, publishedAt: Date

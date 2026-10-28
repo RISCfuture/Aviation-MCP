@@ -1,5 +1,35 @@
 # Hosted Aviation MCP implementation
 
+## Updated dependencies and ingestion verification (2026-10-28)
+
+- The user confirmed all upstream dependencies were updated. All six new pinned
+  aviation libraries passed fresh Linux release target builds. StreamingCSV
+  advances to 3.0.0 as required by SwiftNASR 5.0.0.
+- The server adapters preserve optional runway paving, separate DOF currency
+  and release dates, CIFP true/magnetic courses, distance/time units, published
+  approach roles, route qualifiers, service authorizations, airspace end markers
+  and separate procedure/glide-slope/vertical-path altitudes. Source parser
+  provenance identifies the new revisions.
+- All 36 tests pass on macOS and Linux release mode against PostGIS. Swift
+  format, SwiftLint, actionlint, hadolint, shellcheck and YAML lint pass.
+- Full CIFP staging still fails: cycle 2610 rejects KUIN R31 UYAPI's qualifier
+  `A`; cycle 2611 rejects that record and the KOQU V34 SEY/PVD transitions.
+  The latter have no final approach route in the source. Evidence is appended
+  to SwiftCIFP's local `AVIATION-MCP-BUGS.md`; these are coverage blockers, not
+  all confirmed parser defects. Publication remains disabled for the pair.
+- A separate diagnostic confirms the corrected KOAK I12 roles in both files:
+  RAIDR is an IAF at 5,000 feet MSL, PLAZA is the FAF, and RW12 is the MAP.
+  The transition requires GPS while the common route requires DME. This is
+  fixture verification, not a current operational flight briefing.
+- Production DOF publication completed with 656,884 spatial records at
+  23:11:13 UTC, version 53178D34-1F20-49F1-8611-30820A5CEADC. The job exited
+  zero and was destroyed. Aircraft retains 388 records. The first production
+  spatial plan used the GiST index and took 3,796.665 ms with cold data; the
+  earlier local timing does not describe production latency.
+- Full staging with the new parsers produced 171,330 current NASR records,
+  171,436 next-cycle NASR records and 656,884 DOF obstacles. Public serving
+  remains undeployed while the updated deployment image builds.
+
 ## Final review rulings (2026-10-28)
 
 - Image 30d2651 started DOF normalization successfully on Fly; the aircraft

@@ -90,6 +90,13 @@ struct `Normalized source imports` {
     var fields = try JSONDecoder().decode([String: Value].self, from: Data(encoded.utf8))
     fields["altitudeConstraint"] = try .encoded(AltitudeConstraint.atOrAbove(.feet(3000, .msl)))
     fields["speedConstraint"] = try .encoded(SpeedConstraint.atOrBelow(knots: 210))
+    fields["course"] = .object(["degrees": 123, "reference": "T"])
+    fields["length"] = try .encoded(
+      ProcedureLeg.Length.time(.init(value: 90, unit: .seconds)))
+    fields["waypointDescription"] = .object([
+      "fixType": try .encoded(WaypointDescriptionCode.FixType.essential),
+      "approachRole": try .encoded(WaypointDescriptionCode.ApproachRole.initialApproachFix)
+    ])
     let leg = try JSONDecoder().decode(ProcedureLeg.self, from: JSONEncoder().encode(fields))
     let value = CIFPRestrictions.leg(leg, coordinate: nil)
     #expect(value.objectValue?["altitude_constraint"]?.objectValue?["code"] == "+")
@@ -99,6 +106,15 @@ struct `Normalized source imports` {
     #expect(value.objectValue?["speed_constraint"]?.objectValue?["knots"] == 210)
     #expect(
       CIFPRestrictions.altitude(.flightLevel(180)).objectValue?["datum"] == "standard_pressure")
+    #expect(value.objectValue?["course"] == .object(["degrees": .double(123), "reference": "true"]))
+    #expect(value.objectValue?["length"] == .object(["value": 1.5, "unit": "min"]))
+    #expect(value.objectValue?["is_initial_approach_fix"] == true)
+    #expect(value.objectValue?["waypoint_description"] == "E  A")
+    let glideSlope = CIFPRestrictions.constraint(
+      .atOrAboveWithGlideSlope(.feet(2000, .msl), glideSlope: .feet(2200, .msl)))
+    #expect(glideSlope.objectValue?["altitude"]?.objectValue?["value"] == 2000)
+    #expect(glideSlope.objectValue?["glide_slope_altitude"]?.objectValue?["value"] == 2200)
+    #expect(glideSlope.objectValue?["upper"] == nil)
     var path = ProcedurePath()
     path.append(
       sequence: 10, terminator: "IF",

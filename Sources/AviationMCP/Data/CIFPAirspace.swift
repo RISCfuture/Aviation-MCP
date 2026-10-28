@@ -21,7 +21,7 @@ enum CIFPAirspace {
         multiple: airspace.multipleCode, type: "special_use", boundaries: airspace.boundaries,
         lower: airspace.lowerLimit, upper: airspace.upperLimit
       ).record(versionID: versionID)
-      record.data["restrictive_type"] = .string(String(airspace.restrictiveType.rawValue))
+      record.data["restrictive_type"] = .string(String(airspace.kind.rawValue))
       record.supplemental = try Normalization.supplemental(airspace)
       records.append(record)
     }
@@ -51,6 +51,7 @@ private struct AirspaceDefinition {
         boundaries.sorted { $0.sequenceNumber < $1.sequenceNumber }.map { boundary in
           Normalization.object([
             "sequence": .int(boundary.sequenceNumber),
+            "is_end_of_description": .bool(boundary.isEndOfDescription),
             "via": boundary.boundaryVia.map { .string(String($0.rawValue)) },
             "position": boundary.coordinate.map {
               Normalization.point(latitude: $0.latitudeDeg, longitude: $0.longitudeDeg)

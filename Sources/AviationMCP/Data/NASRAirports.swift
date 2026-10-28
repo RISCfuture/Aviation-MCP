@@ -33,7 +33,8 @@ enum NASRAirports {
     Normalization.object([
       "identifier": .string(runway.identification),
       "length_ft": NASRNormalization.uint(runway.lengthFt),
-      "width_ft": NASRNormalization.uint(runway.widthFt), "paved": .bool(runway.isPaved),
+      "width_ft": NASRNormalization.uint(runway.widthFt),
+      "paved": runway.isPaved.map(Value.bool) ?? .null,
       "materials": .array(runway.materials.map(\.rawValue).sorted().map(Value.string)),
       "ends": .array(
         [end(runway.baseEnd, opposite: runway.reciprocalEnd)]
