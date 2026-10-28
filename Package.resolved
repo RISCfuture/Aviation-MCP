@@ -407,7 +407,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/RISCfuture/SwiftGeographic.git",
       "state" : {
-        "revision" : "49fad28c575a8efd6e8a154fdf579982d2eeebf9"
+        "revision" : "2efa7ed75bea27a4a3696abe17b8596d3c023ab6"
       }
     },
     {
@@ -415,7 +415,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/RISCfuture/SwiftMETAR.git",
       "state" : {
-        "revision" : "0e7d39936dd0d4c8b3c4f78d09e1a908648fc647"
+        "revision" : "c50ef10be12bc1a425c02861b44dcb23bf31bfc1"
       }
     },
     {
@@ -423,7 +423,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/RISCfuture/SwiftNASR.git",
       "state" : {
-        "revision" : "43793427d3ff4cac842981405a38aad62bb15e57"
+        "revision" : "2391caf97a98bce449c105db7ac75250f7ef5476"
       }
     },
     {

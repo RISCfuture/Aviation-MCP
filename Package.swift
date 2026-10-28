@@ -18,7 +18,7 @@ let package = Package(
   dependencies: [
     .package(
       url: "https://github.com/RISCfuture/SwiftNASR.git",
-      revision: "43793427d3ff4cac842981405a38aad62bb15e57"),
+      revision: "2391caf97a98bce449c105db7ac75250f7ef5476"),
     .package(
       url: "https://github.com/RISCfuture/SwiftCIFP.git",
       revision: "e80a87c3b8edba9cd60ad00bf69b1aa4e164af46"),
@@ -30,10 +30,10 @@ let package = Package(
       revision: "9c70df543447d3c886211aa3669fead87ce41258"),
     .package(
       url: "https://github.com/RISCfuture/SwiftMETAR.git",
-      revision: "0e7d39936dd0d4c8b3c4f78d09e1a908648fc647"),
+      revision: "c50ef10be12bc1a425c02861b44dcb23bf31bfc1"),
     .package(
       url: "https://github.com/RISCfuture/SwiftGeographic.git",
-      revision: "49fad28c575a8efd6e8a154fdf579982d2eeebf9"),
+      revision: "2efa7ed75bea27a4a3696abe17b8596d3c023ab6"),
 
     .package(url: "https://github.com/vapor/vapor.git", exact: "4.122.3"),
     .package(url: "https://github.com/RISCfuture/StreamingCSV.git", exact: "2.1.2"),
