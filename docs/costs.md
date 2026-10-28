@@ -40,7 +40,7 @@ on-demand machines pay only for its running hours.
 
 The serving process opens pools and registers routes; ingestion and migrations
 are separate commands. It does not download or parse distributions at startup.
-The measured initial serving image is about 152 MB uncompressed. Both database
+The deployed serving image is about 141 MB uncompressed. Both database
 and application reside in San Jose to avoid inter-region connection latency.
 
 Database acquisition waits up to `DATABASE_WAIT_SECONDS` (15 by default), so
@@ -61,5 +61,11 @@ probe on October 28, 2026 completed `SELECT 1` after approximately seven seconds
 with no retries, starting from an automatically stopped database. Timing had
 one-second resolution. The temporary probe machine was destroyed afterward.
 This is one component measurement, not an end-to-end MCP latency guarantee.
-The serving image is still being verified. After deployment, measure the full
-request and verify eventual idle shutdown of both machines.
+A public deployment probe on October 28, 2026 stopped both serving and database
+machines, then completed `get_data_status` without retries in 9.942905 seconds
+(first byte 9.940718 seconds). The subsequent warm request took 0.311596 seconds.
+These are single observations. Fly Proxy automatically stopped the serving
+machine at 23:52:19 UTC, about six minutes after the last public test request.
+Unrelated requests for asset paths woke the app again at 23:52:42 UTC,
+interrupting the database idle-stop observation. Background internet traffic
+can therefore add runtime even without MCP tool use.

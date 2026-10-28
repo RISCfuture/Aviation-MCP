@@ -1,5 +1,35 @@
 # Hosted Aviation MCP implementation
 
+## Public deployment and cold-start verification (2026-10-28)
+
+- Signed commit 6ae4909 is pushed. The first remote build lost Depot connectivity;
+  a fresh retry completed and pushed the 141 MB image
+  `registry.fly.io/aviation-mcp-ingest@sha256:4d296887ecfc3559a47550dcbb5b528083b5a489ab975b2ac834fa0417402cbd`.
+  GitHub's `AVIATION_INGEST_IMAGE` points to this digest.
+- Deployed one serving machine, 861544ae2910d8, with zero minimum running
+  machines. `https://aviation-mcp.org/mcp` passed TLS, readiness and eight-tool
+  discovery. Public obstacle, aircraft, NOTAM, weather, parsing and geography
+  calls returned successful structured results. The disabled groups remain
+  omitted from discovery.
+- Stopping both serving and aviation database machines, then sending one MCP
+  request without retries, returned HTTP 200 in 9.942905 seconds. The warm call
+  took 0.311596 seconds. Source status correctly reports DOF/aircraft available
+  and NASR/CIFP unavailable. Fly Proxy automatically stopped the server at
+  23:52:19 UTC with exit code zero. Requests for unrelated asset paths woke it
+  again at 23:52:42 UTC, interrupting the database idle-stop observation. This
+  confirms autostart while leaving the full idle database check incomplete.
+- AWC-only and Open-Meteo-only requests selected the requested provider. A default
+  combined request preserved AWC temperature and supplemented modeled pressure
+  levels. A cached repeat preserved the same local daily budget. An unapproved
+  Origin returned HTTP 403. Metrics expose source availability, query timing,
+  ingestion outcomes and provider consumption.
+- All 388 aircraft profiles also staged with the updated SwiftACD. Public
+  periodic records retain their original parser provenance until scheduled
+  ingestion revalidates them with the new image. No ingestion machines remain.
+- All six GitHub Linux library jobs for 6ae4909 passed. Server/container CI
+  remains in progress and its lint job passed. Local Linux release/macOS suites
+  and all required linters passed before deployment.
+
 ## Updated dependencies and ingestion verification (2026-10-28)
 
 - The user confirmed all upstream dependencies were updated. All six new pinned

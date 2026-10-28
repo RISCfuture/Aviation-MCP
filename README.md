@@ -1,10 +1,18 @@
 # Aviation MCP
 
-Swift 6.4/Vapor aviation server using the official MCP SDK at `/mcp`.
-Implementation is ongoing; no hosted deployment is available yet. The local
-server supports weather, supplied-report parsing, coordinate calculations,
-source status and database-backed queries. Dataset acquisition, complete source
-mappings and acceptance parity remain in progress.
+Swift 6.4/Vapor aviation server using the official MCP SDK's stateless Streamable
+HTTP transport at **<https://aviation-mcp.org/mcp>**.
+
+The hosted server exposes eight tools for obstacles, aircraft, weather, supplied
+report parsing, NOTAMs, geography and source status. Airport, navigation,
+procedure and airspace tools remain disabled while CIFP source rejections are
+resolved. Complete source coverage and all five original acceptance cases have
+not yet been established.
+
+Serving and custom PostgreSQL/PostGIS machines are configured to stop when idle.
+An October 28, 2026 probe with both machines stopped completed its first MCP
+request in 9.94 seconds without retries; the warm request took 0.31 seconds.
+These are single measurements, not latency guarantees.
 
 ## Linux dependency verification
 

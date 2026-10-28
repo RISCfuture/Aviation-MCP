@@ -136,9 +136,10 @@ and verify container startup. The integration tests require
 `TEST_DATABASE_URL` and reset the entire `public` schema: use a disposable test
 database only.
 
-The public repository is `RISCfuture/Aviation-MCP`. The intended endpoint is
-`https://aviation-mcp.org/mcp`; the serving image is not deployed yet. Cloudflare
-apex A/AAAA records point to Fly using DNS-only mode, and the Fly TLS certificate
+The public repository is `RISCfuture/Aviation-MCP`. The deployed endpoint is
+`https://aviation-mcp.org/mcp`, with eight tools from the six enabled groups in
+`fly.toml`. Airport, navigation, procedure and airspace groups remain disabled.
+Cloudflare apex A/AAAA records point to Fly using DNS-only mode, and the Fly TLS certificate
 is active. The custom PostgreSQL 18/PostGIS database has a 10 GB encrypted
 volume. Apply `scripts/database-privileges.sql` after running migrations with
 the ingestion role to grant the serving role only its required table privileges.

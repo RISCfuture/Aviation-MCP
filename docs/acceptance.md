@@ -38,3 +38,24 @@ Prior art is [Squawk](https://github.com/neilcochran/squawk), specifically
 
 Source parity remains unverified until ingestion mappings and behavioral checks
 cover these capabilities.
+
+## Public deployment checks on October 28, 2026
+
+The deployed image for commit `6ae4909` passed TLS, readiness and eight-tool
+catalog checks. Public B738 lookup and an explicit KSFO NOTAM overlap window
+exercised cases 4 and 5. A coordinate-centered 5 NM obstacle query returned
+MSL-ordered DOF records; case 2's runway context remains blocked on paired
+NASR/CIFP publication, as do cases 1 and 3.
+
+AWC-only, Open-Meteo-only and default combined weather queries succeeded. The
+combined response kept AWC's temperature and supplemented modeled pressure
+levels, with field provenance and attribution. Repeating it used cached data
+without reducing the locally tracked Open-Meteo daily budget. Supplied METAR
+parsing, UTM/MGRS conversion and an antimeridian geodesic query also passed.
+An unapproved Origin received HTTP 403. Concurrent calls reused JSON-RPC ID 1
+and returned the corresponding independent results.
+
+The endpoint serves the already validated DOF and aircraft snapshots, retaining
+their original parser provenance. GitHub's ingestion image now includes the new
+parser pins; scheduled ingestion will revalidate and replace those snapshots.
+CIFP's known source rejections remain an explicit publication failure.
