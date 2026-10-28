@@ -12,6 +12,26 @@ import VaporTesting
 
 @Suite(.serialized, .enabled(if: ProcessInfo.processInfo.environment["TEST_DATABASE_URL"] != nil))
 struct `Transactional publication` {
+  @Test(arguments: [(true, 2), (false, 2), (true, 100)])
+  func `retries acquisition at most three times without replaying queries`(
+    beforeQuery: Bool, failures: Int
+  ) async throws {
+    let attempts = ConnectionAttempts()
+    var value: Int?
+    do {
+      value = try await SQLConnectionAcquisition.run {
+        let attempt = await attempts.advance()
+        guard attempt <= failures else { return .success(42) }
+        if beforeQuery { throw ChannelError.ioOnClosedChannel }
+        return .failure(ChannelError.ioOnClosedChannel)
+      }
+    } catch {
+      #expect(error is ChannelError)
+    }
+    #expect(await attempts.count == (beforeQuery ? 3 : 1))
+    #expect(value == (beforeQuery && failures == 2 ? 42 : nil))
+  }
+
   @Test
   func `returns the original failure when rollback loses its connection`() async throws {
     try await withDatabase { store async throws in

@@ -8,6 +8,15 @@ import VaporTesting
 
 @testable import AviationMCP
 
+actor ConnectionAttempts {
+  private(set) var count = 0
+
+  func advance() -> Int {
+    count += 1
+    return count
+  }
+}
+
 extension AviationRecord {
   static func fixture(_ version: SourceVersion) -> Self {
     Self(

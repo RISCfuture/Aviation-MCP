@@ -10,27 +10,37 @@ extension Database {
     return ConnectedSQLDatabase(database: postgres)
   }
 
-  func withSQLTransaction<Result: Sendable>(
-    _ operation: @escaping @Sendable (any Database) async throws -> Result
-  ) async throws -> Result {
-    try await withConnection { database in
-      let sql = try database.sqlDatabase()
-      try await sql.raw("BEGIN").run()
-      do {
-        let result = try await operation(database)
-        try await sql.raw("COMMIT").run()
-        return result
-      } catch {
-        do {
-          try await sql.raw("ROLLBACK").run()
-        } catch {
-          database.logger.warning("Transaction rollback failed; closing its connection")
-          if let postgres = database as? any PostgresDatabase {
-            try? await postgres.withConnection { $0.close() }.get()
-          }
+  func withSQLTransaction<Value: Sendable>(
+    _ operation: @escaping @Sendable (any Database) async throws -> Value
+  ) async throws -> Value {
+    try await SQLConnectionAcquisition.run {
+      try await withConnection { database -> Result<Value, any Error> in
+        do { return .success(try await database.performSQLTransaction(operation)) } catch {
+          return .failure(error)
         }
-        throw error
       }
+    }
+  }
+
+  private func performSQLTransaction<Value: Sendable>(
+    _ operation: @Sendable (any Database) async throws -> Value
+  ) async throws -> Value {
+    let sql = try sqlDatabase()
+    try await sql.raw("BEGIN").run()
+    do {
+      let result = try await operation(self)
+      try await sql.raw("COMMIT").run()
+      return result
+    } catch {
+      do {
+        try await sql.raw("ROLLBACK").run()
+      } catch {
+        logger.warning("Transaction rollback failed; closing its connection")
+        if let postgres = self as? any PostgresDatabase {
+          try? await postgres.withConnection { $0.close() }.get()
+        }
+      }
+      throw error
     }
   }
 }
@@ -45,21 +55,30 @@ private struct ConnectedSQLDatabase: SQLDatabase {
   func execute(
     sql query: any SQLExpression, _ onRow: @escaping @Sendable (any SQLRow) -> Void
   ) -> EventLoopFuture<Void> {
-    database.withConnection { connection in
-      connection.eventLoop.flatSubmit {
-        ActivePostgresConnection(connection: connection).sql().execute(sql: query, onRow)
+    eventLoop.makeFutureWithTask {
+      try await SQLConnectionAcquisition.run {
+        try await database.withConnection { connection in
+          connection.eventLoop.flatSubmit {
+            ActivePostgresConnection(connection: connection).sql().execute(sql: query, onRow)
+          }.map { Result<Void, any Error>.success(()) }
+            .flatMapErrorThrowing { .failure($0) }
+        }.get()
       }
     }
   }
 
-  func withSession<Result: Sendable>(
-    _ operation: @escaping @Sendable (any SQLDatabase) async throws -> Result
-  ) async throws -> Result {
-    try await database.withConnection { connection in
-      connection.eventLoop.makeFutureWithTask {
-        try await operation(ConnectedSQLDatabase(database: connection))
-      }
-    }.get()
+  func withSession<Value: Sendable>(
+    _ operation: @escaping @Sendable (any SQLDatabase) async throws -> Value
+  ) async throws -> Value {
+    try await SQLConnectionAcquisition.run {
+      try await database.withConnection { connection in
+        connection.eventLoop.makeFutureWithTask { () -> Result<Value, any Error> in
+          do {
+            return .success(try await operation(ConnectedSQLDatabase(database: connection)))
+          } catch { return .failure(error) }
+        }
+      }.get()
+    }
   }
 }
 

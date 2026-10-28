@@ -2,15 +2,24 @@
 
 ## Final review rulings (2026-10-28)
 
+- Workflow 40782467475 verified the scoped Fly token, private job creation,
+  automatic machine cleanup and purge. NASR still returned HTTP 503. DOF and
+  aircraft failed during initial database connection establishment while the
+  Fly proxy was waking; neither process hung and no DOF data was published.
+- SQL connection acquisition now retries transient setup failures at most three
+  times, with backoff and a 15-second window for starting another attempt.
+  Errors from work on an already leased connection are returned without replay,
+  including uncertain commit outcomes. All 36 tests pass on macOS and Linux
+  release mode; the retry/exhaustion/non-replay cases were verified RED to GREEN.
+  A new Fly ingestion run is still required to validate this cold-start change.
 - Workaround commit f81e220 is signed and pushed. Its 141 MB release image is
   `registry.fly.io/aviation-mcp-ingest@sha256:c15de4fa28ee97248724f7698ddf5d3c2a74bd5879dd0a9cea42df7ddd769546`,
   now configured as GitHub's `AVIATION_INGEST_IMAGE`. Private Fly checks passed
   for database wake-up/status, B738 characteristics and overlapping KSFO NOTAMs;
   DOF correctly remains unavailable. The temporary serving machine was removed.
 - Automatic approval review rejected `gh workflow run ingestion.yml` because
-  dispatch requires approval and the session policy is `never`. The user has
-  the exact dispatch command; workflow token/cleanup and full DOF publication
-  acceptance remain pending. Public serving is not deployed.
+  dispatch requires approval and the session policy is `never`. The user
+  dispatched workflow 40782467475. Public serving is not deployed.
 - Implemented the user-authorized server-side PostgresNIO workaround without
   modifying upstream code. SQLKit submits encoded queries through a connection
   guard on the PostgreSQL event loop. Closed connections fail immediately;
