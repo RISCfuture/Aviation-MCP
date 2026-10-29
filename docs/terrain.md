@@ -123,6 +123,13 @@ returned the same maximum. Repeating that request took 0.47 s, with an explicit
 answer-cache hit and zero upstream requests. These measurements exclude Fly
 machine startup.
 
+Live checks on aviation-mcp.org verified the same maximum, concurrent clients
+reusing JSON-RPC IDs, the supplied-gradient comparison, and an antimeridian ocean
+corridor. A cached request measured 0.62 s using curl. After stopping the serving
+machine, a public request automatically restarted it and reused the persisted
+answer with zero upstream requests. These are individual observations, not
+latency guarantees. The restart check stopped only the serving machine.
+
 ## Operations and development
 
 Run migrations with the ingestion role, then `aviation-mcp import-terrain` with
@@ -136,6 +143,8 @@ unchanged checksums do not rewrite the tile table.
 Enable the `terrain` group in `AVIATION_GROUPS`. Readiness requires its catalog
 when enabled. `get_data_status` includes terrain catalog release, checksum,
 retrieval time and counts. Query latency/errors use the existing per-tool metrics.
+The mounted cache directory must be writable by the container's UID/GID 10001;
+initialize `/data/terrain` with that ownership when attaching an empty volume.
 
 | Setting | Default |
 | --- | --- |
