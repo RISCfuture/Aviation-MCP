@@ -14,6 +14,7 @@ struct TerrainCell: Codable, Sendable {
 
 struct TerrainCatalog: Sendable {
   let database: any Database
+  var release: TerrainRelease = .copernicus2021
 
   static func parse(_ text: String, product: String) throws -> [TerrainCell] {
     let resolution = product == "glo30" ? "10" : "30"
@@ -42,12 +43,7 @@ struct TerrainCatalog: Sendable {
   func publish(glo30: String, glo90: String) async throws {
     let fine = try Self.parse(glo30, product: "glo30")
     let coarse = try Self.parse(glo90, product: "glo90")
-    guard (25000...40000).contains(fine.count), (25000...40000).contains(coarse.count),
-      Set(fine.map(\.key)).isSubset(of: Set(coarse.map(\.key)))
-    else {
-      throw StorageError.invalidImport(
-        "Copernicus catalogs are incomplete or inconsistent; ocean cannot be inferred.")
-    }
+    try validate(glo30: glo30, glo90: glo90, fine: fine, coarse: coarse)
     let checksum = Normalization.checksum(Data((glo30 + "\nGLO90\n" + glo90).utf8))
     var selected = Dictionary(uniqueKeysWithValues: coarse.map { ($0.key, $0) })
     for cell in fine { selected[cell.key] = cell }
@@ -82,7 +78,7 @@ struct TerrainCatalog: Sendable {
       try await sql.raw(
         """
         INSERT INTO terrain_catalog(singleton,checksum,source_release,counts)
-        VALUES(true,\(bind: checksum),'Copernicus DEM 2021 AWS public',\(bind: counts)::jsonb)
+        VALUES(true,\(bind: checksum),\(bind: release.name),\(bind: counts)::jsonb)
         ON CONFLICT(singleton) DO UPDATE SET checksum=excluded.checksum,
           imported_at=now(),source_release=excluded.source_release,counts=excluded.counts
         """
@@ -163,6 +159,20 @@ struct TerrainCatalog: Sendable {
       return request
     }
   }
+  private func validate(glo30: String, glo90: String, fine: [TerrainCell], coarse: [TerrainCell])
+    throws
+  {
+    guard Normalization.checksum(Data(glo30.utf8)) == release.glo30Checksum,
+      Normalization.checksum(Data(glo90.utf8)) == release.glo90Checksum,
+      Set(fine.map(\.key)).isSubset(of: Set(coarse.map(\.key)))
+    else {
+      throw StorageError.invalidImport(
+        "Copernicus catalogs do not match the validated release; "
+          + "source changes require validation before ocean can be inferred."
+      )
+    }
+  }
+
   private static func tiles(_ rows: [any SQLRow]) throws -> [Value] {
     try rows.map { row in
       let geometry = try row.decode(column: "geometry", as: String.self)

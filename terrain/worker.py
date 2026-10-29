@@ -22,7 +22,7 @@ from rasterio.windows import from_bounds, intersect
 
 from range_cache import Budget, RangeCache, RangeFile, TerrainError
 
-READER_REVISION = "copernicus-native-1"
+READER_REVISION = "copernicus-native-2"
 GEOD = Geod(ellps="WGS84")
 
 
@@ -54,7 +54,7 @@ def climb_margin(values, rows, columns, transform, climb):
     }
 
 
-def analyze_tile(url, geometry, cache, budget, climb=None):
+def analyze_tile(url, geometry, cache, budget, climb=None, tile=None):
     """Find all selected native-cell extrema without using averaged overviews."""
     handles = []
 
@@ -86,6 +86,8 @@ def analyze_tile(url, geometry, cache, budget, climb=None):
                 or source.transform.e >= 0
             ):
                 raise TerrainError("Unsupported terrain raster grid")
+            if tile is not None:
+                validate_grid(source, tile)
             extent = from_bounds(*bounds(geometry), transform=source.transform)
             for _, window in source.block_windows(1):
                 budget.check()
@@ -155,6 +157,51 @@ def analyze_tile(url, geometry, cache, budget, climb=None):
             handle.close()
 
 
+def validate_grid(source, tile):
+    """Require the full native point-registered grid for the catalog's degree cell."""
+    fields = tile["name"].split("_")
+    latitude = int(fields[4][1:]) * (-1 if fields[4][0] == "S" else 1)
+    longitude = int(fields[6][1:]) * (-1 if fields[6][0] == "W" else 1)
+    latitude_band = abs(latitude + 0.5)
+    width = next(
+        width
+        for boundary, width in [
+            (50, 3600),
+            (60, 2400),
+            (70, 1800),
+            (80, 1200),
+            (85, 720),
+            (91, 360),
+        ]
+        if latitude_band < boundary
+    )
+    height = 3600
+    if tile["product"] == "glo90":
+        width //= 3
+        height //= 3
+    expected = (
+        1 / width,
+        0,
+        longitude - 0.5 / width,
+        0,
+        -1 / height,
+        latitude + 1 + 0.5 / height,
+    )
+    actual = tuple(source.transform)[:6]
+    if (
+        source.width != width
+        or source.height != height
+        or source.dtypes != ("float32",)
+        or not all(
+            math.isclose(a, b, rel_tol=0, abs_tol=1e-10)
+            for a, b in zip(actual, expected, strict=True)
+        )
+    ):
+        raise TerrainError(
+            "Terrain raster does not match the catalog's native grid and coverage"
+        )
+
+
 def tile_url(tile):
     """Construct only public Copernicus URLs from validated catalog identifiers."""
     product, name = tile["product"], tile["name"]
@@ -201,7 +248,7 @@ def run_job(request, cache, budget):
             continue
         try:
             result = analyze_tile(
-                tile_url(tile), tile["geometry"], cache, budget, climb
+                tile_url(tile), tile["geometry"], cache, budget, climb, tile
             )
             sources.append(
                 {

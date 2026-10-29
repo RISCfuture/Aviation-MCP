@@ -8,7 +8,7 @@ kill_timeout = "35s"
 
 [env]
   APP_ROLE = "serve"
-  AVIATION_GROUPS = "obstacles,aircraft,weather,notams,geography,status"
+  AVIATION_GROUPS = "obstacles,aircraft,weather,notams,geography,status,terrain"
   PORT = "8080"
   MCP_ALLOWED_ORIGINS = "https://aviation-mcp.org"
   MCP_TIMEOUT_SECONDS = "30"
@@ -16,6 +16,12 @@ kill_timeout = "35s"
   PUBLIC_RATE_BURST = "20"
   WEATHER_CACHE_SECONDS = "900"
   DATABASE_WAIT_SECONDS = "15"
+  TERRAIN_CACHE_DIRECTORY = "/data/terrain"
+  TERRAIN_CACHE_BYTES = "536870912"
+
+[[mounts]]
+  source = "terrain_cache"
+  destination = "/data"
 
 [http_service]
   internal_port = 8080

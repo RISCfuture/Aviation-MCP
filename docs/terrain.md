@@ -65,9 +65,13 @@ object ETags and source retrieval times accompany answers. ETags are conditional
 object identifiers, not presented as cryptographic checksums. The catalog has
 no invented aviation-cycle expiration.
 
-The importer validates both catalogs before atomically replacing the active
-catalog. A degree cell absent from both complete published catalogs is treated
-as ocean. A failed HTTP request, malformed raster, invalid native value or NoData
+The importer requires both catalogs to match the SHA-256 digests of the validated
+2021 release before atomically replacing the active catalog. Changed catalogs
+require release validation and updated pins; count thresholds alone cannot
+establish ocean coverage. Each raster must also match its catalog cell’s full
+native dimensions, Float32 band, resolution and point-registered transform. A
+degree cell absent from both complete published catalogs is treated as ocean.
+A failed HTTP request, malformed raster, invalid native value or NoData
 sample is unknown, never sea level. Partial answers label the maximum as a
 maximum of available data; fully unavailable answers are structured tool errors.
 
@@ -88,10 +92,11 @@ Source and license: [Copernicus AWS dataset](https://registry.opendata.aws/coper
 | Degree-tile candidates | 32 |
 | Downloaded ranges per request | 64 MiB total; at most 128 HTTP operations including HEAD |
 | Native pixels read | 20 million |
+| Worker input/output | 2 MiB corridor request; 1 MiB result |
 | Worker | One per serving instance; identical concurrent requests coalesce |
 | Execution | 25 s cooperative budget, 27 s child alarm, 28 s parent kill; enclosing MCP timeout still applies |
 | Worker address space on Linux | 1 GiB; numerical libraries use one thread |
-| Disk cache default | 512 MiB, least-recently-used eviction |
+| Disk cache default | 512 MiB and 4,096 entries, least-recently-used eviction |
 | Complete-answer reuse | 300 seconds, bound to catalog, geometry, assumptions and reader revision |
 
 Source metadata is checked when reading blocks; a complete cached answer retains
@@ -112,6 +117,11 @@ A local Bay Area probe fetched 10,622,977 bytes of a 20,060,161-byte COG and fou
 used cached blocks, downloaded zero bytes and took 0.61 s. These are local
 observations, not Fly end-to-end latency guarantees. Cold application/database
 startup and uncached terrain reads are separate contributions to latency.
+
+A subsequent local MCP request with an empty serving cache took 4.71 s and
+returned the same maximum. Repeating that request took 0.47 s, with an explicit
+answer-cache hit and zero upstream requests. These measurements exclude Fly
+machine startup.
 
 ## Operations and development
 

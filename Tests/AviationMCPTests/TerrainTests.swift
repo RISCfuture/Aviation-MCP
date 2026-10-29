@@ -46,26 +46,26 @@ extension `Transactional publication` {
   @Test
   func `publishes terrain catalogs atomically and splits antimeridian corridors`() async throws {
     try await withDatabase { store in
-      try await TerrainSchema().prepare(on: store.database)
-      let names = (-40..<40).flatMap { latitude in
-        (-160..<160).map { longitude in
-          String(
-            format: "Copernicus_DSM_COG_10_%@%02d_00_%@%03d_00_DEM",
-            latitude < 0 ? "S" : "N", abs(latitude), longitude < 0 ? "W" : "E", abs(longitude))
-        }
-      }
-      let fine = names.joined(separator: "\n")
-      let coarse =
-        fine.replacingOccurrences(of: "COG_10_", with: "COG_30_")
-        + "\nCopernicus_DSM_COG_30_N00_00_E179_00_DEM"
-      let catalog = TerrainCatalog(database: store.database)
-      try await catalog.publish(glo30: fine, glo90: coarse)
+      let fixture = try await Self.terrainFixture(store)
+      let catalog = fixture.catalog
+      let fine = fixture.fine
+      let coarse = fixture.coarse
+      let names = fine.split(whereSeparator: \.isNewline).map(String.init)
       let status = try await catalog.status()
       #expect(status.objectValue?["counts"]?.objectValue?["glo90"] == 1)
       await #expect(throws: StorageError.self) {
         try await catalog.publish(glo30: "incomplete", glo90: coarse)
       }
+      let missingName = try #require(names.last)
+      let truncatedFine = names.dropLast().joined(separator: "\n")
+      let truncatedCoarse = coarse.split(whereSeparator: \.isNewline)
+        .filter { $0 != missingName.replacingOccurrences(of: "COG_10_", with: "COG_30_") }
+        .joined(separator: "\n")
+      await #expect(throws: StorageError.self) {
+        try await catalog.publish(glo30: truncatedFine, glo90: truncatedCoarse)
+      }
       #expect(try await catalog.status() == status)
+
       let query = try TerrainQuery(
         ToolArguments([
           "route": .array([.array([179.98, 0.5]), .array([-179.98, 0.5])]), "half_width_nm": 1
@@ -84,6 +84,12 @@ extension `Transactional publication` {
         """
       ).first(decodingColumn: "crosses", as: Bool.self)
       #expect(crossesGreenwich == false)
+      let polar = try TerrainQuery(
+        ToolArguments([
+          "route": .array([.array([30, 85]), .array([30.1, 85.01])]), "half_width_nm": 0.05
+        ]))
+      let polarRequest = try await catalog.request(polar)
+      #expect(!(polarRequest["tiles"]?.arrayValue?.isEmpty ?? true))
       let tooLong = try TerrainQuery(
         ToolArguments([
           "route": .array([.array([0, 0]), .array([80, 0])]), "half_width_nm": 1
@@ -91,6 +97,33 @@ extension `Transactional publication` {
       await #expect(throws: MCPError.self) { try await catalog.request(tooLong) }
     }
   }
+  private static func terrainFixture(_ store: AviationStore) async throws
+    -> TerrainFixture
+  {
+    try await TerrainSchema().prepare(on: store.database)
+    let names = [
+      "Copernicus_DSM_COG_10_N37_00_W123_00_DEM",
+      "Copernicus_DSM_COG_10_S01_00_W123_00_DEM"
+    ]
+    let fine = names.joined(separator: "\n")
+    let coarse =
+      fine.replacingOccurrences(of: "COG_10_", with: "COG_30_")
+      + "\nCopernicus_DSM_COG_30_N00_00_E179_00_DEM"
+    let release = TerrainRelease(
+      name: "fixture",
+      glo30Checksum: Normalization.checksum(Data(fine.utf8)),
+      glo90Checksum: Normalization.checksum(Data(coarse.utf8)))
+    let catalog = TerrainCatalog(database: store.database, release: release)
+    try await catalog.publish(glo30: fine, glo90: coarse)
+    return TerrainFixture(catalog: catalog, fine: fine, coarse: coarse)
+  }
+
+  private struct TerrainFixture {
+    let catalog: TerrainCatalog
+    let fine: String
+    let coarse: String
+  }
+
 }
 
 extension `Bounded terrain requests` {

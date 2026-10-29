@@ -103,6 +103,8 @@ class TerrainReads(unittest.TestCase):
             cache.put("a", b"a" * 15)
             cache.put("b", b"b" * 15)
             self.assertLessEqual(cache.size(), 20)
+            smaller = RangeCache(Path(directory), maximum_bytes=10)
+            self.assertLessEqual(smaller.size(), 10)
             with (
                 RangeFile(url, cache, Budget(maximum_bytes=100)) as source,
                 self.assertRaises(TerrainError),
@@ -110,22 +112,25 @@ class TerrainReads(unittest.TestCase):
                 source.read(1)
 
     def test_native_peak_nodata_and_climb_bound_survive_window_selection(self):
-        samples = np.full((32, 32), 10, dtype="float32")
+        samples = np.full((1200, 1200), 10, dtype="float32")
         samples[7, 7] = 1000
         samples[8, 7] = -9999
         with MemoryFile() as memory:
             with memory.open(
                 driver="GTiff",
-                width=32,
-                height=32,
+                width=1200,
+                height=1200,
                 count=1,
                 dtype="float32",
-                transform=from_origin(-122, 38, 0.001, 0.001),
+                transform=from_origin(
+                    -123 - 1 / 2400, 38 + 1 / 2400, 1 / 1200, 1 / 1200
+                ),
                 crs="EPSG:4326",
                 nodata=-9999,
                 tiled=True,
-                blockxsize=16,
-                blockysize=16,
+                blockxsize=128,
+                blockysize=128,
+                compress="deflate",
             ) as dataset:
                 dataset.write(samples, 1)
             payload = memory.read()
@@ -133,11 +138,11 @@ class TerrainReads(unittest.TestCase):
             "type": "Polygon",
             "coordinates": [
                 [
-                    [-122, 38],
-                    [-121.968, 38],
-                    [-121.968, 37.968],
-                    [-122, 37.968],
-                    [-122, 38],
+                    [-123 - 1 / 2400, 38 + 1 / 2400],
+                    [-122 - 1 / 2400, 38 + 1 / 2400],
+                    [-122 - 1 / 2400, 37 + 1 / 2400],
+                    [-123 - 1 / 2400, 37 + 1 / 2400],
+                    [-123 - 1 / 2400, 38 + 1 / 2400],
                 ]
             ],
         }
@@ -145,7 +150,7 @@ class TerrainReads(unittest.TestCase):
             "starting_altitude_ft": 100,
             "gradient_ft_per_nm": 200,
             "clearance_ft": 50,
-            "start": [-122, 38],
+            "start": [-123, 38],
             "half_width_m": 1852,
         }
         with (
@@ -156,15 +161,19 @@ class TerrainReads(unittest.TestCase):
             result = analyze_tile(url, geometry, cache, Budget(), climb)
             self.assertEqual(result["maximum"]["elevation_m"], 1000)
             self.assertEqual(result["nodata_cells"], 1)
-            self.assertEqual(result["valid_cells"], 1023)
+            self.assertEqual(result["valid_cells"], 1200 * 1200 - 1)
             self.assertLess(result["climb"]["minimum_margin_ft"], 0)
-            self.assertAlmostEqual(result["maximum"]["longitude"], -121.9925)
+            self.assertAlmostEqual(result["maximum"]["longitude"], -123 + 7 / 1200)
             request = {
-                "start": [-122, 38],
+                "start": [-123, 38],
                 "half_width_m": 1852,
                 "climb": dict(climb, starting_altitude_ft=10000),
                 "tiles": [
-                    {"name": "fixture", "product": "glo30", "geometry": geometry}
+                    {
+                        "name": "Copernicus_DSM_COG_30_N37_00_W123_00_DEM",
+                        "product": "glo90",
+                        "geometry": geometry,
+                    }
                 ],
             }
             with patch("worker.tile_url", return_value=url):
@@ -172,6 +181,52 @@ class TerrainReads(unittest.TestCase):
             self.assertFalse(combined["coverage"]["complete"])
             self.assertEqual(combined["climb"]["status"], "not_established")
             self.assertGreater(combined["climb"]["limiting"]["minimum_margin_ft"], 0)
+
+    def test_shifted_or_cropped_land_cannot_become_complete_ocean(self):
+        with MemoryFile() as memory:
+            with memory.open(
+                driver="GTiff",
+                width=32,
+                height=32,
+                count=1,
+                dtype="float32",
+                transform=from_origin(10, 10, 0.001, 0.001),
+                crs="EPSG:4326",
+            ) as dataset:
+                dataset.write(np.full((32, 32), 9000, dtype="float32"), 1)
+            payload = memory.read()
+        geometry = {
+            "type": "Polygon",
+            "coordinates": [
+                [[-123, 38], [-122.99, 38], [-122.99, 37.99], [-123, 37.99], [-123, 38]]
+            ],
+        }
+        request = {
+            "start": [-123, 38],
+            "half_width_m": 1852,
+            "climb": {
+                "starting_altitude_ft": 100,
+                "gradient_ft_per_nm": 200,
+                "clearance_ft": 50,
+            },
+            "tiles": [
+                {
+                    "name": "Copernicus_DSM_COG_30_N37_00_W123_00_DEM",
+                    "product": "glo90",
+                    "geometry": geometry,
+                },
+                {"name": "ocean", "product": "ocean", "geometry": geometry},
+            ],
+        }
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            source_server(payload) as (url, _),
+            patch("worker.tile_url", return_value=url),
+        ):
+            result = run_job(request, RangeCache(Path(directory)), Budget())
+            self.assertFalse(result["coverage"]["complete"])
+            self.assertEqual(len(result["coverage"]["gaps"]), 1)
+            self.assertEqual(result["climb"]["status"], "not_established")
 
 
 if __name__ == "__main__":

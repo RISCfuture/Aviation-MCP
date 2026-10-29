@@ -69,6 +69,7 @@ class RangeCache:
         self.directory = directory
         self.maximum_bytes = maximum_bytes
         directory.mkdir(parents=True, exist_ok=True)
+        self.prune(0, 0)
 
     def path(self, key):
         return self.directory / (hashlib.sha256(key.encode()).hexdigest() + ".block")
@@ -85,18 +86,25 @@ class RangeCache:
     def size(self):
         return sum(path.stat().st_size for path in self.directory.glob("*.block"))
 
-    def put(self, key, data):
-        if len(data) > self.maximum_bytes:
-            return
+    def prune(self, incoming_bytes, incoming_entries):
         entries = sorted(
             (p.stat().st_mtime_ns, p, p.stat().st_size)
             for p in self.directory.glob("*.block")
         )
         total = sum(size for _, _, size in entries)
-        while entries and total + len(data) > self.maximum_bytes:
+        while entries and (
+            total + incoming_bytes > self.maximum_bytes
+            or len(entries) + incoming_entries > 4096
+        ):
             _, path, size = entries.pop(0)
             path.unlink(missing_ok=True)
             total -= size
+
+    def put(self, key, data):
+        if len(data) > self.maximum_bytes:
+            return
+        self.path(key).unlink(missing_ok=True)
+        self.prune(len(data), 1)
         with tempfile.NamedTemporaryFile(
             dir=self.directory, delete=False, prefix="pending-"
         ) as stream:
