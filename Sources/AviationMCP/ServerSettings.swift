@@ -2,6 +2,10 @@ import Foundation
 import Vapor
 
 struct ServerSettings: Sendable {
+  let terrainPython: String
+  let terrainScript: String
+  let terrainCacheDirectory: String
+  let terrainCacheBytes: Int
   let role: String
   let databaseURL: String
   let databaseWaitSeconds: Double
@@ -18,6 +22,13 @@ struct ServerSettings: Sendable {
   let openMeteoLimits: [BudgetLimit]
 
   init() throws {
+    terrainPython = Environment.get("TERRAIN_PYTHON") ?? "/opt/terrain/bin/python"
+    terrainScript = Environment.get("TERRAIN_SCRIPT") ?? "/app/terrain/worker.py"
+    terrainCacheDirectory =
+      Environment.get("TERRAIN_CACHE_DIRECTORY") ?? "/tmp/aviation-terrain-cache"
+    terrainCacheBytes = Int(
+      try Self.number(
+        "TERRAIN_CACHE_BYTES", default: 536_870_912, range: 1_048_576...21_474_836_480))
     role = Environment.get("APP_ROLE") ?? "serve"
     guard ["serve", "ingest"].contains(role) else { throw Self.invalid("APP_ROLE") }
     let databaseKey = role == "ingest" ? "INGEST_DATABASE_URL" : "DATABASE_URL"

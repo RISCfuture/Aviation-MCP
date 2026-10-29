@@ -25,6 +25,7 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
+      TEST_TERRAIN_PYTHON: /opt/terrain/bin/python
       TEST_DATABASE_URL: postgres://postgres:aviation-ci-test@postgres:5432/aviation_test?sslmode=disable
     steps:
       - uses: actions/checkout@v4
@@ -32,6 +33,16 @@ jobs:
         with:
           path: .build
           key: swift-linux-6.4.1-${{ hashFiles('Package.resolved') }}
+      - name: Terrain worker dependencies and tests
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends python3-venv
+          python3 -m venv /opt/terrain
+          /opt/terrain/bin/pip install --only-binary=:all: -r terrain/requirements.txt ruff==0.17.3
+          cd terrain
+          /opt/terrain/bin/python -m unittest discover -s tests -v
+          /opt/terrain/bin/ruff check .
+          /opt/terrain/bin/ruff format --check .
       - name: Release build
         run: swift build --build-system native -c release --product aviation-mcp --jobs 4
       - name: Swift Testing with PostGIS

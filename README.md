@@ -44,3 +44,4 @@ features are accepted. These are library build checks, not library test runs.
 
 - [Progress and decisions](docs/implementation-progress.md)
 - [Original acceptance cases and Squawk comparison](docs/acceptance.md)
+- [On-demand terrain queries and operations](docs/terrain.md)

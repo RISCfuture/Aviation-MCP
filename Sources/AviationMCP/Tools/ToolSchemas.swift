@@ -71,6 +71,9 @@ enum ToolSchemas {
         ])
       ]) { _, new in new }
       required = ["operation"]
+    case .queryTerrain:
+      properties = terrainProperties
+      required = ["route", "half_width_nm"]
     case .getDataStatus: properties = [:]
     default:
       properties = periodic(tool)
@@ -94,6 +97,18 @@ enum ToolSchemas {
     for key in schema["required"]?.arrayValue?.compactMap(\.stringValue) ?? [] {
       guard arguments.values[key] != nil else { throw MCPError.invalidParams("Missing \(key)") }
     }
+  }
+
+  private static var terrainProperties: [String: Value] {
+    return [
+      "route": .object([
+        "type": "array", "minItems": 2, "maxItems": 20,
+        "items": .object(["type": "array", "minItems": 2, "maxItems": 2, "items": number])
+      ]),
+      "half_width_nm": .object(["type": "number", "minimum": 0.05, "maximum": 2]),
+      "starting_altitude_ft": number, "gradient_ft_per_nm": number, "clearance_ft": number,
+      "vertical_datum": enumeration(["EGM2008"])
+    ]
   }
 
   private static var weatherProperties: [String: Value] {

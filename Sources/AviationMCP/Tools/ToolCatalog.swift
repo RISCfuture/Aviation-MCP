@@ -6,6 +6,7 @@ struct ToolCatalog: Sendable {
   let groups: Set<DomainGroup>
   let weather: WeatherService
   let notams: NOTAMQueries?
+  var terrain: TerrainService?
 
   var tools: [Tool] { ToolDefinition.allCases.filter { groups.contains($0.group) }.map(\.tool) }
 
@@ -17,6 +18,11 @@ struct ToolCatalog: Sendable {
     try ToolSchemas.validate(arguments, for: tool)
     do {
       return try await execute(tool, arguments: arguments).response()
+    } catch let error as TerrainFailure {
+      return try ToolResult(
+        results: [], completeness: "unavailable",
+        error: .object(["code": "terrain_unavailable", "message": .string(error.reason)])
+      ).response()
     } catch let error as WeatherFailure {
       return try ToolResult(
         results: [], completeness: "unavailable",
@@ -47,6 +53,9 @@ struct ToolCatalog: Sendable {
   ) async throws -> ToolResult {
     switch tool {
     case .getDataStatus: return try await status()
+    case .queryTerrain:
+      guard let terrain else { throw TerrainFailure(reason: "Terrain is not configured.") }
+      return try await terrain.query(arguments)
     case .convertCoordinates: return try GeometryTools.convert(arguments)
     case .computeGeometry:
       return try await GeometryTools(database: store.database).compute(arguments)
@@ -94,7 +103,7 @@ struct ToolCatalog: Sendable {
 
   private func status() async throws -> ToolResult {
     let snapshot = try await store.snapshot()
-    let values: [Value] = try SourceName.allCases.map { source in
+    var values: [Value] = try SourceName.allCases.map { source in
       var value: [String: Value] = ["source": .string(source.rawValue)]
       if let version = snapshot.versions[source] {
         value["status"] = "available"
@@ -104,6 +113,9 @@ struct ToolCatalog: Sendable {
       }
       value["nextVersion"] = try snapshot.next[source].map { try .encoded(SourceStamp($0)) }
       return .object(value)
+    }
+    if groups.contains(.terrain) {
+      values.append(try await TerrainCatalog(database: store.database).status())
     }
     return ToolResult(results: values, sources: snapshot.versions.values.map(SourceStamp.init))
   }

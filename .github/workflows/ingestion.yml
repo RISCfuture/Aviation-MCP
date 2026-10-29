@@ -79,6 +79,18 @@ jobs:
             scripts/run-ingestion-job.sh ingest-sources "$(jq -r . <<< "$plan")"
           done < plans.jsonl
 
+  terrain:
+    if: ${{ github.event_name != 'push' && vars.AVIATION_INGEST_IMAGE != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate and publish terrain catalogs
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_INGEST_API_TOKEN }}
+          AVIATION_INGEST_IMAGE: ${{ vars.AVIATION_INGEST_IMAGE }}
+        run: scripts/run-ingestion-job.sh import-terrain
+
   purge:
     needs: ingest
     if: ${{ always() && !cancelled() && github.event_name != 'push' && vars.AVIATION_INGEST_IMAGE != '' }}

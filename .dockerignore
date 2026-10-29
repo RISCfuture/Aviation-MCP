@@ -6,3 +6,6 @@
 !Tests/
 !Tests/**
 !Dockerfile
+!terrain/
+!terrain/*.py
+!terrain/requirements.txt

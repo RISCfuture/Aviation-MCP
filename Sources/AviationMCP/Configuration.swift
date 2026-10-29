@@ -21,10 +21,12 @@ public func configure(_ app: Application) throws {
       pruneInterval: settings.role == "serve" ? .seconds(30) : nil,
       maxIdleTimeBeforePruning: .seconds(60)), as: .psql)
   app.migrations.add(AviationSchema())
+  app.migrations.add(TerrainSchema())
   guard settings.role == "serve" else {
     app.asyncCommands.use(RemoteIngestionCommand(), as: "ingest-sources")
     app.asyncCommands.use(PublishCommand(), as: "publish-bundle")
     app.asyncCommands.use(PurgeCommand(), as: "purge")
+    app.asyncCommands.use(ImportTerrainCommand(), as: "import-terrain")
     return
   }
   app.http.server.configuration.hostname = "0.0.0.0"
@@ -32,7 +34,20 @@ public func configure(_ app: Application) throws {
   let store = AviationStore(database: app.db)
   let notams = try configureNOTAMs(app, settings: settings)
   let weather = configureWeather(app, settings: settings)
-  let catalog = ToolCatalog(store: store, groups: settings.groups, weather: weather, notams: notams)
+  let terrain =
+    settings.groups.contains(.terrain)
+    ? TerrainService(
+      catalog: TerrainCatalog(database: app.db),
+      worker: TerrainWorker(
+        python: settings.terrainPython, script: settings.terrainScript,
+        cacheDirectory: settings.terrainCacheDirectory, cacheBytes: settings.terrainCacheBytes))
+    : nil
+  let catalog = ToolCatalog(
+    store: store, groups: settings.groups, weather: weather, notams: notams, terrain: terrain)
+  registerMCP(app, catalog: catalog, settings: settings)
+}
+
+private func registerMCP(_ app: Application, catalog: ToolCatalog, settings: ServerSettings) {
   let metrics = ServerMetrics()
   app.middleware.use(
     AdmissionMiddleware(
@@ -54,7 +69,7 @@ public func configure(_ app: Application) throws {
       throw error
     }
   }.register(on: app)
-  registerOperations(app, store: store, groups: settings.groups, metrics: metrics)
+  registerOperations(app, store: catalog.store, groups: settings.groups, metrics: metrics)
 }
 
 private func configureWeather(_ app: Application, settings: ServerSettings) -> WeatherService {
@@ -107,6 +122,12 @@ private func registerOperations(
       throw Abort(
         .serviceUnavailable, reason: "One or more enabled sources have no effective validated data."
       )
+    }
+    if groups.contains(.terrain) {
+      let terrain = try await TerrainCatalog(database: store.database).status()
+      guard terrain.objectValue?["status"] == "available" else {
+        throw Abort(.serviceUnavailable, reason: "Terrain catalog is unavailable.")
+      }
     }
     return ["status": "ready"]
   }

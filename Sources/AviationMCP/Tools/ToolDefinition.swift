@@ -2,7 +2,7 @@ import MCP
 
 enum DomainGroup: String, CaseIterable, Sendable {
   case airports, navigation, airspace, procedures, obstacles, aircraft, weather, notams, geography,
-    status
+    status, terrain
 }
 
 enum ToolDefinition: String, CaseIterable, Sendable {
@@ -22,6 +22,7 @@ enum ToolDefinition: String, CaseIterable, Sendable {
   case convertCoordinates = "convert_coordinates"
   case computeGeometry = "compute_geometry"
   case getDataStatus = "get_data_status"
+  case queryTerrain = "query_terrain"
 
   var group: DomainGroup {
     switch self {
@@ -35,6 +36,7 @@ enum ToolDefinition: String, CaseIterable, Sendable {
     case .queryNOTAMs: .notams
     case .convertCoordinates, .computeGeometry: .geography
     case .getDataStatus: .status
+    case .queryTerrain: .terrain
     }
   }
 
@@ -65,6 +67,9 @@ enum ToolDefinition: String, CaseIterable, Sendable {
     case .computeGeometry:
       "Compute WGS84 geodesic routes, distances, true bearings or destination coordinates."
     case .getDataStatus: "Report effective source cycles, availability and provenance."
+    case .queryTerrain:
+      "Find native-cell terrain maxima within a coordinate route corridor, "
+        + "with optional conservative supplied-gradient comparison in EGM2008."
     }
   }
 
@@ -73,7 +78,8 @@ enum ToolDefinition: String, CaseIterable, Sendable {
       name: rawValue, description: description, inputSchema: ToolSchemas.input(self),
       annotations: .init(
         readOnlyHint: true, destructiveHint: false, idempotentHint: true,
-        openWorldHint: group == .weather || group == .notams), outputSchema: ToolSchemas.output)
+        openWorldHint: group == .weather || group == .notams || group == .terrain),
+      outputSchema: ToolSchemas.output)
   }
 
   var periodicSources: [SourceName] {

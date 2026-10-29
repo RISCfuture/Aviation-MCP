@@ -6,7 +6,7 @@ set -euo pipefail
 command_name=${1:?Supply an ingestion command}
 shift
 case "$command_name" in
-  ingest-sources|purge|migrate) ;;
+  ingest-sources|purge|migrate|import-terrain) ;;
   *) exit 2 ;;
 esac
 

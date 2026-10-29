@@ -10,7 +10,7 @@ GRANT USAGE, CREATE ON SCHEMA public TO aviation_ingest;
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM aviation_serve;
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM aviation_serve;
 GRANT SELECT ON source_versions, aviation_records, manifests, manifest_versions,
-  active_manifest, ingestion_runs TO aviation_serve;
+  active_manifest, ingestion_runs, terrain_catalog, terrain_tiles TO aviation_serve;
 GRANT SELECT, INSERT, UPDATE, DELETE ON weather_cache, provider_budgets,
   provider_cooldowns, admission_buckets TO aviation_serve;
 ALTER ROLE aviation_serve NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION;
