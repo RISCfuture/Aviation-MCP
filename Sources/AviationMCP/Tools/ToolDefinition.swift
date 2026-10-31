@@ -43,27 +43,42 @@ enum ToolDefinition: String, CaseIterable, Sendable {
   var description: String {
     switch self {
     case .findAirports:
-      "Find current airports by identifier, name, location or minimum runway length."
-    case .getAirport: "Get an airport and its runways; ambiguous identifiers return candidates."
+      "Search current FAA airports by identifier, name, position, runway length or surface. "
+        + "Records include runways, elevation in feet MSL and CTAF/UNICOM frequencies."
+    case .getAirport:
+      "Get one airport and its runways by FAA location identifier or ICAO code (SQL or KSQL). "
+        + "An identifier shared by several airports returns candidates; select one with record_id."
     case .findNavigation:
-      "Find navaids, fixes, ILS, holds, FSS and AWOS records in the effective cycle."
-    case .getAirway: "Get an airway with ordered source segments and restrictions."
+      "Find navaids, fixes, ILS facilities, holds, flight service stations and AWOS/ASOS "
+        + "stations in the current cycle by identifier, name or position."
+    case .getAirway:
+      "Get an airway's ordered fixes with MEA, MOCA, distance and magnetic course per segment. "
+        + "Supply entry_fix and exit_fix to return only that portion, in travel order."
     case .findRoutes:
-      "Find preferred and coded departure routes by airport, origin or destination in the "
-        + "effective cycle."
+      "Find preferred IFR routes and coded departure routes by origin, destination or identifier; "
+        + "airport matches either end."
     case .queryAirspace:
       "Find airspace containing or near a position or route, optionally at an MSL altitude, "
-        + "or by identifier or airport; ARTCC facility and boundary point records do not "
-        + "establish containment."
-    case .findProcedures: "Find departures, arrivals and approaches by airport and identifier."
-    case .getProcedure: "Get procedure transitions, leg restrictions and geometry coverage gaps."
+        + "or by identifier or airport. Results give distance_nm and whether the reference is "
+        + "inside; ARTCC facility and boundary point records do not establish containment."
+    case .findProcedures:
+      "List an airport's approaches, departures and arrivals as summaries: identifier, "
+        + "approach name, runways, transition and fix sequence, one record per transition. "
+        + "Use get_procedure for legs and altitude and speed restrictions."
+    case .getProcedure:
+      "Get a procedure's legs with altitude and speed restrictions, joining the common route to "
+        + "an optional transition. available_transitions lists each transition's initial fix and "
+        + "altitude. Approaches use CIFP identifiers: I04R is ILS RWY 4R."
     case .queryObstacles:
       "Find obstacles near coordinates, a route, an airport/runway departure sector or an exact "
         + "procedure_id; highest ordering uses MSL elevation."
     case .getAircraft:
-      "Find published aircraft characteristics and performance by ICAO type identifier."
+      "Get FAA Aircraft Characteristics Database data for an ICAO type designator: dimensions, "
+        + "maximum takeoff weight, approach category, design groups and wake category. "
+        + "It is not performance data."
     case .getWeather:
-      "Get aviation weather with AWC priority and modeled Open-Meteo supplements; sources are selectable."
+      "Get weather for a station or position at a time: AWC METAR and TAF first, then modeled "
+        + "Open-Meteo values. Altimeter is in inHg and hPa; visibility in statute miles."
     case .parseWeather:
       "Parse supplied METAR, TAF or winds-aloft text with an explicit reference date."
     case .queryNOTAMs:
@@ -71,8 +86,10 @@ enum ToolDefinition: String, CaseIterable, Sendable {
         + "area NOTAMs such as TFRs; runway and procedure text matches are listed first."
     case .convertCoordinates: "Convert WGS84 latitude/longitude, UTM, UPS and MGRS coordinates."
     case .computeGeometry:
-      "Compute WGS84 geodesic routes, distances, true bearings or destination coordinates."
-    case .getDataStatus: "Report effective source cycles, availability and provenance."
+      "Compute WGS84 geodesic distances and initial true bearings, destination points, "
+        + "or densified route paths."
+    case .getDataStatus:
+      "Report each source's effective cycle, availability, parse errors and next version."
     case .queryTerrain:
       "Find native-cell terrain maxima within a coordinate route corridor, "
         + "with optional conservative supplied-gradient comparison in EGM2008."

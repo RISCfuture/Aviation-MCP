@@ -10,6 +10,7 @@ struct PeriodicQueries: Sendable {
     -> ToolResult
   {
     let limit = try arguments.limit()
+    let includeGeometry = try arguments.boolean("include_geometry") ?? false
     let cursor = try arguments.string("cursor").map(QueryCursor.decode)
     let signature = try QueryCursor.signature(arguments.values)
     return try await store.withSnapshot { sql, snapshot in
@@ -35,7 +36,10 @@ struct PeriodicQueries: Sendable {
       query += " LIMIT \(bind: limit + 1) OFFSET \(bind: cursor?.offset ?? 0)"
       let rows = try await sql.raw(query).all()
       var result = ToolResult(
-        results: try rows.prefix(limit).map(Self.present), sources: versions.map(SourceStamp.init))
+        results: try rows.prefix(limit).map {
+          try Self.present($0, includeGeometry: includeGeometry)
+        },
+        sources: versions.map(SourceStamp.init))
       result.warnings = warnings + context.warnings
       if rows.isEmpty { result.warnings += airports.emptyResultWarnings }
       if arguments.values["altitude_ft"] != nil {
@@ -88,7 +92,7 @@ struct PeriodicQueries: Sendable {
   private static func coverage(
     versions: [SourceVersion], kinds: [String], spatial: Bool
   ) throws -> [String] {
-    var warnings = versions.flatMap(\.coverageWarnings)
+    var warnings = versions.flatMap { $0.omissionWarnings(for: kinds) }
     var covered = 0
     for kind in kinds {
       let total = versions.reduce(0) {
@@ -196,7 +200,12 @@ struct PeriodicQueries: Sendable {
     return " ORDER BY upper(identifier), sequence NULLS LAST, id, kind, version_id"
   }
 
-  private static func present(_ row: any SQLRow) throws -> Value {
+  private static let lineGeometryFields = [
+    "missed_approach_geometry", "geometry_gaps", "missed_approach_geometry_gaps",
+    "geometry_gap_sequences", "geometry_scope", "geometry_limitations"
+  ]
+
+  private static func present(_ row: any SQLRow, includeGeometry: Bool) throws -> Value {
     let payload = try row.decode(column: "payload", as: String.self)
     var object = try JSONDecoder().decode([String: Value].self, from: Data(payload.utf8))
     object["id"] = .string(try row.decode(column: "id", as: String.self))
@@ -213,7 +222,12 @@ struct PeriodicQueries: Sendable {
     if row.contains(column: "altitude_match") {
       object["altitude_match"] = .string(try row.decode(column: "altitude_match", as: String.self))
     }
-    if let geometry = try row.decode(column: "geometry", as: String?.self) {
+    let geometry = try row.decode(column: "geometry", as: String?.self)
+    guard includeGeometry || geometry.map(isPoint) == true else {
+      for field in lineGeometryFields { object.removeValue(forKey: field) }
+      return .object(object)
+    }
+    if let geometry {
       if geometry.utf8.count <= 32_768 {
         object["geometry"] = try JSONDecoder().decode(Value.self, from: Data(geometry.utf8))
       } else {
@@ -221,6 +235,10 @@ struct PeriodicQueries: Sendable {
       }
     }
     return .object(object)
+  }
+
+  private static func isPoint(_ geoJSON: String) -> Bool {
+    geoJSON.hasPrefix(#"{"type":"Point""#)
   }
 }
 

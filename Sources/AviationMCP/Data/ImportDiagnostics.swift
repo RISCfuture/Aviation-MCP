@@ -57,7 +57,7 @@ extension SourceVersion {
     guard parseErrorCount > 0 else { return [] }
     return [
       "\(source.rawValue) cycle \(cycle) has \(parseErrorCount) source parsing errors. "
-        + "Records or fields may be missing; consult sources.validation.parse_errors for locations and diagnostics."
+        + "Records or fields may be missing; consult version.validation.parse_errors for locations and diagnostics."
     ]
   }
 }

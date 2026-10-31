@@ -391,4 +391,25 @@ extension `Normalized source imports` {
       low["coordinates"]?.arrayValue?.map { $0.arrayValue?.first?.arrayValue?.count } == [4, 4])
     #expect(centers[1].data["upper_limit"] == centers[0].data["lower_limit"])
   }
+
+  @Test
+  func `reports only parse errors that may have dropped records of the requested kind`() {
+    var diagnostics = NASRDiagnostics()
+    diagnostics.record(
+      .fieldError(
+        recordType: .airports, recordID: "kept", field: "agreements", value: "X",
+        underlying: StorageError.invalidImport("Unknown agreement")))
+    diagnostics.record(
+      .recordError(
+        recordType: .airports, recordID: "dropped",
+        underlying: StorageError.invalidImport("Missing coordinate")))
+    var version = SourceVersion(
+      id: UUID(), source: .nasr, cycle: "2026-10-29", effectiveFrom: .now, effectiveUntil: nil,
+      checksum: "", parserRevision: "", validated: true)
+    version.validation = diagnostics.errors.validation
+    #expect(version.omissionWarnings(for: ["navaid"]).isEmpty)
+    let airportWarnings = version.omissionWarnings(for: ["airport"])
+    #expect(airportWarnings.count == 1)
+    #expect(airportWarnings.first?.contains(": 1 airport source record(s) could not") == true)
+  }
 }

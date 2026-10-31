@@ -5,6 +5,8 @@ import SQLKit
 import SwiftGeographic
 
 struct GeometryTools: Sendable {
+  private static let routeGeometryLimit = 131_072
+
   let database: any Database
 
   static func convert(_ arguments: ToolArguments) throws -> ToolResult {
@@ -30,28 +32,40 @@ struct GeometryTools: Sendable {
       let geometry = GeometryTools(database: transaction)
       switch try arguments.string("operation", required: true) {
       case "destination": return try await geometry.destination(arguments)
-      case "route", "distance": return try await geometry.route(arguments)
+      case "distance": return try await geometry.route(arguments, includeGeometry: false)
+      case "route": return try await geometry.route(arguments, includeGeometry: true)
       default: throw MCPError.invalidParams("Supported operations: destination, distance, route")
       }
     }
   }
 
-  private func route(_ arguments: ToolArguments) async throws -> ToolResult {
+  private func route(_ arguments: ToolArguments, includeGeometry: Bool) async throws -> ToolResult {
     let coordinates = try Self.coordinates(arguments)
     let geoJSON = Value.object(["type": "LineString", "coordinates": .array(coordinates)])
-    let json = String(data: try JSONEncoder().encode(geoJSON), encoding: .utf8)
-    let sql = try database.sqlDatabase()
+    let json = String(bytes: try JSONEncoder().encode(geoJSON), encoding: .utf8)
+    var value = try await measure(json)
+    var result = ToolResult(results: [])
+    if includeGeometry {
+      let geometry = try await displayGeometry(json)
+      if geometry.utf8.count <= Self.routeGeometryLimit {
+        value["geometry"] = try JSONDecoder().decode(Value.self, from: Data(geometry.utf8))
+      } else {
+        result.completeness = "partial"
+        result.warnings = ["Route geometry exceeds the payload limit; distance remains available."]
+      }
+    }
+    result.results = [.object(value)]
+    return result
+  }
+
+  private func measure(_ line: String?) async throws -> [String: Value] {
     guard
-      let row = try await sql.raw(
+      let row = try await database.sqlDatabase().raw(
         """
-        WITH route AS (SELECT ST_SetSRID(ST_GeomFromGeoJSON(\(bind: json)),4326) AS line),
-        segments AS (SELECT (ST_DumpSegments(ST_Segmentize(line::geography,10000)::geometry)).geom
-        AS segment FROM route),
-        display AS (SELECT ST_LineMerge(ST_Collect(CASE WHEN ST_XMax(segment) - ST_XMin(segment) > 180
-          THEN ST_WrapX(ST_ShiftLongitude(segment),180,-360) ELSE segment END)) AS shape FROM segments)
+        WITH route AS (SELECT ST_SetSRID(ST_GeomFromGeoJSON(\(bind: line)),4326) AS line)
         SELECT ST_Length(line::geography)/1852 AS distance_nm,
-          degrees(ST_Azimuth(ST_StartPoint(line)::geography,ST_EndPoint(line)::geography)) AS bearing,
-          ST_AsGeoJSON(shape) AS geometry FROM route, display
+          degrees(ST_Azimuth(ST_StartPoint(line)::geography,ST_EndPoint(line)::geography)) AS bearing
+        FROM route
         """
       ).first()
     else { throw StorageError.requiresPostgreSQL }
@@ -62,16 +76,24 @@ struct GeometryTools: Sendable {
     if let bearing = try row.decode(column: "bearing", as: Double?.self) {
       value["initial_bearing_true_deg_to_endpoint"] = .double(bearing)
     }
-    let geometry = try row.decode(column: "geometry", as: String.self)
-    var result = ToolResult(results: [])
-    if geometry.utf8.count <= 131_072 {
-      value["geometry"] = try JSONDecoder().decode(Value.self, from: Data(geometry.utf8))
-    } else {
-      result.completeness = "partial"
-      result.warnings = ["Route geometry exceeds the payload limit; distance remains available."]
-    }
-    result.results = [.object(value)]
-    return result
+    return value
+  }
+
+  /// The geodesic path densified to 10 km segments, split at the antimeridian.
+  private func displayGeometry(_ line: String?) async throws -> String {
+    guard
+      let row = try await database.sqlDatabase().raw(
+        """
+        WITH route AS (SELECT ST_SetSRID(ST_GeomFromGeoJSON(\(bind: line)),4326) AS line),
+        segments AS (SELECT (ST_DumpSegments(ST_Segmentize(line::geography,10000)::geometry)).geom
+        AS segment FROM route),
+        display AS (SELECT ST_LineMerge(ST_Collect(CASE WHEN ST_XMax(segment) - ST_XMin(segment) > 180
+          THEN ST_WrapX(ST_ShiftLongitude(segment),180,-360) ELSE segment END)) AS shape FROM segments)
+        SELECT ST_AsGeoJSON(shape) AS geometry FROM display
+        """
+      ).first()
+    else { throw StorageError.requiresPostgreSQL }
+    return try row.decode(column: "geometry", as: String.self)
   }
 
   private func destination(_ arguments: ToolArguments) async throws -> ToolResult {

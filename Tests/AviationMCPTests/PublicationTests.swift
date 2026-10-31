@@ -166,7 +166,7 @@ struct `Transactional publication` {
         arguments: ToolArguments(["identifier": "missing"]))
       #expect(unmatched.results.isEmpty)
       #expect(unmatched.completeness == "partial")
-      #expect(unmatched.warnings.contains { $0.contains("source parsing errors") })
+      #expect(unmatched.warnings.contains { $0.contains("could not be parsed") })
       let published = try await store.snapshot().versions[.nasr]
       #expect(published?.parseErrorCount == 1)
       #expect(published?.validation?["outcome"] == "partial")

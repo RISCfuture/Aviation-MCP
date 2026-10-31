@@ -101,20 +101,34 @@ struct `Navigation expansion` {
       transition: "EXIT")
     let expanded = try #require(result.results.first?.objectValue)
     #expect(
-      expanded["expanded_legs"]?.arrayValue?.map { $0.objectValue?["fix"] } == [
+      expanded["legs"]?.arrayValue?.map { $0.objectValue?["fix"] } == [
         "RW04L", "JOIN", "JOIN", "EXIT"
       ])
     #expect(expanded["transition_boundaries"]?.arrayValue?.first?.objectValue?["index"] == 2)
     let truncated = try ProcedureExpansion.apply(
       ToolResult(results: [common], nextCursor: "another-page"), transition: "EXIT")
-    #expect(truncated.results.first?.objectValue?["expanded_legs"] == nil)
+    #expect(truncated.results.first?.objectValue?["transition_boundaries"] == nil)
     #expect(truncated.completeness == "partial")
-    let continuation = try ProcedureExpansion.apply(
-      ToolResult(results: [transition]), transition: "EXIT", isContinuation: true)
-    #expect(continuation.results.first?.objectValue?["expanded_legs"] == nil)
     #expect(RunwayName.matches("RW04B", requested: "4L"))
     #expect(RunwayName.matches("ALL", requested: "04R"))
     #expect(!RunwayName.matches("RW04L", requested: "04R"))
+  }
+
+  @Test
+  func `lists available transitions and names them when a requested one is missing`() throws {
+    let common = Self.procedure(id: "final", transition: nil, fixes: ["WINNI", "RW04R"])
+    let transition = Self.procedure(id: "goshi", transition: "GOSHI", fixes: ["GOSHI", "WINNI"])
+    let result = try ProcedureExpansion.apply(
+      ToolResult(results: [common, transition]), transition: nil)
+    let procedure = try #require(result.results.first?.objectValue)
+    #expect(procedure["legs"]?.arrayValue?.map { $0.objectValue?["fix"] } == ["WINNI", "RW04R"])
+    #expect(
+      procedure["available_transitions"]
+        == .array([.object(["name": "GOSHI", "initial_fix": "GOSHI"])]))
+    let error = try #require(throws: ToolInputError.self) {
+      try ProcedureExpansion.apply(ToolResult(results: [common, transition]), transition: "GOSHY")
+    }
+    #expect(error.reason.hasSuffix("Available transitions: GOSHI."))
   }
 
   private static func procedure(id: String, transition: String?, fixes: [String]) -> Value {

@@ -8,6 +8,7 @@ enum AirwayExpansion {
       throw MCPError.invalidParams("Supply both entry_fix and exit_fix")
     }
     guard let entry, let exit else { return result }
+    let includeGeometry = try arguments.boolean("include_geometry") ?? false
     var expanded = result
     expanded.results = try result.results.compactMap { value -> Value? in
       guard var fields = value.objectValue, let segments = fields["segments"]?.arrayValue else {
@@ -37,16 +38,17 @@ enum AirwayExpansion {
           "Fields describe the next segment in published order; "
             + "in reverse traversal this is the previous result point.")
         let path = AirwayGeometry.path(portion)
-        fields["geometry"] =
-          fields["geometry_scope"] == "unavailable_due_to_parse_errors" ? nil : path.geometry
-        fields["geometry_gap_sequences"] = .array(path.gaps)
-        expanded.warnings += warnings(for: portion, gaps: path.gaps)
+        if includeGeometry {
+          fields["geometry"] =
+            fields["geometry_scope"] == "unavailable_due_to_parse_errors" ? nil : path.geometry
+          fields["geometry_gap_sequences"] = .array(path.gaps)
+        }
+        expanded.warnings += warnings(for: portion, gaps: includeGeometry ? path.gaps : [])
       }
       return .object(fields)
     }
     guard !expanded.results.isEmpty else {
-      throw StorageError.invalidImport(
-        "No airway candidate contains both requested endpoint fixes.")
+      throw ToolInputError(reason: "No airway candidate contains both requested endpoint fixes.")
     }
     if !expanded.warnings.isEmpty { expanded.completeness = "partial" }
     return expanded

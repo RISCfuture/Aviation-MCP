@@ -76,6 +76,14 @@ struct ToolArguments: Sendable {
   }
 }
 
+/// Well-formed arguments that name something the published data doesn't contain.
+struct ToolInputError: LocalizedError {
+  let reason: String
+
+  var errorDescription: String? { "The tool arguments could not be satisfied." }
+  var failureReason: String? { reason }
+}
+
 extension Value {
   static func encoded(_ value: some Encodable) throws -> Self {
     let encoder = JSONEncoder()

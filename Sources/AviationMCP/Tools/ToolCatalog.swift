@@ -14,38 +14,43 @@ struct ToolCatalog: Sendable {
     guard let tool = ToolDefinition(rawValue: parameters.name), groups.contains(tool.group) else {
       throw MCPError.invalidParams("Unknown or disabled tool")
     }
-    let arguments = ToolArguments(parameters.arguments)
-    try ToolSchemas.validate(arguments, for: tool)
     do {
+      let arguments = ToolArguments(parameters.arguments)
+      try ToolSchemas.validate(arguments, for: tool)
       return try await execute(tool, arguments: arguments).response()
     } catch let error as TerrainFailure {
-      return try ToolResult(
-        results: [], completeness: "unavailable",
-        error: .object(["code": "terrain_unavailable", "message": .string(error.reason)])
-      ).response()
+      return try Self.failure("terrain_unavailable", message: error.reason)
     } catch let error as WeatherFailure {
+      var details = try Value.encoded(error).objectValue ?? [:]
+      details["code"] = "weather_unavailable"
       return try ToolResult(
         results: [], completeness: "unavailable",
-        rateLimits: try error.rateLimits.map(Value.encoded), error: .encoded(error)
+        rateLimits: try error.rateLimits.map(Value.encoded), error: .object(details)
       ).response()
+    } catch let error as ToolInputError {
+      return try Self.failure("invalid_argument", message: error.reason)
+    } catch MCPError.invalidParams(let message) {
+      return try Self.failure("invalid_argument", message: message ?? "Invalid arguments.")
+    } catch StorageError.expiredCursor {
+      return try Self.failure(
+        "cursor_expired", message: StorageError.expiredCursor.failureReason ?? "")
     } catch let error as StorageError {
-      return try ToolResult(
-        results: [], completeness: "unavailable",
-        error: .object([
-          "code": "data_unavailable", "message": .string(error.failureReason ?? "Data unavailable")
-        ])
-      ).response()
+      return try Self.failure(
+        "data_unavailable", message: error.failureReason ?? "Data unavailable")
     } catch is CancellationError {
       throw CancellationError()
     } catch let error as MCPError {
       throw error
     } catch {
-      return try ToolResult(
-        results: [], completeness: "unavailable",
-        error: .object(["code": "service_failure", "message": "The request could not be completed."]
-        )
-      ).response()
+      return try Self.failure("service_failure", message: "The request could not be completed.")
     }
+  }
+
+  private static func failure(_ code: String, message: String) throws -> CallTool.Result {
+    try ToolResult(
+      results: [], completeness: "unavailable",
+      error: .object(["code": .string(code), "message": .string(message)])
+    ).response()
   }
 
   private func execute(
@@ -79,24 +84,37 @@ struct ToolCatalog: Sendable {
     }
     var values = arguments.values
     if tool == .queryObstacles, values["order"] == nil { values["order"] = "highest" }
+    // ProcedureExpansion selects the transition, so it can list every published one.
+    if tool == .getProcedure { values["transition"] = nil }
     var sources = tool.periodicSources
     if tool == .queryObstacles {
       if values["runway"] != nil { sources.append(.nasr) }
       if values["procedure_id"] != nil { sources.append(.cifp) }
     }
-    var result = try await PeriodicQueries(store: store).search(
+    let result = try await PeriodicQueries(store: store).search(
       kinds: kinds,
       sources: sources, arguments: ToolArguments(values))
-    if tool == .getAirway { result = try AirwayExpansion.apply(result, arguments: arguments) }
-    if tool == .getProcedure {
+    return try Self.shape(result, for: tool, arguments: arguments)
+  }
+
+  private static func shape(
+    _ found: ToolResult, for tool: ToolDefinition, arguments: ToolArguments
+  ) throws -> ToolResult {
+    var result = found
+    switch tool {
+    case .getAirway: result = try AirwayExpansion.apply(result, arguments: arguments)
+    case .getProcedure:
       result = try ProcedureExpansion.apply(
         result, transition: arguments.string("transition"),
-        isContinuation: arguments.string("cursor") != nil)
+        includeGeometry: arguments.boolean("include_geometry") ?? false)
+    case .findProcedures: result.results = result.results.map(ProcedureSummary.summary)
+    default: break
     }
-    if [.getAirport, .getProcedure, .getAircraft].contains(tool), result.results.count > 1 {
+    if [.getAirport, .getAirway, .getProcedure].contains(tool), result.results.count > 1 {
       result.completeness = "partial"
       result.warnings.append(
-        "The identifier is ambiguous; select a candidate using its airport or location context.")
+        "The identifier matches several records; call again with record_id set to one candidate's id."
+      )
     }
     return result
   }
@@ -108,12 +126,12 @@ struct ToolCatalog: Sendable {
       if let version = snapshot.versions[source] {
         value["status"] = "available"
         value["coverage"] = version.parseErrorCount > 0 ? "partial" : "complete"
-        value["version"] = try .encoded(SourceStamp(version))
+        value["version"] = try .encoded(SourceProvenance(version))
       } else {
         value["status"] = "unavailable"
         value["reason"] = snapshot.unavailability(of: source).map(Value.string)
       }
-      value["nextVersion"] = try snapshot.next[source].map { try .encoded(SourceStamp($0)) }
+      value["nextVersion"] = try snapshot.next[source].map { try .encoded(SourceProvenance($0)) }
       return .object(value)
     }
     if groups.contains(.terrain) {

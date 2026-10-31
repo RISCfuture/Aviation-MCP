@@ -75,6 +75,43 @@ struct `Isolated HTTP requests` {
   }
 
   @Test
+  func `shows a tool error and the serialized result in text content`() async throws {
+    let failure = ToolResult(
+      results: [], completeness: "unavailable",
+      error: .object([
+        "code": "weather_unavailable", "reason": "No report covers the requested time.",
+        "providers": [
+          ["provider": "awc", "reason": "Budget exhausted.", "retryAt": "2026-10-31T09:00:00Z"]
+        ]
+      ]))
+    try await withApp { app in
+      MCPGateway(
+        origins: ["https://aviation.example"], timeout: .seconds(2),
+        tools: [Tool(name: "weather", description: "Weather", inputSchema: ["type": "object"])]
+      ) { _ in try failure.response() }.register(on: app)
+      try await app.testing().test(.POST, "/mcp") { request in
+        request.headers = Self.headers
+        request.body = ByteBuffer(
+          string: """
+            {"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"weather"}}
+            """
+        )
+      } afterResponse: { response in
+        let reply = try JSONDecoder().decode(
+          RPCReply.self, from: Data(response.body.readableBytesView))
+        let texts = reply.result.content.map(\.text)
+        #expect(
+          texts.first == """
+            Error weather_unavailable: No report covers the requested time.
+            awc: Budget exhausted. Retry after 2026-10-31T09:00:00Z.
+            """)
+        let serialized = try JSONDecoder().decode(Value.self, from: Data((texts.last ?? "").utf8))
+        #expect(serialized.objectValue?["error"]?.objectValue?["code"] == "weather_unavailable")
+      }
+    }
+  }
+
+  @Test
   func `initializes without negotiating unsupported experimental capabilities`() async throws {
     try await withApp { app in
       MCPGateway(origins: [], timeout: .seconds(2), tools: []) { _ in
