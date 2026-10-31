@@ -58,7 +58,7 @@ jobs:
       TEST_TERRAIN_PYTHON: /opt/terrain/bin/python
       TEST_DATABASE_URL: postgres://postgres:aviation-ci-test@postgres:5432/aviation_test?sslmode=disable
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Swift format
         run: swift format lint --strict --recursive Sources Tests Package.swift
       - uses: actions/cache@v6
@@ -87,7 +87,7 @@ jobs:
     outputs:
       reference: ${{ steps.push.outputs.reference }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4.4.1
       - name: Build deployment image
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
@@ -123,7 +123,7 @@ jobs:
     env:
       IMAGE: ${{ needs.image.outputs.reference }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1  # 1.6
       - name: Record the serving image for rollback
         id: previous

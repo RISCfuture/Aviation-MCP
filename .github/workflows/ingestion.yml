@@ -41,10 +41,10 @@ jobs:
       ingest: ${{ steps.decide.outputs.ingest }}
       maintenance: ${{ steps.schedule.outputs.maintenance }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Plan this run
         id: schedule
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const { plan } = require('./.github/scripts/ingestion-plan.cjs');
@@ -80,8 +80,8 @@ jobs:
     if: needs.plan.outputs.check == 'true'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
       - run: node --test .github/scripts/*.test.cjs
@@ -97,7 +97,7 @@ jobs:
       matrix:
         source: [nasr, cifp, dof, aircraft]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Compile source checker
         run: >-
           swiftc Sources/AviationMCP/Data/SourceDiscovery.swift
@@ -121,7 +121,7 @@ jobs:
     outputs:
       reference: ${{ steps.serving.outputs.reference }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Resolve the image the server runs
         id: serving
         env:
@@ -146,7 +146,7 @@ jobs:
       AVIATION_INGEST_IMAGE: ${{ needs.image.outputs.reference }}
       SOURCE: ${{ matrix.source }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
           pattern: source-*
@@ -209,7 +209,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Validate and publish terrain catalogs
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_INGEST_API_TOKEN }}
@@ -224,7 +224,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Purge expired data and caches
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_INGEST_API_TOKEN }}
@@ -241,7 +241,7 @@ jobs:
       actions: read
       issues: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v8
         with:
           pattern: source-*
@@ -290,7 +290,7 @@ jobs:
           key: published-status-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Notify owner of failures, withheld releases and coverage gaps
         if: always()
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           CHECK_RESULT: ${{ needs.check.result }}
           IMAGE_RESULT: ${{ needs.image.result }}

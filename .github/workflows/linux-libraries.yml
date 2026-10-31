@@ -22,7 +22,7 @@ jobs:
           - SwiftMETAR
           - SwiftGeographic
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Pull Swift toolchain
         run: docker pull swift:6.4.1-noble
       - name: Build pinned library
