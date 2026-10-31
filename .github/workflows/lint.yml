@@ -1,0 +1,30 @@
+name: Lint
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install linters
+        run: brew install swiftlint actionlint hadolint shellcheck yamllint markdownlint-cli2
+      - run: swiftlint lint --strict
+      - run: actionlint
+      - run: hadolint Dockerfile
+      - run: shellcheck scripts/*.sh
+      - run: yamllint -c .yamllint.yml .github .swiftlint.yml
+      - run: markdownlint-cli2 --config .markdownlint-cli2.jsonc '**/*.md'

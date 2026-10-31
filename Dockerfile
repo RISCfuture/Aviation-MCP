@@ -1,4 +1,5 @@
 FROM swift:6.4.1-noble AS build
+ARG SWIFT_BUILD_JOBS=1
 WORKDIR /workspace
 COPY Package.swift Package.resolved ./
 RUN --mount=type=cache,id=aviation-swift-6.4.1,target=/workspace/.build,sharing=locked \
@@ -6,7 +7,7 @@ RUN --mount=type=cache,id=aviation-swift-6.4.1,target=/workspace/.build,sharing=
 COPY Sources Sources
 COPY Tests Tests
 RUN --mount=type=cache,id=aviation-swift-6.4.1,target=/workspace/.build,sharing=locked \
-    swift build --build-system native -c release --product aviation-mcp --jobs 1 \
+    swift build --build-system native -c release --product aviation-mcp --jobs "$SWIFT_BUILD_JOBS" \
     && bin_dir="$(swift build --build-system native -c release --show-bin-path)" \
     && mkdir /output \
     && cp "$bin_dir/aviation-mcp" /output/ \

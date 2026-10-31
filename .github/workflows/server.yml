@@ -1,15 +1,46 @@
-name: Server verification
+name: Server
 
 on:
   pull_request:
+    branches: [main]
+    paths-ignore: &unrelated-paths
+      - '**/*.md'
+      - 'docs/**'
+      - 'plugins/**'
+      - 'site/**'
+      - '.github/dependabot.yml'
+      - '.github/scripts/**'
+      - '.github/workflows/ingestion.yml'
+      - '.github/workflows/lint.yml'
+      - '.github/workflows/linux-libraries.yml'
+      - '.github/workflows/site.yml'
+      - 'fly.ingest.toml'
+      - 'fly.postgres.toml'
+      - 'scripts/CheckSource.swift'
+      - 'scripts/database-privileges.sql'
+      - 'scripts/ingest-checked-sources.sh'
+      - 'scripts/measure-cold-start.sh'
+      - 'scripts/repair-identifier-index.sql'
+      - 'scripts/verify-linux-libraries.sh'
   push:
+    branches: [main]
+    paths-ignore: *unrelated-paths
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# Main runs queue in push order, and a newer push replaces any queued run, so an
+# older commit never deploys over a newer one.
+concurrency:
+  group: server-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  DEPLOYS: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+
 jobs:
-  linux:
+  test:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     container: swift:6.4.1-noble
@@ -28,11 +59,16 @@ jobs:
       TEST_TERRAIN_PYTHON: /opt/terrain/bin/python
       TEST_DATABASE_URL: postgres://postgres:aviation-ci-test@postgres:5432/aviation_test?sslmode=disable
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/cache@v4
+      - uses: actions/checkout@v6
+      - name: Swift format
+        run: swift format lint --strict --recursive Sources Tests Package.swift
+      - uses: actions/cache@v6
         with:
           path: .build
-          key: swift-linux-6.4.1-${{ hashFiles('Package.resolved') }}
+          key: >-
+            swift-linux-6.4.1-${{ hashFiles('Package.swift', 'Package.resolved') }}-${{
+            hashFiles('Sources/**', 'Tests/**') }}
+          restore-keys: swift-linux-6.4.1-${{ hashFiles('Package.swift', 'Package.resolved') }}-
       - name: Terrain worker dependencies and tests
         run: |
           apt-get update
@@ -43,49 +79,80 @@ jobs:
           /opt/terrain/bin/python -m unittest discover -s tests -v
           /opt/terrain/bin/ruff check .
           /opt/terrain/bin/ruff format --check .
-      - name: Release build
-        run: swift build --build-system native -c release --product aviation-mcp --jobs 4
       - name: Swift Testing with PostGIS
         run: swift test --build-system native -c release --jobs 4
-      - name: Swift format
-        run: swift format lint --strict --recursive Sources Tests Package.swift
 
-  lint:
-    runs-on: macos-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install linters
-        run: brew install swiftlint actionlint hadolint shellcheck yamllint markdownlint-cli2
-      - run: swiftlint lint --strict
-      - run: actionlint
-      - run: hadolint Dockerfile
-      - run: shellcheck scripts/*.sh
-      - run: yamllint -c .yamllint.yml .github .swiftlint.yml
-      - run: markdownlint-cli2 --config .markdownlint-cli2.jsonc '**/*.md'
-
-  container:
+  image:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build deployment image
-        run: docker build --tag aviation-mcp:ci .
-      - name: Verify runtime linkage and staging commands
-        run: docker run --rm --env APP_ROLE=stage aviation-mcp:ci --help
-
-  deploy:
-    needs: [linux, lint, container]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    concurrency:
-      group: fly-server-production
-      cancel-in-progress: false
+    outputs:
+      reference: ${{ steps.push.outputs.reference }}
     steps:
       - uses: actions/checkout@v6
-      - uses: superfly/flyctl-actions/setup-flyctl@1.6
-      - name: Deploy verified server revision
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4.4.1
+      - name: Build deployment image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
+        with:
+          context: .
+          load: true
+          tags: aviation-mcp:${{ github.sha }}
+          build-args: SWIFT_BUILD_JOBS=4
+          cache-from: type=gha,scope=server-image
+          cache-to: type=gha,scope=server-image,mode=max
+      - name: Smoke-test the image
+        run: scripts/smoke-test-image.sh "aviation-mcp:$GITHUB_SHA"
+      - if: env.DEPLOYS == 'true'
+        uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1  # 1.6
+      - name: Push the tested image to the Fly registry
+        id: push
+        if: env.DEPLOYS == 'true'
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_SERVER_API_TOKEN }}
-        run: flyctl deploy --config fly.toml --remote-only --ha=false --yes
+          REPOSITORY: registry.fly.io/aviation-mcp-server
+        run: |
+          flyctl auth docker
+          docker tag "aviation-mcp:$GITHUB_SHA" "$REPOSITORY:$GITHUB_SHA"
+          docker push --quiet "$REPOSITORY:$GITHUB_SHA"
+          reference=$(docker image inspect --format '{{index .RepoDigests 0}}' "$REPOSITORY:$GITHUB_SHA")
+          echo "reference=$reference" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: [test, image]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      IMAGE: ${{ needs.image.outputs.reference }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1  # 1.6
+      - name: Record the serving image for rollback
+        id: previous
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_SERVER_API_TOKEN }}
+        run: |
+          reference=$(scripts/deployed-image.sh)
+          echo "reference=$reference" >> "$GITHUB_OUTPUT"
+      - name: Apply database migrations with the new image
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_INGEST_API_TOKEN }}
+          AVIATION_INGEST_IMAGE: ${{ env.IMAGE }}
+        run: scripts/run-ingestion-job.sh migrate --yes
+      - name: Deploy the tested image
+        id: deploy
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_SERVER_API_TOKEN }}
+        run: flyctl deploy --config fly.toml --image "$IMAGE" --ha=false --yes
+      - name: Cold-start the release through the edge
+        id: smoke
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_SERVER_API_TOKEN }}
+        run: scripts/smoke-test-deployment.sh "$IMAGE"
+      - name: Roll back to the previous image
+        if: failure() && (steps.deploy.outcome == 'failure' || steps.smoke.outcome == 'failure')
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_SERVER_API_TOKEN }}
+          PREVIOUS_IMAGE: ${{ steps.previous.outputs.reference }}
+        run: |
+          flyctl deploy --config fly.toml --image "$PREVIOUS_IMAGE" --ha=false --yes
+          scripts/smoke-test-deployment.sh "$PREVIOUS_IMAGE"
