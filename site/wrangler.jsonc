@@ -11,7 +11,7 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "404-page",
-    "run_worker_first": ["/mcp", "/mcp/*", "/health", "/ready", "/metrics"],
+    "run_worker_first": ["/mcp", "/mcp/*", "/health"],
   },
   "vars": { "MCP_ORIGIN": "https://aviation-mcp-server.fly.dev" },
   "secrets": { "required": ["EDGE_PROXY_SECRET"] },

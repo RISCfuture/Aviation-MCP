@@ -1,6 +1,7 @@
-const servicePaths = new Set(["/mcp", "/health", "/ready", "/metrics"]);
+const noStore = { "Cache-Control": "no-store" };
+const originHeaders = ["Via", "Fly-Request-Id"];
 
-/** Authenticates the edge-observed client address for the origin's shared rate limiter. */
+/** Signs the edge-observed client address, which the origin requires and meters per client. */
 export async function signedHeaders(
   request: Request,
   secret: string,
@@ -39,42 +40,60 @@ export async function signedHeaders(
   return headers;
 }
 
-/** Serves static site assets and streams MCP traffic to the fixed Fly origin. */
+/** Answers requests the edge can settle without waking the Fly origin. */
+function edgeResponse(request: Request, url: URL): Response | undefined {
+  if (url.pathname === "/health")
+    return Response.json({ status: "ok" }, { headers: noStore });
+  if (url.protocol !== "https:")
+    return Response.json(
+      { error: "https_required", endpoint: `https://${url.host}/mcp` },
+      { status: 403, headers: noStore },
+    );
+  if (request.method !== "POST")
+    return new Response(null, {
+      status: 405,
+      headers: { ...noStore, Allow: "POST" },
+    });
+  return undefined;
+}
+
+/** Streams one MCP POST to the fixed Fly origin with a signed client address. */
+async function proxy(request: Request, url: URL, env: Env): Promise<Response> {
+  if (!env.EDGE_PROXY_SECRET || env.EDGE_PROXY_SECRET.length < 32) {
+    return Response.json(
+      { error: "proxy_unavailable" },
+      { status: 503, headers: { ...noStore, "Retry-After": "60" } },
+    );
+  }
+  const target = new URL(env.MCP_ORIGIN);
+  target.pathname = url.pathname;
+  target.search = url.search;
+  try {
+    const headers = await signedHeaders(request, env.EDGE_PROXY_SECRET);
+    const upstream = new Request(new Request(target, request), {
+      headers,
+      redirect: "manual",
+      signal: request.signal,
+    });
+    const result = await fetch(upstream, { cache: "no-store" });
+    const response = new Response(result.body, result);
+    response.headers.set("Cache-Control", "no-store");
+    for (const name of originHeaders) response.headers.delete(name);
+    return response;
+  } catch {
+    return Response.json(
+      { error: "upstream_unavailable" },
+      { status: 502, headers: { ...noStore, "Retry-After": "5" } },
+    );
+  }
+}
+
+/** Serves static site assets, answers health checks, and streams MCP traffic to Fly. */
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    if (!servicePaths.has(url.pathname)) return env.ASSETS.fetch(request);
-    if (!env.EDGE_PROXY_SECRET || env.EDGE_PROXY_SECRET.length < 32) {
-      return Response.json(
-        { error: "proxy_unavailable" },
-        {
-          status: 503,
-          headers: { "Retry-After": "60", "Cache-Control": "no-store" },
-        },
-      );
-    }
-    const target = new URL(env.MCP_ORIGIN);
-    target.pathname = url.pathname;
-    target.search = url.search;
-    try {
-      const headers = await signedHeaders(request, env.EDGE_PROXY_SECRET);
-      const upstream = new Request(new Request(target, request), {
-        headers,
-        redirect: "manual",
-        signal: request.signal,
-      });
-      const result = await fetch(upstream, { cache: "no-store" });
-      const response = new Response(result.body, result);
-      response.headers.set("Cache-Control", "no-store");
-      return response;
-    } catch {
-      return Response.json(
-        { error: "upstream_unavailable" },
-        {
-          status: 502,
-          headers: { "Retry-After": "5", "Cache-Control": "no-store" },
-        },
-      );
-    }
+    if (url.pathname !== "/mcp" && url.pathname !== "/health")
+      return env.ASSETS.fetch(request);
+    return edgeResponse(request, url) ?? proxy(request, url, env);
   },
 } satisfies ExportedHandler<Env>;

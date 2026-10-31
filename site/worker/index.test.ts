@@ -50,7 +50,11 @@ test("streams MCP bodies and preserves status, protocol headers, and retry infor
     });
     return new Response("rate limited", {
       status: 429,
-      headers: { "Retry-After": "4" },
+      headers: {
+        "Retry-After": "4",
+        Via: "1.1 fly.io",
+        "Fly-Request-Id": "01M68M1B-sjc",
+      },
     });
   });
   vi.stubGlobal("fetch", upstream);
@@ -67,15 +71,18 @@ test("streams MCP bodies and preserves status, protocol headers, and retry infor
   expect(response.status).toBe(429);
   expect(response.headers.get("Retry-After")).toBe("4");
   expect(response.headers.get("Cache-Control")).toBe("no-store");
+  expect(response.headers.get("Via")).toBeNull();
+  expect(response.headers.get("Fly-Request-Id")).toBeNull();
   expect(await response.text()).toBe("rate limited");
   expect(upstream).toHaveBeenCalledOnce();
   expect(assetFetch).not.toHaveBeenCalled();
 });
 
-test("keeps site requests off the Fly origin and never treats an unknown API path as MCP", async () => {
+test("keeps site and operational requests off the Fly origin", async () => {
   const upstream = vi.fn();
   vi.stubGlobal("fetch", upstream);
-  for (const path of ["/", "/assets/site.js", "/mcp/unknown"]) {
+  const paths = ["/", "/assets/site.js", "/mcp/unknown", "/ready", "/metrics"];
+  for (const path of paths) {
     const response = await worker.fetch(
       new Request(`https://aviation-mcp.org${path}`),
       env,
@@ -83,11 +90,39 @@ test("keeps site requests off the Fly origin and never treats an unknown API pat
     expect(await response.text()).toBe("website");
   }
   expect(upstream).not.toHaveBeenCalled();
-  expect(assetFetch).toHaveBeenCalledTimes(3);
+  expect(assetFetch).toHaveBeenCalledTimes(paths.length);
+});
+
+test("answers health checks, non-POST methods and plain HTTP at the edge", async () => {
+  const upstream = vi.fn();
+  vi.stubGlobal("fetch", upstream);
+  const health = await worker.fetch(
+    new Request("https://aviation-mcp.org/health"),
+    env,
+  );
+  expect(health.status).toBe(200);
+  expect(await health.json()).toEqual({ status: "ok" });
+  for (const method of ["GET", "HEAD", "OPTIONS", "DELETE"]) {
+    const response = await worker.fetch(
+      new Request("https://aviation-mcp.org/mcp", { method }),
+      env,
+    );
+    expect(response.status).toBe(405);
+    expect(response.headers.get("Allow")).toBe("POST");
+  }
+  const insecure = await worker.fetch(
+    new Request("http://aviation-mcp.org/mcp", { method: "POST", body: "{}" }),
+    env,
+  );
+  expect(insecure.status).toBe(403);
+  expect(await insecure.json()).toMatchObject({ error: "https_required" });
+  expect(upstream).not.toHaveBeenCalled();
+  expect(assetFetch).not.toHaveBeenCalled();
 });
 
 test("fails closed when signing configuration is missing and reports upstream outages", async () => {
   const request = new Request("https://aviation-mcp.org/mcp", {
+    method: "POST",
     headers: { "CF-Connecting-IP": "192.0.2.1" },
   });
   const upstream = vi.fn().mockRejectedValue(new Error("offline"));
