@@ -17,8 +17,7 @@ let package = Package(
   products: [.executable(name: "aviation-mcp", targets: ["Run"])],
   dependencies: [
     .package(
-      url: "https://github.com/RISCfuture/SwiftNASR.git",
-      revision: "a4d56cc686e148460a200eeff5751c2beed36847"),
+      url: "https://github.com/RISCfuture/SwiftNASR.git", exact: "6.0.0"),
     .package(
       url: "https://github.com/RISCfuture/SwiftCIFP.git",
       revision: "d57301f98db1b850b9c57d823c7f7dcf996fc730"),

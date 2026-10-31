@@ -21,8 +21,11 @@ struct NASRDiagnostics: Sendable {
         error, kind: Self.kind(type), recordID: id,
         details: ["field": .string(field), "source_value": value.map(Value.string) ?? .null])
       store(diagnostic, kind: Self.kind(type), id: id)
-    case .recordError(let type, let id, _):
-      let diagnostic = errors.record(error, kind: Self.kind(type), recordID: id)
+    case .recordError(let type, let id, let underlying):
+      let row = underlying as? CSVRowError
+      let diagnostic = errors.record(
+        error, kind: Self.kind(type), recordID: id, line: row.map { Int($0.rowNumber) },
+        details: row.map { ["file": .string($0.filename)] } ?? [:])
       store(diagnostic, kind: Self.kind(type), id: id)
     }
   }
