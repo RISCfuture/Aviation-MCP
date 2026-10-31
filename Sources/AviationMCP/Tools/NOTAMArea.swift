@@ -36,7 +36,9 @@ struct NOTAMArea: Sendable {
         area.reference = coordinate
       }
       guard let version = snapshot.versions[.nasr] else {
-        guard location != nil else { throw StorageError.unavailable(.nasr) }
+        guard location != nil else {
+          throw StorageError.unavailable(.nasr, reason: snapshot.unavailability(of: .nasr))
+        }
         area.warnings.append(
           "No effective NASR cycle can locate the overlying ARTCC; area NOTAMs such as TFRs "
             + "are not included.")
