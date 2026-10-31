@@ -135,10 +135,10 @@ func registerOperations(
   let databaseMetrics = TrafficGatedMetrics { try await databaseMetricsReport(store: store) }
   app.get("health") { _ in ["status": "ok"] }
   app.get("ready") { _ async throws -> [String: String] in try await readiness.current() }
-  app.get("metrics") { _ async throws -> Vapor.Response in
+  app.get("metrics") { _ async -> Vapor.Response in
     let body =
       await metrics.render()
-      + (try await databaseMetrics.render(afterCalls: await metrics.totalCalls))
+      + (await databaseMetrics.render(afterCalls: await metrics.totalCalls))
     return Vapor.Response(
       status: .ok, headers: ["Content-Type": "text/plain; version=0.0.4"], body: .init(string: body)
     )

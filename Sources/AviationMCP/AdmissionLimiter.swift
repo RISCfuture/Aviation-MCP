@@ -10,7 +10,7 @@ struct AdmissionRate: Sendable {
   var perSecond: Double { requestsPerMinute / 60 }
 }
 
-/// The budget one key receives: a token bucket plus a cap on in-flight tool calls.
+/// The budget one key receives: a token bucket for tool calls plus a cap on in-flight requests.
 struct AdmissionPolicy: Sendable {
   let rate: AdmissionRate
   let concurrency: Int
@@ -22,7 +22,7 @@ struct AdmissionSettings: Sendable {
   var client = AdmissionPolicy(
     rate: AdmissionRate(requestsPerMinute: 60, burst: 20), concurrency: 2)
   var connector = AdmissionPolicy(
-    rate: AdmissionRate(requestsPerMinute: 600, burst: 120), concurrency: 4)
+    rate: AdmissionRate(requestsPerMinute: 600, burst: 120), concurrency: 24)
   var connectorNetworks: [IPNetwork] = []
   var global = AdmissionRate(requestsPerMinute: 1200, burst: 200)
 }
@@ -36,14 +36,17 @@ enum AdmissionDecision: Sendable {
   case admitted(AdmissionTicket)
   case rateLimited(retryAfterSeconds: Int)
   case concurrencyLimited
+  /// The request costs more than a full bucket holds, so no wait admits it.
+  case exceedsCapacity(maximumCost: Int)
 }
 
 /**
- Meters `tools/call` requests in memory on the single serving machine.
+ Meters `/mcp` requests in memory on the single serving machine.
 
- Each client network (an IPv4 address or IPv6 /64) has its own bucket. Requests from a configured
- connector egress range share that range's larger bucket, and every admitted request also draws
- from one global bucket.
+ Every request holds one of its key's concurrency slots while it runs, and each `tools/call` in it
+ draws a token. Each client network (an IPv4 address or IPv6 /64) has its own bucket. Requests from
+ a configured connector egress range share that range's larger budget, and every admitted request
+ also draws from one global bucket.
  */
 actor AdmissionLimiter {
   private static let pruneInterval = Duration.seconds(60)
@@ -70,8 +73,10 @@ actor AdmissionLimiter {
     global.refill(settings.global, at: now)
     buckets[key] = bucket
     defer { prune(at: now) }
-    guard inFlight[key, default: 0] < policy.concurrency else { return .concurrencyLimited }
     let demand = Double(cost)
+    let capacity = min(policy.rate.burst, settings.global.burst)
+    guard demand <= capacity else { return .exceedsCapacity(maximumCost: Int(capacity)) }
+    guard inFlight[key, default: 0] < policy.concurrency else { return .concurrencyLimited }
     guard bucket.tokens >= demand else {
       return .rateLimited(retryAfterSeconds: bucket.secondsUntil(demand, rate: policy.rate))
     }
@@ -130,8 +135,8 @@ private struct TokenBucket {
   }
 }
 
-/// Charges `tools/call` requests to `/mcp` against the admission limiter; every other request
-/// passes free.
+/// Admits each `/mcp` POST through the admission limiter, charging its `tools/call` messages;
+/// every other request passes free.
 struct AdmissionMiddleware: AsyncMiddleware {
   let limiter: AdmissionLimiter
   let clients: ClientAddressResolver
@@ -143,13 +148,12 @@ struct AdmissionMiddleware: AsyncMiddleware {
       return try await next.respond(to: request)
     }
     let body = try await request.body.collect(max: MCPGateway.maximumBodyBytes).get()
-    let cost = JSONRPCPayload(body).toolCallCount
-    guard cost > 0 else { return try await next.respond(to: request) }
     let address = clients.address(of: request)
-    switch await limiter.admit(address, cost: cost) {
+    switch await limiter.admit(address, cost: JSONRPCPayload(body).admissionCost) {
     case .admitted(let ticket):
       do {
-        let response = try await WeatherClient.$key.withValue(address.map(IPNetwork.init(client:))) {
+        let client = address.map(IPNetwork.init(client:))
+        let response = try await RequestClient.$key.withValue(client) {
           try await next.respond(to: request)
         }
         await limiter.release(ticket)
@@ -162,15 +166,24 @@ struct AdmissionMiddleware: AsyncMiddleware {
       return Self.tooManyRequests(error: "server_rate_limit", retryAfterSeconds: seconds)
     case .concurrencyLimited:
       return Self.tooManyRequests(error: "client_concurrency_limit", retryAfterSeconds: 1)
+    case .exceedsCapacity(let maximumCost):
+      return Self.json(
+        status: .badRequest,
+        body: "{\"error\":\"too_many_tool_calls\",\"maximum_tool_calls\":\(maximumCost)}")
     }
   }
 
   private static func tooManyRequests(error: String, retryAfterSeconds: Int) -> Vapor.Response {
-    Vapor.Response(
+    let response = json(
       status: .tooManyRequests,
-      headers: ["Retry-After": String(retryAfterSeconds), "Content-Type": "application/json"],
-      body: .init(
-        string: "{\"error\":\"\(error)\",\"retry_after_seconds\":\(retryAfterSeconds)}"))
+      body: "{\"error\":\"\(error)\",\"retry_after_seconds\":\(retryAfterSeconds)}")
+    response.headers.replaceOrAdd(name: "Retry-After", value: String(retryAfterSeconds))
+    return response
+  }
+
+  private static func json(status: HTTPStatus, body: String) -> Vapor.Response {
+    Vapor.Response(
+      status: status, headers: ["Content-Type": "application/json"], body: .init(string: body))
   }
 }
 
@@ -185,7 +198,10 @@ struct JSONRPCPayload {
     messages = value?.arrayValue ?? value.map { [$0] } ?? []
   }
 
-  var toolCallCount: Int {
-    messages.count { $0.objectValue?["method"]?.stringValue == "tools/call" }
+  /// The tokens the request draws: one per `tools/call`, or none for a batch the gateway rejects
+  /// for its length before running anything.
+  var admissionCost: Int {
+    guard messages.count <= MCPGateway.maximumBatchMessages else { return 0 }
+    return messages.count { $0.objectValue?["method"]?.stringValue == "tools/call" }
   }
 }

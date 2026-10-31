@@ -1,11 +1,5 @@
 import Foundation
 
-/// The admitted client's network (one IPv4 address or IPv6 /64), bound for the duration of an
-/// MCP tool call.
-enum WeatherClient {
-  @TaskLocal static var key: IPNetwork?
-}
-
 /// Caps each client's share of the upstream provider budgets within this process, so one client
 /// cannot exhaust a provider for everyone else.
 ///

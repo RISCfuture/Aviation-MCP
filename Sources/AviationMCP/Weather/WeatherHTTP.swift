@@ -14,7 +14,7 @@ struct WeatherHTTP: Sendable {
   {
     let key = "\(provider):\(SHA256.hash(data: Data(url.utf8)))"
     return try await cache.value(key: key, provider: provider) {
-      let client = WeatherClient.key
+      let client = RequestClient.key
       if let client {
         try await reserveShare(provider: provider, client: client, units: units, limits: limits)
       }

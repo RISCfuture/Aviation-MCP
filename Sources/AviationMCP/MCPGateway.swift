@@ -6,6 +6,8 @@ import Vapor
 struct MCPGateway: Sendable {
   /// The largest request body accepted on `/mcp`.
   static let maximumBodyBytes = 1_048_576
+  /// The most JSON-RPC messages one batch may hold.
+  static let maximumBatchMessages = 10
   /// Protocol versions that permit JSON-RPC batches; a request without a version header uses
   /// 2025-03-26.
   private static let batchingProtocolVersions: Set<String> = ["2024-11-05", "2025-03-26"]
@@ -86,6 +88,11 @@ struct MCPGateway: Sendable {
     }
     guard !items.isEmpty else {
       return .error(statusCode: 400, .invalidRequest("Batch array must not be empty"))
+    }
+    guard items.count <= Self.maximumBatchMessages else {
+      return .error(
+        statusCode: 400,
+        .invalidRequest("A batch may hold at most \(Self.maximumBatchMessages) messages"))
     }
     guard !items.contains(where: { $0.objectValue?["method"] == "initialize" }) else {
       return .error(statusCode: 400, .invalidRequest("initialize must not be part of a batch"))

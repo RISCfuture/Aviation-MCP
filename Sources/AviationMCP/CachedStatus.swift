@@ -23,7 +23,9 @@ actor ExpiringValue<Value: Sendable> {
  Database-backed metrics that refresh only after new tool calls, at most once per interval.
 
  Fly scrapes `/metrics` every 15 seconds over the private network. Tying refreshes to tool traffic
- lets the connection pool drain and the database machine stop while the server sits idle.
+ lets the connection pool drain and the database machine stop while the server sits idle. A failed
+ refresh keeps the last metrics, reports `aviation_database_metrics_up 0` and waits out the same
+ interval before trying again.
  */
 actor TrafficGatedMetrics {
   private static let minimumRefreshInterval = Duration.seconds(60)
@@ -31,21 +33,32 @@ actor TrafficGatedMetrics {
   private let load: @Sendable () async throws -> String
   private var rendered = ""
   private var renderedAfterCalls = 0
-  private var refreshed: ContinuousClock.Instant?
+  private var attempted: ContinuousClock.Instant?
+  private var reachable: Bool?
 
   init(load: @escaping @Sendable () async throws -> String) {
     self.load = load
   }
 
-  func render(afterCalls calls: Int, now: ContinuousClock.Instant = .now) async throws -> String {
-    guard calls > renderedAfterCalls, isRefreshDue(at: now) else { return rendered }
-    rendered = try await load()
-    renderedAfterCalls = calls
-    refreshed = now
-    return rendered
+  func render(afterCalls calls: Int, now: ContinuousClock.Instant = .now) async -> String {
+    if calls > renderedAfterCalls, isRefreshDue(at: now) {
+      await refresh(afterCalls: calls, at: now)
+    }
+    return rendered + (reachable.map { "aviation_database_metrics_up \($0 ? 1 : 0)\n" } ?? "")
+  }
+
+  private func refresh(afterCalls calls: Int, at now: ContinuousClock.Instant) async {
+    attempted = now
+    do {
+      rendered = try await load()
+      renderedAfterCalls = calls
+      reachable = true
+    } catch {
+      reachable = false
+    }
   }
 
   private func isRefreshDue(at now: ContinuousClock.Instant) -> Bool {
-    refreshed.map { $0.duration(to: now) >= Self.minimumRefreshInterval } ?? true
+    attempted.map { $0.duration(to: now) >= Self.minimumRefreshInterval } ?? true
   }
 }
