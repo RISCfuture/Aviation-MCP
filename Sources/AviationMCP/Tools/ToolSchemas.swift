@@ -274,9 +274,12 @@ private enum Obstacles {
   static let search = Common.position.merging(Common.pagination) { $1 }.merging([
     "identifier": ToolSchemas.text("Digital Obstacle File obstacle number."),
     "radius_nm": ToolSchemas.described(
-      ["type": "number", "minimum": 0.01, "maximum": 500, "default": 5],
+      [
+        "type": "number", "minimum": 0.01,
+        "maximum": .double(PeriodicQueries.obstacleRadiusLimitNM), "default": 5
+      ],
       "Search radius in nautical miles around the coordinates, route or procedure path, or the "
-        + "length of a runway departure area. Defaults to 5."),
+        + "length of a runway departure area; at most 50. Defaults to 5."),
     "airport": ToolSchemas.text(
       "Airport of a runway departure search, as an FAA location identifier or ICAO code. "
         + "Requires runway."),

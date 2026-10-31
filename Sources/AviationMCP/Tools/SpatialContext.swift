@@ -105,7 +105,9 @@ struct SpatialContext {
         "The runway has no published threshold or heading to orient a departure sector; "
           + "request departure_area circle.")
     }
-    let length = try arguments.number("radius_nm", default: 5, range: 0.01...500) ?? 5
+    let length =
+      try arguments.number(
+        "radius_nm", default: 5, range: 0.01...PeriodicQueries.obstacleRadiusLimitNM) ?? 5
     let farHalfWidth = departureHalfWidthNM + length * tan(departureSplayDeg * .pi / 180)
     let farCenter = Geodesy.destination(from: departure, courseDeg: course, distanceNM: length)
     let corners = [

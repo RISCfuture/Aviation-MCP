@@ -4,6 +4,10 @@ import MCP
 import SQLKit
 
 struct PeriodicQueries: Sendable {
+  static let obstacleRadiusLimitNM = 50.0
+  private static let radiusLimitNM = 500.0
+  private static let defaultRadiusNM = 5.0
+
   let store: AviationStore
 
   func search(kinds: [String], sources: [SourceName], arguments: ToolArguments) async throws
@@ -148,11 +152,17 @@ struct PeriodicQueries: Sendable {
       """
     query += try filters(arguments, kinds: kinds)
     query += airports.predicate
-    query += try context.filter(
-      radiusNM: arguments.number("radius_nm", default: 5, range: 0.01...500) ?? 5)
+    query += try context.filter(radiusNM: radius(arguments, kinds: kinds))
     if let altitude { query += " AND \(altitude) <> 'outside'" }
     query += try ordering(order(arguments, kinds: kinds, context: context), context: context)
     return query
+  }
+
+  /// Obstacle searches stop at 50 NM so a single search stays within the statement timeout.
+  private static func radius(_ arguments: ToolArguments, kinds: [String]) throws -> Double {
+    let limit = kinds.contains("obstacle") ? obstacleRadiusLimitNM : radiusLimitNM
+    return try arguments.number("radius_nm", default: defaultRadiusNM, range: 0.01...limit)
+      ?? defaultRadiusNM
   }
 
   private static func filters(_ arguments: ToolArguments, kinds: [String])
