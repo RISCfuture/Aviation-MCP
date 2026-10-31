@@ -5,6 +5,7 @@ actor TerrainService {
   private let catalog: TerrainCatalog
   private let worker: TerrainWorker
   private var jobs: [String: Job] = [:]
+  private var allowance = WorkerTimeAllowance()
 
   init(catalog: TerrainCatalog, worker: TerrainWorker) {
     self.catalog = catalog
@@ -26,7 +27,9 @@ actor TerrainService {
       guard jobs.isEmpty else {
         throw TerrainFailure(reason: "Terrain worker is busy; retry shortly.")
       }
-      task = Task { try await self.perform(query) }
+      let client = RequestClient.key
+      try requireAllowance(for: client)
+      task = Task { try await self.perform(query, chargingTo: client) }
       jobs[key] = Job(task: task, waiters: [waiter])
     }
     defer { release(key, waiter: waiter) }
@@ -39,6 +42,13 @@ actor TerrainService {
     }
   }
 
+  private func requireAllowance(for client: IPNetwork?) throws {
+    guard let client, let wait = allowance.wait(for: client, at: .now) else { return }
+    let seconds = Int((wait / .seconds(1)).rounded(.up))
+    throw TerrainFailure(
+      reason: "This client has used its share of the terrain worker; retry in \(seconds) seconds.")
+  }
+
   private func release(_ key: String, waiter: UUID) {
     guard var job = jobs[key], job.waiters.remove(waiter) != nil else { return }
     if job.waiters.isEmpty {
@@ -47,6 +57,16 @@ actor TerrainService {
     } else {
       jobs[key] = job
     }
+  }
+
+  private func perform(_ query: TerrainQuery, chargingTo client: IPNetwork?) async throws
+    -> ToolResult
+  {
+    let start = ContinuousClock.now
+    defer {
+      if let client { allowance.charge(client, for: start.duration(to: .now), at: .now) }
+    }
+    return try await perform(query)
   }
 
   private func perform(_ query: TerrainQuery) async throws -> ToolResult {

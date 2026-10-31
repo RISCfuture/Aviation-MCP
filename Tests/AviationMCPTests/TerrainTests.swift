@@ -25,6 +25,19 @@ struct `Bounded terrain requests` {
   }
 
   @Test
+  func `limits each client to its share of terrain worker time`() throws {
+    var allowance = WorkerTimeAllowance()
+    let start = ContinuousClock.now
+    let client = try #require(IPNetwork(cidr: "192.0.2.1/32"))
+    let neighbor = try #require(IPNetwork(cidr: "192.0.2.2/32"))
+    #expect(allowance.wait(for: client, at: start) == nil)
+    allowance.charge(client, for: .seconds(70), at: start)
+    #expect(allowance.wait(for: client, at: start) == .seconds(40))
+    #expect(allowance.wait(for: neighbor, at: start) == nil)
+    #expect(allowance.wait(for: client, at: start + .seconds(41)) == nil)
+  }
+
+  @Test
   func `forwards only worker messages marked for clients`() {
     let worker = TerrainWorker(python: "", script: "", cacheDirectory: "", cacheBytes: 0)
     let marked =
