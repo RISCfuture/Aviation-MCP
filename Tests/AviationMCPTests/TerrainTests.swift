@@ -25,6 +25,21 @@ struct `Bounded terrain requests` {
   }
 
   @Test
+  func `forwards only worker messages marked for clients`() {
+    let worker = TerrainWorker(python: "", script: "", cacheDirectory: "", cacheBytes: 0)
+    let marked =
+      "RuntimeWarning: overflow\n\(TerrainWorker.clientMessagePrefix)Terrain tile limit reached\n"
+    #expect(worker.failure(stderr: marked, status: 1).reason == "Terrain tile limit reached")
+    let traceback = """
+      Traceback (most recent call last):
+        File "/app/terrain/worker.py", line 359, in <module>
+      KeyError: 'tiles'
+      """
+    #expect(
+      worker.failure(stderr: traceback, status: 1).reason == "Terrain worker failed unexpectedly.")
+  }
+
+  @Test
   func `parses catalog coordinates strictly and rejects duplicate or invalid cells`() throws {
     let name = "Copernicus_DSM_COG_10_S01_00_W123_00_DEM"
     let cells = try TerrainCatalog.parse(name + "\n", product: "glo30")

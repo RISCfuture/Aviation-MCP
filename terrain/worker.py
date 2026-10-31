@@ -23,6 +23,8 @@ from rasterio.windows import from_bounds, intersect
 from range_cache import Budget, RangeCache, RangeFile, TerrainError
 
 READER_REVISION = "copernicus-native-2"
+# Matches TerrainWorker.clientMessagePrefix; the server forwards only these lines to clients.
+CLIENT_MESSAGE_PREFIX = "aviation-terrain-error: "
 GEOD = Geod(ellps="WGS84")
 
 
@@ -356,5 +358,7 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except (TerrainError, OSError, ValueError, MemoryError) as error:
+    except TerrainError as error:
+        raise SystemExit(f"{CLIENT_MESSAGE_PREFIX}{error}") from error
+    except (OSError, ValueError, MemoryError) as error:
         raise SystemExit(str(error)) from error
