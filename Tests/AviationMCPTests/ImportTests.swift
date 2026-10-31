@@ -243,7 +243,6 @@ struct `Normalized source imports` {
     let normalized = try #require(record.data["variants"]?.arrayValue)
     #expect(normalized.map { $0.objectValue?["approach_category"]?.stringValue } == ["C", "D"])
     #expect(record.data["category_requires_variant_selection"] == true)
-    #expect(record.supplemental["identity"] != nil)
     #expect(record.data["identity"] == nil)
   }
 }

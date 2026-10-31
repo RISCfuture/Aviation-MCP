@@ -31,7 +31,7 @@ enum CIFPImporter {
     for airport in await linked.airports.values.sorted(by: { $0.id < $1.id }) {
       records += await procedures(airport, versionID: version.id, diagnostics: &diagnostics.errors)
     }
-    records += CIFPAirspace.records(cifp, versionID: version.id, diagnostics: &diagnostics.errors)
+    records += CIFPAirspace.records(cifp, versionID: version.id)
     guard !records.isEmpty else {
       throw StorageError.invalidImport("CIFP contains no usable records.")
     }
@@ -60,7 +60,6 @@ enum CIFPImporter {
         }
         record.data["landing"] = approach.landing.map { .string(String($0.rawValue)) }
         record.data["levels_of_service"] = approach.levelsOfService.map(CIFPRestrictions.levels)
-        record.supplemental = try Normalization.supplemental(approach)
         records.append(record)
       } catch {
         diagnostics.record(
@@ -69,12 +68,11 @@ enum CIFPImporter {
     }
     for sid in airport.sids {
       do {
-        var record = try await ProcedureDefinition(
+        let record = try await ProcedureDefinition(
           identifier: sid.identifier, airport: airport.id, type: "departure",
           routeType: String(sid.routeType.rawValue), transition: sid.transitionId,
           runways: sid.runwayNames.sorted(), legs: sid.legs, missed: []
         ).record(versionID: versionID)
-        record.supplemental = try Normalization.supplemental(sid)
         records.append(record)
       } catch {
         diagnostics.record(error, kind: "procedure", recordID: airport.id + "/" + sid.identifier)
@@ -82,12 +80,11 @@ enum CIFPImporter {
     }
     for star in airport.stars {
       do {
-        var record = try await ProcedureDefinition(
+        let record = try await ProcedureDefinition(
           identifier: star.identifier, airport: airport.id, type: "arrival",
           routeType: String(star.routeType.rawValue), transition: star.transitionId,
           runways: star.runwayNames.sorted(), legs: star.legs, missed: []
         ).record(versionID: versionID)
-        record.supplemental = try Normalization.supplemental(star)
         records.append(record)
       } catch {
         diagnostics.record(error, kind: "procedure", recordID: airport.id + "/" + star.identifier)

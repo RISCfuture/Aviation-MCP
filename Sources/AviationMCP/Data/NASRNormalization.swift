@@ -29,15 +29,13 @@ enum NASRNormalization {
   static func float(_ value: Float?) -> Value? { value.map { .double(Double($0)) } }
 
   static func base(
-    _ source: some Encodable, version: UUID, kind: String,
-    identity: NASRIdentity, position: Location?
-  ) throws -> AviationRecord {
+    version: UUID, kind: String, identity: NASRIdentity, position: Location?
+  ) -> AviationRecord {
     var record = AviationRecord(
       versionID: version, kind: kind, id: identity.id,
       identifier: identity.identifier, name: identity.name)
     record.geometry = position.map(point)
     record.elevationMSLFeet = position?.elevationFtMSL.map(Double.init)
-    record.supplemental = try Normalization.supplemental(source)
     return record
   }
 }

@@ -4,8 +4,8 @@ import SwiftNASR
 
 enum NASRNavigation {
   static func navaid(_ navaid: Navaid, versionID: UUID) throws -> AviationRecord {
-    var record = try NASRNormalization.base(
-      navaid, version: versionID, kind: "navaid",
+    var record = NASRNormalization.base(
+      version: versionID, kind: "navaid",
       identity: .init(
         id: [
           navaid.id, navaid.type.rawValue, navaid.stateName ?? "", navaid.country ?? "", navaid.name
@@ -24,8 +24,8 @@ enum NASRNavigation {
   }
 
   static func fix(_ fix: Fix, versionID: UUID) throws -> AviationRecord {
-    var record = try NASRNormalization.base(
-      fix, version: versionID, kind: "fix",
+    var record = NASRNormalization.base(
+      version: versionID, kind: "fix",
       identity: .init(
         id: [fix.id, fix.ICAORegion ?? "", fix.stateName].joined(separator: "/"),
         identifier: fix.id, name: fix.id),
@@ -41,8 +41,8 @@ enum NASRNavigation {
   }
 
   static func weather(_ station: WeatherStation, versionID: UUID) throws -> AviationRecord {
-    var record = try NASRNormalization.base(
-      station, version: versionID, kind: "awos",
+    var record = NASRNormalization.base(
+      version: versionID, kind: "awos",
       identity: .init(id: station.id, identifier: station.id, name: station.city ?? station.id),
       position: station.position)
     record.data = NASRNormalization.fields([

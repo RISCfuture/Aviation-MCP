@@ -4,8 +4,8 @@ import SwiftNASR
 
 enum NASRFacilities {
   static func ils(_ facility: ILS, versionID: UUID) throws -> AviationRecord {
-    var record = try NASRNormalization.base(
-      facility, version: versionID, kind: "ils",
+    var record = NASRNormalization.base(
+      version: versionID, kind: "ils",
       identity: .init(id: facility.id, identifier: facility.ILSId, name: facility.airportName),
       position: facility.localizer?.position)
     record.airport = facility.airportId
@@ -22,8 +22,8 @@ enum NASRFacilities {
   }
 
   static func fss(_ facility: FSS, versionID: UUID) throws -> AviationRecord {
-    var record = try NASRNormalization.base(
-      facility, version: versionID, kind: "fss",
+    var record = NASRNormalization.base(
+      version: versionID, kind: "fss",
       identity: .init(id: facility.id, identifier: facility.id, name: facility.name),
       position: facility.location)
     record.airport = facility.airportId
@@ -33,7 +33,7 @@ enum NASRFacilities {
       "phone": facility.phoneNumber.map(Value.string), "city": facility.city.map(Value.string),
       "frequencies": .array(
         try facility.frequencies.map { frequency in
-          let fields = try Normalization.supplemental(frequency)
+          let fields = try Normalization.encodedFields(frequency)
           return Normalization.object([
             "frequency_khz": fields["frequencyKHz"], "name": fields["name"],
             "single_sideband": fields["singleSideband"], "use": fields["use"]
@@ -44,8 +44,8 @@ enum NASRFacilities {
   }
 
   static func hold(_ hold: Hold, versionID: UUID) throws -> AviationRecord {
-    var record = try NASRNormalization.base(
-      hold, version: versionID, kind: "hold",
+    var record = NASRNormalization.base(
+      version: versionID, kind: "hold",
       identity: .init(id: hold.id, identifier: hold.name, name: hold.name),
       position: hold.fixPosition ?? hold.navaidPosition)
     record.data = NASRNormalization.fields([

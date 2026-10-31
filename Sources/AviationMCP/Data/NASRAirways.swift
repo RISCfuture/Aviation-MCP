@@ -4,8 +4,8 @@ import SwiftNASR
 
 enum NASRAirways {
   static func record(_ airway: Airway, versionID: UUID) throws -> AviationRecord {
-    var record = try NASRNormalization.base(
-      airway, version: versionID, kind: "airway",
+    var record = NASRNormalization.base(
+      version: versionID, kind: "airway",
       identity: .init(id: airway.id, identifier: airway.designation, name: airway.designation),
       position: nil)
     let segments = airway.segments.sorted { $0.sequenceNumber < $1.sequenceNumber }

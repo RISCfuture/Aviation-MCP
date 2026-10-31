@@ -4,8 +4,8 @@ import SwiftNASR
 
 enum NASRAirports {
   static func record(_ airport: Airport, versionID: UUID) throws -> AviationRecord {
-    var record = try NASRNormalization.base(
-      airport, version: versionID, kind: "airport",
+    var record = NASRNormalization.base(
+      version: versionID, kind: "airport",
       identity: .init(
         id: airport.id + "/" + airport.LID, identifier: airport.ICAOIdentifier ?? airport.LID,
         name: airport.name),

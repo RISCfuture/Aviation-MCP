@@ -15,7 +15,6 @@ struct AviationRecord: Codable, Sendable {
   var heightAGLFeet: Double?
   var geometry: Value?
   var data: [String: Value] = [:]
-  var supplemental: [String: Value] = [:]
 }
 
 struct AviationStore: Sendable {
@@ -125,14 +124,14 @@ struct AviationStore: Sendable {
       """
       INSERT INTO aviation_records
         (version_id, kind, id, identifier, name, airport, sequence,
-         elevation_msl_ft, height_agl_ft, geometry, data, supplemental)
+         elevation_msl_ft, height_agl_ft, geometry, data)
       SELECT "versionID", kind, id, identifier, name, airport, sequence,
         "elevationMSLFeet", "heightAGLFeet",
-        ST_SetSRID(ST_GeomFromGeoJSON(geometry::text), 4326)::geography, data, supplemental
+        ST_SetSRID(ST_GeomFromGeoJSON(geometry::text), 4326)::geography, data
       FROM jsonb_to_recordset(\(bind: json)::jsonb) AS r(
         "versionID" uuid, kind text, id text, identifier text, name text,
         airport text, sequence integer, "elevationMSLFeet" double precision,
-        "heightAGLFeet" double precision, geometry jsonb, data jsonb, supplemental jsonb)
+        "heightAGLFeet" double precision, geometry jsonb, data jsonb)
       """
     ).run()
   }

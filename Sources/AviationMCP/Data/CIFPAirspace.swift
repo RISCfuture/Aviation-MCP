@@ -3,35 +3,27 @@ import MCP
 import SwiftCIFP
 
 enum CIFPAirspace {
-  static func records(
-    _ cifp: CIFP, versionID: UUID, diagnostics: inout ImportDiagnostics
-  ) -> [AviationRecord] {
+  static func records(_ cifp: CIFP, versionID: UUID) -> [AviationRecord] {
     var records: [AviationRecord] = []
     for airspace in cifp.controlledAirspaces {
-      do {
-        var record = AirspaceDefinition(
-          identifier: airspace.airspaceCenter, name: airspace.name, region: airspace.icaoRegion,
-          category: airspace.airspaceClass.map { String($0.rawValue) } ?? "",
-          multiple: airspace.multipleCode, type: "controlled", boundaries: airspace.boundaries,
-          lower: airspace.lowerLimit, upper: airspace.upperLimit
-        ).record(versionID: versionID)
-        record.data["class"] = airspace.airspaceClass.map { .string(String($0.rawValue)) }
-        record.supplemental = try Normalization.supplemental(airspace)
-        records.append(record)
-      } catch { diagnostics.record(error, kind: "airspace", recordID: airspace.airspaceCenter) }
+      var record = AirspaceDefinition(
+        identifier: airspace.airspaceCenter, name: airspace.name, region: airspace.icaoRegion,
+        category: airspace.airspaceClass.map { String($0.rawValue) } ?? "",
+        multiple: airspace.multipleCode, type: "controlled", boundaries: airspace.boundaries,
+        lower: airspace.lowerLimit, upper: airspace.upperLimit
+      ).record(versionID: versionID)
+      record.data["class"] = airspace.airspaceClass.map { .string(String($0.rawValue)) }
+      records.append(record)
     }
     for airspace in cifp.specialUseAirspaces {
-      do {
-        var record = AirspaceDefinition(
-          identifier: airspace.fullDesignation, name: airspace.name, region: airspace.icaoRegion,
-          category: String(airspace.kind.rawValue),
-          multiple: airspace.multipleCode, type: "special_use", boundaries: airspace.boundaries,
-          lower: airspace.lowerLimit, upper: airspace.upperLimit
-        ).record(versionID: versionID)
-        record.data["restrictive_type"] = .string(String(airspace.kind.rawValue))
-        record.supplemental = try Normalization.supplemental(airspace)
-        records.append(record)
-      } catch { diagnostics.record(error, kind: "airspace", recordID: airspace.fullDesignation) }
+      var record = AirspaceDefinition(
+        identifier: airspace.fullDesignation, name: airspace.name, region: airspace.icaoRegion,
+        category: String(airspace.kind.rawValue),
+        multiple: airspace.multipleCode, type: "special_use", boundaries: airspace.boundaries,
+        lower: airspace.lowerLimit, upper: airspace.upperLimit
+      ).record(versionID: versionID)
+      record.data["restrictive_type"] = .string(String(airspace.kind.rawValue))
+      records.append(record)
     }
     return records
   }

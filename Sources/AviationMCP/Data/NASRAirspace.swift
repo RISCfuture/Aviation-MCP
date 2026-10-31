@@ -4,8 +4,8 @@ import SwiftNASR
 
 enum NASRAirspace {
   static func artcc(_ center: ARTCC, versionID: UUID) throws -> AviationRecord {
-    var record = try NASRNormalization.base(
-      center, version: versionID, kind: "artcc",
+    var record = NASRNormalization.base(
+      version: versionID, kind: "artcc",
       identity: .init(id: center.id, identifier: center.code, name: center.name),
       position: center.location)
     record.data = NASRNormalization.fields([
@@ -22,8 +22,8 @@ enum NASRAirspace {
   }
 
   static func boundary(_ boundary: ARTCCBoundarySegment, versionID: UUID) throws -> AviationRecord {
-    var record = try NASRNormalization.base(
-      boundary, version: versionID, kind: "artcc_boundary",
+    var record = NASRNormalization.base(
+      version: versionID, kind: "artcc_boundary",
       identity: .init(
         id: boundary.id, identifier: boundary.ARTCCIdentifier, name: boundary.centerName),
       position: boundary.position)
@@ -42,8 +42,8 @@ enum NASRAirspace {
   }
 
   static func parachute(_ area: ParachuteJumpArea, versionID: UUID) throws -> AviationRecord {
-    var record = try NASRNormalization.base(
-      area, version: versionID, kind: "parachute_area",
+    var record = NASRNormalization.base(
+      version: versionID, kind: "parachute_area",
       identity: .init(
         id: area.PJAId, identifier: area.PJAId,
         name: area.dropZoneName ?? area.airportName ?? area.PJAId), position: area.position)
@@ -64,8 +64,8 @@ enum NASRAirspace {
   }
 
   static func military(_ route: MilitaryTrainingRoute, versionID: UUID) throws -> AviationRecord {
-    var record = try NASRNormalization.base(
-      route, version: versionID, kind: "military_route",
+    var record = NASRNormalization.base(
+      version: versionID, kind: "military_route",
       identity: .init(id: route.id, identifier: route.id, name: route.id), position: nil)
     let points = militaryPoints(route)
     let path = AirwayGeometry.path(points)

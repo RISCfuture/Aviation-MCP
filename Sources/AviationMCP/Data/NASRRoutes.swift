@@ -4,8 +4,8 @@ import SwiftNASR
 
 enum NASRRoutes {
   static func coded(_ route: CodedDepartureRoute, versionID: UUID) throws -> AviationRecord {
-    var record = try NASRNormalization.base(
-      route, version: versionID, kind: "coded_departure_route",
+    var record = NASRNormalization.base(
+      version: versionID, kind: "coded_departure_route",
       identity: .init(id: route.id, identifier: route.routeCode, name: route.routeString),
       position: nil)
     record.airport = route.origin
@@ -22,8 +22,8 @@ enum NASRRoutes {
   }
 
   static func preferred(_ route: PreferredRoute, versionID: UUID) throws -> AviationRecord {
-    var record = try NASRNormalization.base(
-      route, version: versionID, kind: "preferred_route",
+    var record = NASRNormalization.base(
+      version: versionID, kind: "preferred_route",
       identity: .init(
         id: route.id, identifier: route.designator ?? route.id,
         name: route.originIdentifier + " to " + route.destinationIdentifier), position: nil)

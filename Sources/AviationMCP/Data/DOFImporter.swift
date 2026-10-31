@@ -55,7 +55,6 @@ enum DOFImporter {
     ]
     record.data["state"] = obstacle.state.map(Value.string)
     record.data["source_updated_at"] = obstacle.lastUpdatedDate.map { .string($0.ISO8601Format()) }
-    record.supplemental = try Normalization.supplemental(obstacle)
     return record
   }
 }

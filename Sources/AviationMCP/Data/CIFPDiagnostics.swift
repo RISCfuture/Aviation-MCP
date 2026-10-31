@@ -40,7 +40,6 @@ struct CIFPDiagnostics {
       else { return original }
       var record = original
       record.data["source_warnings"] = .array(issues)
-      record.supplemental["parser_diagnostics"] = .array(issues)
       record.geometry = nil
       record.data["missed_approach_geometry"] = nil
       record.data["geometry_scope"] = "unavailable_due_to_parse_errors"

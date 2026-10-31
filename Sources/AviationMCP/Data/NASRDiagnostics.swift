@@ -49,7 +49,6 @@ struct NASRDiagnostics: Sendable {
       guard !issues.isEmpty else { return original }
       var record = original
       record.data["source_warnings"] = .array(issues)
-      record.supplemental["parser_diagnostics"] = .array(issues)
       if ["airway", "military_route", "artcc_boundary"].contains(record.kind) {
         record.geometry = nil
         record.data["geometry_scope"] = "unavailable_due_to_parse_errors"

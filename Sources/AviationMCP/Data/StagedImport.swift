@@ -30,7 +30,7 @@ enum Normalization {
     .object(fields.compactMapValues { $0 })
   }
 
-  static func supplemental(_ record: some Encodable) throws -> [String: Value] {
+  static func encodedFields(_ record: some Encodable) throws -> [String: Value] {
     try Value.encoded(record).objectValue ?? [:]
   }
 }

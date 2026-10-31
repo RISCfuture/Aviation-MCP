@@ -57,7 +57,6 @@ enum AircraftImporter {
     record.data["approach_category_source"] = profile.categories.approach.map { _ in
       .string(profile.variants.first?.categories.approach == nil ? "EUROCONTROL APD" : "FAA ACD")
     }
-    record.supplemental = try Normalization.supplemental(profile)
     return record
   }
 
