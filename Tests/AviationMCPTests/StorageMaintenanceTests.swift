@@ -6,7 +6,7 @@ import Testing
 
 extension `Transactional publication` {
   @Test
-  func `re-runs schema migrations over a deployed schema`() async throws {
+  func `re-runs schema migrations over a deployed schema and publishes into it`() async throws {
     try await withDatabase { store in
       let sql = try store.database.sqlDatabase()
       try await sql.raw(
@@ -15,15 +15,10 @@ extension `Transactional publication` {
       for _ in 0..<2 {
         try await AviationSchema().prepare(on: store.database)
         try await TerrainSchema().prepare(on: store.database)
-        try await DropSupplementalRecords().prepare(on: store.database)
+        try await SearchIndexes().prepare(on: store.database)
       }
-      let columns = try await sql.raw(
-        """
-        SELECT count(*) AS total FROM information_schema.columns
-        WHERE table_name = 'aviation_records' AND column_name = 'supplemental'
-        """
-      ).first(decodingColumn: "total", as: Int.self)
-      #expect(columns == 0)
+      try await Self.publishObstacles(store)
+      #expect(try await store.snapshot().versions[.dof] != nil)
     }
   }
 

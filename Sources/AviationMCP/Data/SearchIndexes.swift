@@ -10,7 +10,8 @@ struct SearchIndexes: AsyncMigration {
     "aviation_search_text", "aviation_airport_code", "aviation_obstacle_elevation"
   ]
 
-  private static let statements: [SQLQueryString] = [
+  /// Statements creating the indexes; ``AviationSchema`` also creates them on a fresh database.
+  static let creations = [
     """
     CREATE INDEX IF NOT EXISTS aviation_search_text
     ON aviation_records USING gin ((identifier || ' ' || name) gin_trgm_ops)
@@ -22,9 +23,7 @@ struct SearchIndexes: AsyncMigration {
     """
     CREATE INDEX IF NOT EXISTS aviation_obstacle_elevation
     ON aviation_records(version_id, elevation_msl_ft DESC NULLS LAST) WHERE kind = 'obstacle'
-    """,
-    "DROP INDEX IF EXISTS aviation_name",
-    "DROP INDEX IF EXISTS aviation_airport"
+    """
   ]
 
   /// A case-insensitive substring match against the trigram-indexed identifier and name, which
@@ -44,7 +43,9 @@ struct SearchIndexes: AsyncMigration {
     try await database.withSQLTransaction { connection in
       let sql = try connection.sqlDatabase()
       try await sql.raw("SELECT pg_advisory_xact_lock(13799201)").run()
-      for statement in Self.statements { try await sql.raw(statement).run() }
+      for statement in Self.creations {
+        try await sql.raw(SQLQueryString(stringLiteral: statement)).run()
+      }
     }
   }
 
