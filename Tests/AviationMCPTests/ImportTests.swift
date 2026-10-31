@@ -246,3 +246,30 @@ struct `Normalized source imports` {
     #expect(record.data["identity"] == nil)
   }
 }
+
+extension `Normalized source imports` {
+  @Test
+  func `stores each kind in spatial clusters with unpositioned records last`() {
+    func record(_ kind: String, _ id: String, _ geometry: Value?) -> AviationRecord {
+      var record = AviationRecord(
+        versionID: UUID(), kind: kind, id: id, identifier: id, name: id)
+      record.geometry = geometry
+      return record
+    }
+    let ordered = SpatialOrder.sorted([
+      record("obstacle", "unpositioned", nil),
+      record("obstacle", "new-york", Normalization.point(latitude: 40.7, longitude: -74)),
+      record("obstacle", "oakland", Normalization.point(latitude: 37.7, longitude: -122.2)),
+      record("airport", "boston", .object(["type": "Point", "coordinates": [-71, 42]])),
+      record(
+        "obstacle", "san-carlos",
+        .object([
+          "type": "Polygon",
+          "coordinates": [[[-122.25, 37.5], [-122.2, 37.5], [-122.2, 37.6], [-122.25, 37.5]]]
+        ]))
+    ]).map(\.id)
+    #expect(ordered.first == "boston")
+    #expect(Set(ordered[1...2]) == ["oakland", "san-carlos"])
+    #expect(ordered[3...] == ["new-york", "unpositioned"])
+  }
+}

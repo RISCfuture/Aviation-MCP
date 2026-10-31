@@ -39,6 +39,7 @@ struct AviationStore: Sendable {
 
   func publish(_ versions: [SourceVersion], records: [AviationRecord]) async throws {
     try Self.validate(versions, records: records)
+    let records = SpatialOrder.sorted(records)
     try await database.withSQLTransaction { database in
       let sql = try database.sqlDatabase()
       try await sql.raw("SELECT pg_advisory_xact_lock(13799201)").run()
