@@ -4,7 +4,7 @@ import SwiftACD
 import Synchronization
 
 enum AircraftImporter {
-  static let revision = "aircraft-adapter-3/2d01856fb7b78b11fe614e01b5c4c4483add09f6"
+  static let revision = "aircraft-adapter-4/2d01856fb7b78b11fe614e01b5c4c4483add09f6"
 
   static func parse(
     directory: URL, release: String, publishedAt: Date
@@ -46,30 +46,42 @@ enum AircraftImporter {
     record.data["dimensions"] = profile.dimensions.map(dimensions)
     record.data["weights"] = profile.weights.map(weights)
     record.data["performance"] = profile.performance.map(AircraftPerformance.normalize)
-    record.data["variants"] = .array(profile.variants.map(variant))
+    record.data["variants"] = .array(variants(profile.variants, type: record.data))
     record.data["category_requires_variant_selection"] = .bool(
       Set(profile.variants.compactMap(\.categories.approach)).count > 1)
-    record.data["contributing_sources"] = .array(
-      [
-        profile.sources.contains(.ACD) ? Value.string("FAA ACD") : nil,
-        profile.sources.contains(.APD) ? Value.string("EUROCONTROL APD") : nil
-      ].compactMap { $0 })
+    let sources: [String?] = [
+      profile.sources.contains(.ACD) ? "FAA ACD" : nil,
+      profile.sources.contains(.APD) ? "EUROCONTROL APD" : nil
+    ]
+    record.data["contributing_sources"] = .array(sources.compactMap { $0 }.map(Value.string))
     record.data["approach_category_source"] = profile.categories.approach.map { _ in
       .string(profile.variants.first?.categories.approach == nil ? "EUROCONTROL APD" : "FAA ACD")
     }
     return record
   }
 
-  private static func variant(_ variant: Variant) -> Value {
+  /// Each variant's id and the fields that distinguish it: a field every variant shares with
+  /// the type is omitted.
+  private static func variants(_ variants: [Variant], type: [String: Value]) -> [Value] {
+    let fields = variants.map(variant)
+    let shared = Set(fields.flatMap(\.keys)).filter { key in
+      fields.allSatisfy { $0[key] == type[key] }
+    }
+    return zip(variants, fields).map { variant, fields in
+      var distinct = fields.filter { !shared.contains($0.key) }
+      distinct["id"] = .string(variant.id)
+      return .object(distinct)
+    }
+  }
+
+  private static func variant(_ variant: Variant) -> [String: Value] {
     var fields = categories(variant.categories)
-    fields["id"] = .string(variant.id)
     fields["manufacturer"] = variant.manufacturer.map(Value.string)
     fields["model"] = variant.model.map(Value.string)
     fields["approach_speed_kt"] = variant.approachSpeedKt.map(Value.double)
     fields["dimensions"] = variant.dimensions.map(dimensions)
     fields["weights"] = variant.weights.map(weights)
-    fields["source"] = "FAA ACD"
-    return .object(fields)
+    return fields
   }
 
   private static func categories(_ categories: Categories) -> [String: Value] {

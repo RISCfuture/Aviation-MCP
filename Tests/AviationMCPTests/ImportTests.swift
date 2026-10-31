@@ -261,6 +261,8 @@ struct `Normalized source imports` {
     #expect(record.identifier == "B738")
     let normalized = try #require(record.data["variants"]?.arrayValue)
     #expect(normalized.map { $0.objectValue?["approach_category"]?.stringValue } == ["C", "D"])
+    #expect(normalized.allSatisfy { $0.objectValue?["manufacturer"] == nil })
+    #expect(record.data["contributing_sources"] == ["FAA ACD"])
     #expect(record.data["category_requires_variant_selection"] == true)
     #expect(record.data["identity"] == nil)
   }
