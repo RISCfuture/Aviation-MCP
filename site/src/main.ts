@@ -39,40 +39,48 @@ window.addEventListener("pageshow", scheduleNavigationUpdate);
 void document.fonts.ready.then(scheduleNavigationUpdate);
 updateActiveSection();
 
+/** Returns a callback that labels the button "Copied" for two seconds. */
+function copiedFeedback(button: HTMLButtonElement) {
+  const label = button.firstChild;
+  const original = label?.textContent ?? "";
+  let resetTimer: number | undefined;
+
+  return () => {
+    if (!label) return;
+    window.clearTimeout(resetTimer);
+    label.textContent = "Copied ";
+    resetTimer = window.setTimeout(() => {
+      label.textContent = original;
+    }, 2000);
+  };
+}
+
+function selectContents(element: HTMLElement) {
+  const selection = window.getSelection();
+  const range = document.createRange();
+  range.selectNodeContents(element);
+  selection?.removeAllRanges();
+  selection?.addRange(range);
+}
+
 for (const button of document.querySelectorAll<HTMLButtonElement>(
   "[data-copy]",
 )) {
+  const showCopied = copiedFeedback(button);
   button.addEventListener("click", async () => {
-    const text = document
-      .getElementById(button.dataset.copy ?? "")
-      ?.textContent?.trim();
+    const source = document.getElementById(button.dataset.copy ?? "");
+    const text = source?.textContent?.trim();
     const status = document.getElementById("copy-status");
-    if (!text || !status) return;
+    if (!source || !text || !status) return;
     try {
       await navigator.clipboard.writeText(text);
       status.textContent =
-        button.dataset.copy === "endpoint-url"
-          ? "Endpoint URL copied."
-          : "Example prompt copied.";
-      const label = button.firstChild;
-      if (label) {
-        const original = label.textContent;
-        label.textContent = "Copied ";
-        window.setTimeout(() => {
-          label.textContent = original;
-        }, 2000);
-      }
+        button.dataset.copyStatus ?? "Example prompt copied.";
+      showCopied();
     } catch {
       status.textContent =
         "Copy was unavailable. Select the text and copy it manually.";
-      const element = document.getElementById(button.dataset.copy ?? "");
-      if (element) {
-        const selection = window.getSelection();
-        const range = document.createRange();
-        range.selectNodeContents(element);
-        selection?.removeAllRanges();
-        selection?.addRange(range);
-      }
+      selectContents(source);
     }
   });
 }

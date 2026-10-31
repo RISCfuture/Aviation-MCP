@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("shows tool questions before setup and copies a question and the endpoint", async ({
+test("shows the endpoint up front, tool questions before setup, and copies both", async ({
   page,
   context,
 }) => {
@@ -9,13 +9,20 @@ test("shows tool questions before setup and copies a question and the endpoint",
   const activeLink = page
     .getByRole("navigation", { name: "Main navigation" })
     .locator('a[aria-current="location"]');
-  await expect(activeLink).toHaveText("What is it?");
+  await expect(activeLink).toHaveText("About");
+  await page
+    .getByRole("region", { name: /^What is/ })
+    .getByRole("button", { name: "Copy URL" })
+    .click();
+  await expect
+    .poll(() => page.evaluate(() => navigator.clipboard.readText()))
+    .toBe("https://aviation-mcp.org/mcp");
   await page.getByRole("link", { name: "Explore the tools" }).click();
-  await expect(activeLink).toHaveText("Tools & questions");
+  await expect(activeLink).toHaveText("Tools");
   await expect(page.locator("#question-terrain")).toContainText(
     "Truckee (KTRK) to Mammoth Yosemite (KMMH)",
   );
-  await page.getByRole("button", { name: "Copy terrain question" }).click();
+  await page.getByRole("button", { name: "Copy question: Terrain" }).click();
   await expect
     .poll(() => page.evaluate(() => navigator.clipboard.readText()))
     .toContain("Truckee (KTRK) to Mammoth Yosemite (KMMH)");
@@ -26,7 +33,10 @@ test("shows tool questions before setup and copies a question and the endpoint",
     page.getByRole("heading", { name: "Connect the server" }),
   ).toBeVisible();
   await expect(activeLink).toHaveText("Connect");
-  await page.getByRole("button", { name: "Copy URL" }).click();
+  await page
+    .getByRole("region", { name: "Connect the server" })
+    .getByRole("button", { name: "Copy URL" })
+    .click();
   await expect
     .poll(() => page.evaluate(() => navigator.clipboard.readText()))
     .toBe("https://aviation-mcp.org/mcp");
@@ -46,9 +56,9 @@ test("shows tool questions before setup and copies a question and the endpoint",
     .evaluate((heading) =>
       heading.scrollIntoView({ behavior: "instant", block: "start" }),
     );
-  await expect(activeLink).toHaveText("Tools & questions");
+  await expect(activeLink).toHaveText("Tools");
   await page.getByRole("link", { name: "Aviation MCP home" }).click();
-  await expect(activeLink).toHaveText("What is it?");
+  await expect(activeLink).toHaveText("About");
 });
 
 test("keeps core copy and setup usable without JavaScript", async ({
@@ -76,5 +86,10 @@ test("keeps core copy and setup usable without JavaScript", async ({
       .locator("main > section")
       .evaluateAll((sections) => sections.map((section) => section.id)),
   ).toEqual(["about", "tools", "connect"]);
+  const legalLinks = page
+    .getByRole("navigation", { name: "Legal and support" })
+    .getByRole("link");
+  await expect(legalLinks).toHaveText(["Support", "Privacy", "Terms"]);
+  for (const link of await legalLinks.all()) await expect(link).toBeVisible();
   await context.close();
 });

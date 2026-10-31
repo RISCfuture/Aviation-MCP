@@ -4,10 +4,15 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#07110f" />
+    <meta name="color-scheme" content="dark" />
     <meta
       name="description"
       content="Connect ChatGPT or Claude to U.S. aviation data and worldwide terrain through an open-source MCP server."
     />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://aviation-mcp.org/" />
+    <meta property="og:site_name" content="Aviation MCP" />
+    <meta property="og:locale" content="en_US" />
     <meta
       property="og:title"
       content="Aviation MCP — Aviation data for AI assistants"
@@ -16,14 +21,36 @@
       property="og:description"
       content="Use ChatGPT or Claude to query U.S. aviation data and worldwide terrain."
     />
+    <meta property="og:image" content="https://aviation-mcp.org/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:type" content="image/png" />
     <meta
-      property="og:image"
-      content="https://aviation-mcp.org/aviation-data.webp"
+      property="og:image:alt"
+      content="Aviation MCP wordmark and endpoint beside a contour-line terrain illustration with an aviation route overlay"
     />
-    <meta property="og:url" content="https://aviation-mcp.org/" />
-    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="Aviation MCP — Aviation data for AI assistants"
+    />
+    <meta
+      name="twitter:description"
+      content="Use ChatGPT or Claude to query U.S. aviation data and worldwide terrain."
+    />
+    <meta
+      name="twitter:image"
+      content="https://aviation-mcp.org/og-image.png"
+    />
+    <meta
+      name="twitter:image:alt"
+      content="Aviation MCP wordmark and endpoint beside a contour-line terrain illustration with an aviation route overlay"
+    />
     <link rel="canonical" href="https://aviation-mcp.org/" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
     <title>Aviation MCP — Aviation data for AI assistants</title>
     <link rel="stylesheet" href="/src/style.css" />
     <script type="module" src="/src/main.ts"></script>
@@ -59,8 +86,7 @@
         ><span>AVIATION / <strong>MCP</strong></span></a
       >
       <nav aria-label="Main navigation">
-        <a href="#about">What is it?</a
-        ><a href="#tools">Tools &amp; questions</a
+        <a href="#about">About</a><a href="#tools">Tools</a
         ><a href="#connect">Connect</a>
         <a class="github-link" href="https://github.com/RISCfuture/Aviation-MCP"
           >GitHub
@@ -75,13 +101,18 @@
           <div class="hero-art" aria-hidden="true">
             <img
               src="/aviation-data.webp"
+              srcset="
+                /aviation-data-768.webp   768w,
+                /aviation-data-1152.webp 1152w,
+                /aviation-data.webp      1536w
+              "
+              sizes="(width <= 700px) 110vw, 1100px"
               alt=""
               width="1536"
               height="1024"
               fetchpriority="high"
             />
-            <span class="terrain-label">AVIATION DATA</span
-            ><span class="source-label">ILLUSTRATIVE OVERLAY</span>
+            <span class="art-caption">ILLUSTRATIVE OVERLAY</span>
           </div>
           <div class="hero-copy">
             <h1 id="hero-title">What is<br /><em>Aviation MCP?</em></h1>
@@ -95,13 +126,29 @@
               look up airports and procedures, check weather and NOTAMs, or
               analyze obstacles and terrain.
             </p>
+            <div class="hero-endpoint endpoint">
+              <div>
+                <span class="label">Remote MCP endpoint</span
+                ><code id="hero-endpoint-url"
+                  >https://aviation-mcp.org/mcp</code
+                >
+              </div>
+              <button
+                class="outline-button"
+                data-copy="hero-endpoint-url"
+                data-copy-status="Endpoint URL copied."
+              >
+                Copy URL
+                <svg class="icon" aria-hidden="true"><use href="#copy" /></svg>
+              </button>
+            </div>
             <div class="hero-actions">
-              <a class="button" href="#tools"
-                >Explore the tools
+              <a class="button" href="#connect"
+                >Connect the server
                 <svg class="icon" aria-hidden="true">
                   <use href="#arrow-down" /></svg></a
-              ><a class="text-link" href="#connect"
-                >Connect the server
+              ><a class="text-link" href="#tools"
+                >Explore the tools
                 <svg class="icon" aria-hidden="true">
                   <use href="#arrow-down" /></svg
               ></a>
@@ -162,7 +209,7 @@
               <button
                 class="text-link"
                 data-copy="question-airports"
-                aria-label="Copy airports question"
+                aria-label="Copy question: Airports"
               >
                 Copy question
                 <svg class="icon" aria-hidden="true"><use href="#copy" /></svg>
@@ -189,7 +236,7 @@
               <button
                 class="text-link"
                 data-copy="question-procedures"
-                aria-label="Copy procedures question"
+                aria-label="Copy question: Procedures"
               >
                 Copy question
                 <svg class="icon" aria-hidden="true"><use href="#copy" /></svg>
@@ -216,7 +263,7 @@
               <button
                 class="text-link"
                 data-copy="question-navigation"
-                aria-label="Copy navigation question"
+                aria-label="Copy question: Navigation"
               >
                 Copy question
                 <svg class="icon" aria-hidden="true"><use href="#copy" /></svg>
@@ -243,7 +290,7 @@
               <button
                 class="text-link"
                 data-copy="question-airspace"
-                aria-label="Copy airspace question"
+                aria-label="Copy question: Airspace"
               >
                 Copy question
                 <svg class="icon" aria-hidden="true"><use href="#copy" /></svg>
@@ -270,7 +317,7 @@
               <button
                 class="text-link"
                 data-copy="question-notams"
-                aria-label="Copy notams question"
+                aria-label="Copy question: NOTAMs"
               >
                 Copy question
                 <svg class="icon" aria-hidden="true"><use href="#copy" /></svg>
@@ -297,7 +344,7 @@
               <button
                 class="text-link"
                 data-copy="question-weather"
-                aria-label="Copy weather question"
+                aria-label="Copy question: Weather"
               >
                 Copy question
                 <svg class="icon" aria-hidden="true"><use href="#copy" /></svg>
@@ -323,7 +370,7 @@
               <button
                 class="text-link"
                 data-copy="question-aircraft"
-                aria-label="Copy aircraft question"
+                aria-label="Copy question: Aircraft"
               >
                 Copy question
                 <svg class="icon" aria-hidden="true"><use href="#copy" /></svg>
@@ -351,7 +398,7 @@
               <button
                 class="text-link"
                 data-copy="question-obstacles"
-                aria-label="Copy obstacles question"
+                aria-label="Copy question: Obstacles"
               >
                 Copy question
                 <svg class="icon" aria-hidden="true"><use href="#copy" /></svg>
@@ -378,7 +425,7 @@
               <button
                 class="text-link"
                 data-copy="question-terrain"
-                aria-label="Copy terrain question"
+                aria-label="Copy question: Terrain"
               >
                 Copy question
                 <svg class="icon" aria-hidden="true"><use href="#copy" /></svg>
@@ -405,7 +452,7 @@
               <button
                 class="text-link"
                 data-copy="question-coordinates"
-                aria-label="Copy geography question"
+                aria-label="Copy question: Geography"
               >
                 Copy question
                 <svg class="icon" aria-hidden="true"><use href="#copy" /></svg>
@@ -432,7 +479,7 @@
               <button
                 class="text-link"
                 data-copy="question-status"
-                aria-label="Copy source status question"
+                aria-label="Copy question: Source status"
               >
                 Copy question
                 <svg class="icon" aria-hidden="true"><use href="#copy" /></svg>
@@ -445,7 +492,7 @@
             Data availability and parsing gaps are reported at query time.
             Aviation coverage is U.S. only; terrain coverage is worldwide.
           </p>
-          <p>
+          <p class="operational-note">
             A research and planning tool. Verify operational decisions with
             official aviation sources. Terrain comparisons do not establish
             certified obstacle clearance or aircraft performance.
@@ -467,7 +514,11 @@
               <span class="label">Remote MCP endpoint</span
               ><code id="endpoint-url">https://aviation-mcp.org/mcp</code>
             </div>
-            <button class="outline-button" data-copy="endpoint-url">
+            <button
+              class="outline-button"
+              data-copy="endpoint-url"
+              data-copy-status="Endpoint URL copied."
+            >
               Copy URL
               <svg class="icon" aria-hidden="true"><use href="#copy" /></svg>
             </button>
@@ -506,8 +557,9 @@
                   <div>
                     <h4>Bring it into your conversation</h4>
                     <p>
-                      Select the plugin in your chat and ask one of the example
-                      questions below. Approve tool calls when prompted.
+                      Select the plugin in your chat and ask one of the
+                      <a href="#tools">example questions</a>. Approve tool calls
+                      when prompted.
                     </p>
                   </div>
                 </li>
@@ -577,11 +629,13 @@
     </main>
     <footer class="footer wrap">
       <a class="brand" href="#">AVIATION / <strong>MCP</strong></a>
-      <p>
-        Open-source aviation data and calculations.<br />
-        <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> ·
-        <a href="/support">Support</a>
-      </p>
+      <div class="footer-info">
+        <p>Open-source aviation data and calculations.</p>
+        <nav aria-label="Legal and support">
+          <a href="/support/">Support</a><a href="/privacy/">Privacy</a
+          ><a href="/terms/">Terms</a>
+        </nav>
+      </div>
       <a class="text-link" href="https://github.com/RISCfuture/Aviation-MCP"
         >Open source on GitHub
         <svg class="icon" aria-hidden="true"><use href="#arrow-up-right" /></svg

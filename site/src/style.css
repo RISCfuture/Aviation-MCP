@@ -3,6 +3,7 @@
 @import url("@fontsource/ibm-plex-mono/latin-500.css");
 
 :root {
+  color-scheme: dark;
   font-family: "Space Grotesk Variable", sans-serif;
   color: #e9f2eb;
   background: #07110f;
@@ -159,6 +160,10 @@ code {
   letter-spacing: 0.1em;
 }
 
+.header nav :where(a) {
+  padding-block: 12px;
+}
+
 .header nav a[aria-current="location"] {
   color: var(--acid);
   text-decoration: underline;
@@ -203,7 +208,7 @@ code {
   display: flex;
   align-items: center;
   gap: 48px;
-  margin-top: 48px;
+  margin-top: 36px;
 }
 
 .button {
@@ -250,23 +255,13 @@ code {
   mask-image: linear-gradient(to right, transparent, black 20%);
 }
 
-.terrain-label,
-.source-label {
+.art-caption {
   position: absolute;
+  right: 25%;
+  bottom: 6%;
   font: 400 10px var(--mono);
   letter-spacing: 0.15em;
-  border-left: 1px dashed var(--muted);
-  padding: 0 0 50px 12px;
-}
-
-.terrain-label {
-  left: 46%;
-  top: 7%;
-}
-
-.source-label {
-  right: 23%;
-  top: 45%;
+  color: var(--muted);
 }
 
 .hero-copy > .about-detail {
@@ -419,8 +414,14 @@ code {
   gap: 8%;
   padding-top: 30px;
   border-top: 1px solid var(--rule);
-  font: 400 12px/1.8 var(--mono);
+  font: 400 15px/1.8 var(--mono);
   color: var(--muted);
+}
+
+.coverage-note .operational-note {
+  color: var(--paper);
+  border-left: 2px solid var(--acid);
+  padding-left: 18px;
 }
 
 .connect {
@@ -464,6 +465,16 @@ code {
   overflow-wrap: anywhere;
 }
 
+.hero-endpoint {
+  max-width: 590px;
+  margin-top: 36px;
+  padding: 18px 20px;
+}
+
+.hero-endpoint code {
+  font-size: clamp(15px, 1.3vw, 20px);
+}
+
 .outline-button {
   display: inline-flex;
   align-items: center;
@@ -484,7 +495,7 @@ code {
 .connection-note {
   margin-top: 18px;
   color: var(--muted);
-  font: 400 12px/1.8 var(--mono);
+  font: 400 15px/1.8 var(--mono);
 }
 
 .installation-grid {
@@ -553,7 +564,7 @@ code {
 }
 
 .setup-note {
-  font: 400 12px/1.8 var(--mono);
+  font: 400 14px/1.8 var(--mono);
   color: var(--muted);
   margin-bottom: 18px;
 }
@@ -571,9 +582,27 @@ code {
   font-size: 12px;
 }
 
-.footer p {
+.footer-info {
+  display: grid;
+  gap: 4px;
+  font: 400 13px var(--mono);
+}
+
+.footer-info p {
   color: var(--muted);
-  font: 400 11px var(--mono);
+}
+
+.footer-info nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 28px;
+}
+
+.footer-info nav a {
+  padding-block: 10px;
+  text-decoration: underline;
+  text-decoration-color: var(--rule);
+  text-underline-offset: 5px;
 }
 
 .footer .text-link {
@@ -662,16 +691,16 @@ code {
     gap: 6%;
   }
 
-  .footer p {
-    display: none;
+  .footer {
+    flex-wrap: wrap;
   }
 }
 
 @media (width <= 700px) {
   .header {
     flex-wrap: wrap;
-    padding-block: 16px;
-    gap: 14px;
+    padding-block: 14px 0;
+    gap: 2px;
   }
 
   .header .brand {
@@ -688,7 +717,7 @@ code {
     width: 100%;
     justify-content: space-between;
     gap: 10px;
-    font-size: 10px;
+    font-size: 13px;
   }
 
   .header nav .icon {
@@ -742,18 +771,8 @@ code {
     mask-image: linear-gradient(to bottom, transparent, black 30%);
   }
 
-  .terrain-label {
-    top: 35%;
-    left: 25%;
-    font-size: 8px;
-    padding-bottom: 30px;
-  }
-
-  .source-label {
-    top: 55%;
-    right: 15%;
-    font-size: 8px;
-    padding-bottom: 30px;
+  .art-caption {
+    font-size: 9px;
   }
 
   .flow-wrap {
@@ -846,7 +865,7 @@ code {
   .coverage-note {
     grid-template-columns: 1fr;
     gap: 18px;
-    font-size: 11px;
+    font-size: 14px;
   }
 
   .connect h2 {
@@ -868,7 +887,7 @@ code {
   }
 
   .connection-note {
-    font-size: 11px;
+    font-size: 14px;
   }
 
   .installation-grid {

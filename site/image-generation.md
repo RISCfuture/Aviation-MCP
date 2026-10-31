@@ -1,10 +1,23 @@
 # Hero image provenance
 
 `public/aviation-data.webp` was generated with OpenAI's built-in image-generation
-tool on October 28, 2026, using the site's earlier terrain illustration as the
-edit target and style reference. The generated PNG was converted to WebP at
-quality 86. The image is a decorative illustration; the overlays are fictional,
-not source data or an operational aviation chart.
+tool on October 28, 2026, using `image-sources/terrain.webp` as the edit target and style
+reference. The generated PNG was converted to WebP at quality 86. The original
+terrain asset is kept in `image-sources/`, outside the deployed `public/` folder.
+Both are decorative illustrations; the overlays are fictional, not source data or
+an operational aviation chart.
+
+## Derived assets
+
+- `public/aviation-data-768.webp` and `public/aviation-data-1152.webp` are the
+  hero resized with ImageMagick and re-encoded with `cwebp -q 86`.
+- `public/og-image.png` (1200 × 630) is a headless-Chromium render of the hero,
+  the compass mark, the site fonts, and the endpoint URL, quantized with
+  `pngquant`.
+- `public/favicon.ico` (16, 32, and 48 px) is rendered from `public/favicon.svg`.
+  `public/apple-touch-icon.png`, `public/icon-192.png`, and `public/icon-512.png`
+  use the same mark on a full-bleed square, scaled into the central 80% so
+  maskable crops keep the whole compass.
 
 ## Generation prompt
 
