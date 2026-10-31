@@ -272,4 +272,40 @@ extension `Normalized source imports` {
     #expect(Set(ordered[1...2]) == ["oakland", "san-carlos"])
     #expect(ordered[3...] == ["new-york", "unpositioned"])
   }
+
+  @Test
+  func `groups airport frequencies by facility and ignores other serviced facilities`()
+    async throws
+  {
+    let csv = """
+      "FACILITY","FACILITY_TYPE","TOWER_HRS","SERVICED_FACILITY","SERVICED_SITE_TYPE",\
+      "TOWER_OR_COMM_CALL","PRIMARY_APPROACH_RADIO_CALL","FREQ","SECTORIZATION","FREQ_USE","REMARK"
+      "NCT","TRACON","","SQL","AIRPORT","SAN CARLOS","NORCAL","135.65","","APCH/S",""
+      "NCT","TRACON","","SQL","AIRPORT","SAN CARLOS","NORCAL","135.65","NW","DEP/P",""
+      "SQL","ATCT","0700-2100","SQL","AIRPORT","SAN CARLOS","NORCAL","119.0","","LCL/P",""
+      "SQL","ATCT","","SQL","AIRPORT","","","119.0","","CTAF","ACTVT MIRL - CTAF."
+      "ZOA","RCAG","","ZOA","RCAG","","","122.1R","","SAN CARLOS RCO",""
+      "SQL","NAVAID","","SQL","VORTAC","","","113.9","","VOR",""
+
+      """
+    let frequencies = try await NASRFrequencies.parse(
+      AsyncThrowingStream { continuation in
+        continuation.yield(Data(csv.utf8))
+        continuation.finish()
+      })
+    let fields = frequencies.fields(forAirport: "SQL")
+    #expect(fields["tower_hours"] == "0700-2100")
+    #expect(fields["tower_call"] == "SAN CARLOS")
+    #expect(fields["approach_call"] == "NORCAL")
+    #expect(
+      fields["frequencies"]
+        == [
+          ["facility": "NCT", "frequency_khz": 135650, "uses": ["APCH/S", "DEP/P (NW)"]],
+          [
+            "facility": "SQL", "frequency_khz": 119000, "uses": ["LCL/P", "CTAF"],
+            "remarks": ["ACTVT MIRL - CTAF."]
+          ]
+        ])
+    #expect(frequencies.fields(forAirport: "ZOA").isEmpty)
+  }
 }

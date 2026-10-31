@@ -4,13 +4,14 @@ import SwiftNASR
 import Synchronization
 
 enum NASRImporter {
-  static let revision = "nasr-adapter-7/a4d56cc686e148460a200eeff5751c2beed36847"
+  static let revision = "nasr-adapter-8/a4d56cc686e148460a200eeff5751c2beed36847"
 
   static func parse(_ archive: URL) async throws -> StagedImport {
     let cycle = try await NASRCycle.read(archive)
     let nasr = NASR.fromLocalArchive(archive, format: .csv)
     try await nasr.load()
     var diagnostics = try await load(nasr)
+    let frequencies = try await NASRFrequencies.read(archive)
     let data = await nasr.data
     guard let start = cycle.effectiveDate,
       let end = cycle.expirationDate
@@ -22,7 +23,8 @@ enum NASRImporter {
       effectiveFrom: start, effectiveUntil: end,
       checksum: Normalization.checksum(try Data(contentsOf: archive)), parserRevision: revision,
       validated: true)
-    let records = await normalize(data, version: version, diagnostics: &diagnostics)
+    let records = await normalize(
+      data, version: version, frequencies: frequencies, diagnostics: &diagnostics)
     guard !records.isEmpty else {
       throw StorageError.invalidImport("NASR contains no usable records.")
     }
@@ -58,14 +60,15 @@ enum NASRImporter {
   }
 
   private static func normalize(
-    _ data: NASRData, version: SourceVersion, diagnostics: inout NASRDiagnostics
+    _ data: NASRData, version: SourceVersion, frequencies: NASRFrequencies,
+    diagnostics: inout NASRDiagnostics
   ) async
     -> [AviationRecord]
   {
     var records = diagnostics.errors.recover(
       await data.airports ?? [], kind: "airport", identifier: \.id
     ) {
-      try NASRAirports.record($0, versionID: version.id)
+      try NASRAirports.record($0, versionID: version.id, frequencies: frequencies)
     }
     records += diagnostics.errors.recover(
       await data.navaids ?? [], kind: "navaid", identifier: \.id
