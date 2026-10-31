@@ -12,16 +12,22 @@ request() {
     --retry 6 --retry-delay 10 --retry-all-errors "$@"
 }
 
-check_ready() {
-  request "$site/ready" | jq -e '.status == "ready"' >/dev/null
-}
-
-check_tools() {
+mcp() {
   request --header 'Content-Type: application/json' \
     --header 'Accept: application/json, text/event-stream' \
     --header 'MCP-Protocol-Version: 2025-06-18' \
-    --data '{"jsonrpc":"2.0","id":"deploy-smoke","method":"tools/list"}' \
-    "$site/mcp" | jq -e '.result.tools | length > 0' >/dev/null
+    --data "$1" "$site/mcp"
+}
+
+check_tools() {
+  mcp '{"jsonrpc":"2.0","id":"deploy-smoke","method":"tools/list"}' \
+    | jq -e '.result.tools | length > 0' >/dev/null
+}
+
+# get_data_status reads the published manifest, so it proves the release reaches the database.
+check_database() {
+  mcp '{"jsonrpc":"2.0","id":"deploy-smoke","method":"tools/call","params":{"name":"get_data_status"}}' \
+    | jq -e '.result.isError != true and (.result.structuredContent.results | length > 0)' >/dev/null
 }
 
 check_serving_image() {
@@ -33,7 +39,7 @@ check_serving_image() {
   fi
 }
 
-check_ready
 check_tools
+check_database
 check_serving_image
 printf 'Deployment of %s answered through %s.\n' "$expected_image" "$site"

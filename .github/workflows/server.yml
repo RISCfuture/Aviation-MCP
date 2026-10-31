@@ -17,7 +17,6 @@ on:
       - 'fly.ingest.toml'
       - 'fly.postgres.toml'
       - 'scripts/CheckSource.swift'
-      - 'scripts/database-privileges.sql'
       - 'scripts/ingest-checked-sources.sh'
       - 'scripts/measure-cold-start.sh'
       - 'scripts/repair-identifier-index.sql'
@@ -120,7 +119,7 @@ jobs:
     needs: [test, image]
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 75
     env:
       IMAGE: ${{ needs.image.outputs.reference }}
     steps:

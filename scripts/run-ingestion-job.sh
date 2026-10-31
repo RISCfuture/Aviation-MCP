@@ -6,7 +6,8 @@ set -euo pipefail
 command_name=${1:?Supply an ingestion command}
 shift
 # Each command's machine size and in-machine time limit in seconds. The GitHub job timeouts
-# in .github/workflows/ingestion.yml allow each machine its limit plus poll_margin.
+# in .github/workflows/ingestion.yml and server.yml (migrate) allow each machine its limit plus
+# poll_margin.
 case "$command_name" in
   ingest-sources) cpus=4 memory_mb=8192 machine_timeout=3000 ;;
   migrate) cpus=1 memory_mb=2048 machine_timeout=1800 ;;
