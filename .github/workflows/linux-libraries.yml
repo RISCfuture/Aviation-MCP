@@ -1,8 +1,6 @@
 name: Linux aviation libraries
 
 on:
-  pull_request:
-  push:
   workflow_dispatch:
 
 permissions:
@@ -24,7 +22,7 @@ jobs:
           - SwiftMETAR
           - SwiftGeographic
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Pull Swift toolchain
         run: docker pull swift:6.4.1-noble
       - name: Build pinned library
@@ -33,7 +31,7 @@ jobs:
           LIBRARY: ${{ matrix.library }}
       - name: Preserve build evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: linux-${{ matrix.library }}
           path: .build/linux-libraries/

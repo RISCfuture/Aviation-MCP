@@ -8,11 +8,18 @@ readonly output="${VERIFICATION_OUTPUT:-$root/.build/linux-libraries}"
 readonly library="${1:-all}"
 mkdir -p "$output"
 
+pinned_revision() {
+  jq -er --arg name "$1" \
+    '.pins[] | select(.identity == ($name | ascii_downcase)) | .state.revision' \
+    "$root/Package.resolved"
+}
+
 verify_library() {
-  local name="$1" revision="$2" result=0
+  local name="$1" revision result=0
   if [[ "$library" != all && "$library" != "$name" ]]; then
     return
   fi
+  revision=$(pinned_revision "$name")
   printf 'Building %s at %s\n' "$name" "$revision"
   docker run --rm --init \
     "$image" bash -c '
@@ -40,10 +47,7 @@ esac
 docker image inspect "$image" --format '{{index .RepoDigests 0}}' > "$output/image.txt"
 : > "$output/results.tsv"
 failed=0
-verify_library SwiftNASR a4d56cc686e148460a200eeff5751c2beed36847
-verify_library SwiftCIFP d57301f98db1b850b9c57d823c7f7dcf996fc730
-verify_library SwiftDOF 5afe24c34e7ee72c9f31ae8ac23e754bc6ba1217
-verify_library SwiftACD 2d01856fb7b78b11fe614e01b5c4c4483add09f6
-verify_library SwiftMETAR 649e70912e0c1cc21c275545bd26af126bd79326
-verify_library SwiftGeographic 5b166c0730dc3dd7ba85242ab2696556202d73a9
+for name in SwiftNASR SwiftCIFP SwiftDOF SwiftACD SwiftMETAR SwiftGeographic; do
+  verify_library "$name"
+done
 exit "$failed"
