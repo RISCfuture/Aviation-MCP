@@ -24,8 +24,9 @@ COPY terrain/requirements.txt /opt/terrain-requirements.txt
 RUN python3 -m venv /opt/terrain \
     && /opt/terrain/bin/pip install --no-cache-dir --only-binary=:all: -r /opt/terrain-requirements.txt
 WORKDIR /app
-COPY --from=build --chown=aviation:aviation /output/ ./
-COPY --chown=aviation:aviation terrain/ /app/terrain/
+COPY --from=build /output/ ./
+COPY terrain/ /app/terrain/
+RUN /opt/terrain/bin/python -m compileall -q /app/terrain
 USER 10001:10001
 ENV APP_ROLE=serve PORT=8080
 EXPOSE 8080
