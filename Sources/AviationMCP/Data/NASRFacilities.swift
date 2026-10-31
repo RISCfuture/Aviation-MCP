@@ -12,8 +12,10 @@ enum NASRFacilities {
     record.data = NASRNormalization.fields([
       "airport": .string(facility.airportId), "runway": .string(facility.runwayEndId),
       "system_type": .string(facility.systemType.rawValue),
-      "localizer_frequency_khz": NASRNormalization.uint(facility.localizer?.frequencyKHz),
-      "glideslope_frequency_khz": NASRNormalization.uint(facility.glideSlope?.frequencyKHz),
+      "localizer_frequency": NASRNormalization.frequency(
+        kilohertz: facility.localizer?.frequencyKHz),
+      "glideslope_frequency": NASRNormalization.frequency(
+        kilohertz: facility.glideSlope?.frequencyKHz),
       "glideslope_angle_deg": NASRNormalization.float(facility.glideSlope?.angleDeg),
       "magnetic_variation_deg": facility.magneticVariationDeg.map(Value.int),
       "remarks": .array(facility.remarks.map(Value.string))
@@ -35,7 +37,9 @@ enum NASRFacilities {
         try facility.frequencies.map { frequency in
           let fields = try Normalization.encodedFields(frequency)
           return Normalization.object([
-            "frequency_khz": fields["frequencyKHz"], "name": fields["name"],
+            "frequency": NASRNormalization.frequency(
+              kilohertz: fields["frequencyKHz"]?.intValue.flatMap(UInt.init(exactly:))),
+            "name": fields["name"],
             "single_sideband": fields["singleSideband"], "use": fields["use"]
           ])
         })

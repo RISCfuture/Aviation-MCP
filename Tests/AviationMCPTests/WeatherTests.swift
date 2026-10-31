@@ -91,6 +91,8 @@ struct `Weather selection and provenance` {
     #expect(fields["wind_speed_kt"]?.doubleValue == 3)
     #expect(fields["wind_variable"] == true)
     #expect(fields["temperature_c"] == 18)
+    #expect(fields["altimeter_inhg"] == 29.92)
+    #expect(fields["visibility"]?.objectValue?["statute_miles"] == 10.0)
     #expect(report["observation_time"] == "2026-10-28T11:53:00Z")
   }
 

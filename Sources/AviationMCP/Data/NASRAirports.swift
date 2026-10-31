@@ -20,8 +20,8 @@ enum NASRAirports {
       "public_use": .bool(airport.publicUse),
       "facility_type": .string(airport.facilityType.rawValue),
       "status": .string(airport.status.rawValue), "control_tower": .bool(airport.controlTower),
-      "ctaf_khz": NASRNormalization.uint(airport.CTAFKHz),
-      "unicom_khz": NASRNormalization.uint(airport.UNICOMFrequencyKHz),
+      "ctaf_frequency": NASRNormalization.frequency(kilohertz: airport.CTAFKHz),
+      "unicom_frequency": NASRNormalization.frequency(kilohertz: airport.UNICOMFrequencyKHz),
       "magnetic_variation_deg": airport.magneticVariationDeg.map(Value.int),
       "traffic_pattern_altitude_agl_ft": airport.trafficPatternAltitudeFtAGL.map(Value.int),
       "maximum_runway_length_ft": NASRNormalization.uint(

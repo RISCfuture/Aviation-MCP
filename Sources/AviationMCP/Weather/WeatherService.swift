@@ -10,7 +10,7 @@ struct WeatherQuery: Sendable {
   var sources: [String]?
 
   static let supportedFields = [
-    "temperature_c", "dewpoint_c", "altimeter_hpa", "wind_speed_kt",
+    "temperature_c", "dewpoint_c", "altimeter_inhg", "altimeter_hpa", "wind_speed_kt",
     "wind_direction_true_deg", "wind_gust_kt", "visibility", "cloud_layers", "pressure_levels"
   ]
 

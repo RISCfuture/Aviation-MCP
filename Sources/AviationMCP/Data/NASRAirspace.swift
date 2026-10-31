@@ -14,7 +14,8 @@ enum NASRAirspace {
       "icao_identifier": center.ICAOID.map(Value.string),
       "facility_type": .string(center.type.rawValue),
       "location_name": .string(center.locationName), "state": center.stateCode.map(Value.string),
-      "frequencies_khz": .array(center.frequencies.map { .int(Int($0.frequencyKHz)) }),
+      "frequencies": .array(
+        center.frequencies.compactMap { NASRNormalization.frequency(kilohertz: $0.frequencyKHz) }),
       "geometry_scope": "facility_location",
       "geometry_limitations": .array([
         "ARTCC spatial matches use facility locations, not the airspace controlled by those facilities."

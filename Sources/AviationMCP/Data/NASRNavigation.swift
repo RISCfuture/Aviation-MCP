@@ -15,7 +15,7 @@ enum NASRNavigation {
     record.data = NASRNormalization.fields([
       "source_record_id": .string(navaid.id),
       "facility_type": .string(navaid.type.rawValue),
-      "frequency_hz": NASRNormalization.uint(navaid.frequencyHz),
+      "frequency": NASRNormalization.frequency(hertz: navaid.frequencyHz),
       "city": .string(navaid.city), "state": navaid.stateName.map(Value.string),
       "public_use": .bool(navaid.publicUse), "operational": .bool(navaid.isOperational),
       "magnetic_variation_deg": navaid.magneticVariationDeg.map(Value.int)
@@ -47,8 +47,8 @@ enum NASRNavigation {
       position: station.position)
     record.data = NASRNormalization.fields([
       "station_type": .string(station.type.rawValue), "commissioned": .bool(station.isCommissioned),
-      "frequency_khz": NASRNormalization.uint(station.frequencyKHz),
-      "secondary_frequency_khz": NASRNormalization.uint(station.secondaryFrequencyKHz),
+      "frequency": NASRNormalization.frequency(kilohertz: station.frequencyKHz),
+      "secondary_frequency": NASRNormalization.frequency(kilohertz: station.secondaryFrequencyKHz),
       "phone": station.phoneNumber.map(Value.string),
       "airport_site_number": station.airportSiteNumber.map(Value.string)
     ])

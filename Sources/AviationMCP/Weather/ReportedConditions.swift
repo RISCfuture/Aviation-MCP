@@ -3,6 +3,8 @@ import MCP
 import SwiftMETAR
 
 enum ReportedConditions {
+  private static let hectopascalSteps = 10.0, inchOfMercurySteps = 100.0, statuteMileSteps = 16.0
+
   static func values(
     wind: Wind?, visibility: Visibility?, conditions: [Condition], altimeter: Altimeter?
   ) -> [String: Value] {
@@ -17,9 +19,24 @@ enum ReportedConditions {
         return .object(layer)
       })
     if let altimeter {
-      fields["altimeter_hpa"] = .double(altimeter.measurement.converted(to: .hectopascals).value)
+      fields.merge(altimeterSettings(altimeter.measurement)) { $1 }
     }
     return fields
+  }
+
+  /// An altimeter setting in hPa and inHg, each rounded to the precision reports use.
+  static func altimeterSettings(_ pressure: Measurement<UnitPressure>) -> [String: Value] {
+    [
+      "altimeter_hpa": .double(
+        rounded(pressure.converted(to: .hectopascals).value, steps: hectopascalSteps)),
+      "altimeter_inhg": .double(
+        rounded(pressure.converted(to: .inchesOfMercury).value, steps: inchOfMercurySteps))
+    ]
+  }
+
+  /// The value rounded to the nearest 1/`steps` of its unit.
+  private static func rounded(_ value: Double, steps: Double) -> Double {
+    (value * steps).rounded() / steps
   }
 
   static func wind(_ wind: Wind) -> [String: Value] {
@@ -62,7 +79,9 @@ enum ReportedConditions {
   private static func distance(_ value: Visibility.Value, relation: String) -> Value {
     .object([
       "relation": .string(relation),
-      "meters": .double(value.measurement.converted(to: .meters).value)
+      "statute_miles": .double(
+        rounded(value.measurement.converted(to: .miles).value, steps: statuteMileSteps)),
+      "meters": .double(value.measurement.converted(to: .meters).value.rounded())
     ])
   }
 }

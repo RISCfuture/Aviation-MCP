@@ -10,12 +10,15 @@ struct OpenMeteoForecast: Decodable, Sendable {
   ]
   static let surfaceVariables = [
     "temperature_c": "temperature_2m", "dewpoint_c": "dew_point_2m",
-    "altimeter_hpa": "pressure_msl", "wind_speed_kt": "wind_speed_10m",
+    "wind_speed_kt": "wind_speed_10m",
     "wind_direction_true_deg": "wind_direction_10m", "wind_gust_kt": "wind_gusts_10m"
   ]
 
+  private static let altimeterFields = ["altimeter_hpa", "altimeter_inhg"]
+
   static func variables(for fields: [String]) -> [String] {
     var variables = fields.compactMap { surfaceVariables[$0] }
+    if fields.contains(where: altimeterFields.contains) { variables.append("pressure_msl") }
     if fields.contains("pressure_levels") {
       variables += pressureLevels.flatMap { level in
         [
@@ -46,9 +49,16 @@ struct OpenMeteoForecast: Decodable, Sendable {
     for (name, variable) in Self.surfaceVariables {
       if let value = value(variable, at: index) { fields[name] = field(.double(value)) }
     }
-    fields["altimeter_hpa"]?.notes = [
-      "Modeled mean sea-level pressure is an approximation to an altimeter setting."
-    ]
+    if let pressure = value("pressure_msl", at: index) {
+      for (name, setting) in ReportedConditions.altimeterSettings(
+        Measurement(value: pressure, unit: .hectopascals))
+      {
+        fields[name] = field(setting)
+        fields[name]?.notes = [
+          "Modeled mean sea-level pressure is an approximation to an altimeter setting."
+        ]
+      }
+    }
     let levels = Self.pressureLevels.compactMap { level -> Value? in
       guard let height = value("geopotential_height_\(level)hPa", at: index), height > elevation,
         let temperature = value("temperature_\(level)hPa", at: index),
