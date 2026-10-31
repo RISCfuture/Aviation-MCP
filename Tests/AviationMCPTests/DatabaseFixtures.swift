@@ -54,11 +54,9 @@ extension `Transactional publication` {
     return sql
   }
 
-  static func publishObstacles(_ store: AviationStore) async throws -> Value {
+  static func publishObstacles(_ store: AviationStore) async throws {
     let version = Self.version(.dof)
-    let position: Value = .object([
-      "type": "Point", "coordinates": .array([.double(-122.2), .double(37.7)])
-    ])
+    let position = Normalization.point(latitude: 37.7, longitude: -122.2)
     var low = AviationRecord(
       versionID: version.id, kind: "obstacle", id: "low", identifier: "LOW", name: "Low")
     low.elevationMSLFeet = 100
@@ -69,11 +67,16 @@ extension `Transactional publication` {
     high.elevationMSLFeet = 200
     high.heightAGLFeet = 20
     high.geometry = position
-    try await store.publish([version], records: [low, high])
-    return position
+    var behind = AviationRecord(
+      versionID: version.id, kind: "obstacle", id: "behind", identifier: "BEHIND", name: "Behind")
+    behind.elevationMSLFeet = 50
+    behind.geometry = Normalization.point(latitude: 37.7, longitude: -122.18)
+    try await store.publish([version], records: [low, high, behind])
   }
 
-  static func publishDepartureAirport(_ store: AviationStore, position: Value) async throws {
+  /// Publishes KOAK with runway 29 departing west from a departure end 0.47 NM east of the
+  /// obstacles.
+  static func publishDepartureAirport(_ store: AviationStore) async throws {
     let nasr = Self.version(.nasr)
     let cifp = Self.version(.cifp)
     var airport = AviationRecord(
@@ -82,7 +85,11 @@ extension `Transactional publication` {
     airport.data["runways"] = .array([
       .object([
         "ends": .array([
-          .object(["identifier": "29", "departure_end": position])
+          .object([
+            "identifier": "29",
+            "threshold": Normalization.point(latitude: 37.7, longitude: -122.17),
+            "departure_end": Normalization.point(latitude: 37.7, longitude: -122.19)
+          ])
         ])
       ])
     ])
@@ -98,6 +105,7 @@ extension `Transactional publication` {
       try await sql.raw("CREATE SCHEMA public").run()
       try await AviationSchema().prepare(on: app.db)
       try await IdentifierLookupIndex().prepare(on: app.db)
+      try await SearchIndexes().prepare(on: app.db)
       try await operation(AviationStore(database: app.db))
     }
   }
@@ -143,7 +151,11 @@ extension `Transactional publication` {
       INSERT INTO notams VALUES
         ('A','KSFO','2026-10-28','2026-10-30','DAILY 0800-1000','RWY 28L CLOSED','A',now(),NULL),
         ('B','KSFO','2026-10-28',NULL,NULL,'APRON CONSTRUCTION',NULL,now(),NULL),
-        ('C','KSFO','2026-10-30',NULL,NULL,'FUTURE WORK','A',now(),NULL)
+        ('C','KSFO','2026-10-30',NULL,NULL,'FUTURE WORK','A',now(),NULL),
+        ('D','ZOA','2026-10-28',NULL,NULL,'TEMPORARY FLIGHT RESTRICTIONS','W',now(),
+          '{"coordinates":"3737N12223W"}'),
+        ('E','ZOA','2026-10-28',NULL,NULL,'DISTANT AIRSPACE','W',now(),
+          '{"coordinates":"4000N11500W"}')
       """
     ).run()
     let timestamp = ISO8601DateFormatter()

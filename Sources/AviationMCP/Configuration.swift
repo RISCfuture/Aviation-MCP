@@ -24,6 +24,7 @@ public func configure(_ app: Application) throws {
   app.migrations.add(TerrainSchema())
   app.migrations.add(IdentifierLookupIndex())
   app.migrations.add(DropSupplementalRecords())
+  app.migrations.add(SearchIndexes())
   guard settings.role == "serve" else {
     app.asyncCommands.use(RemoteIngestionCommand(), as: "ingest-sources")
     app.asyncCommands.use(PublishCommand(), as: "publish-bundle")

@@ -17,28 +17,30 @@ struct PeriodicQueries: Sendable {
         throw StorageError.expiredCursor
       }
       let versions = try sources.map(snapshot.require)
-      let spatialArguments =
-        kinds.contains("obstacle")
-        ? arguments
-        : ToolArguments(
-          arguments.values.filter { ["latitude", "longitude"].contains($0.key) })
-      let context = try await SpatialContext.resolve(spatialArguments, on: sql, snapshot: snapshot)
+      let context = try await SpatialContext.resolve(
+        Self.spatialArguments(arguments, kinds: kinds), on: sql, snapshot: snapshot)
       if !context.candidates.isEmpty {
         return ToolResult(
           results: context.candidates, sources: versions.map(SourceStamp.init),
           completeness: "partial", warnings: context.warnings)
       }
-      let versionIDs = versions.map(\.id)
+      let airports = try await AirportReferences.resolve(
+        arguments, kinds: kinds, on: sql, snapshot: snapshot)
       let warnings = try Self.coverage(
         versions: versions, kinds: kinds,
         spatial: context.geometry != nil)
       var query = try Self.query(
-        kinds: kinds, versionIDs: versionIDs, arguments: arguments, geometry: context.geometry)
+        kinds: kinds, versionIDs: versions.map(\.id), arguments: arguments, context: context,
+        airports: airports)
       query += " LIMIT \(bind: limit + 1) OFFSET \(bind: cursor?.offset ?? 0)"
       let rows = try await sql.raw(query).all()
       var result = ToolResult(
         results: try rows.prefix(limit).map(Self.present), sources: versions.map(SourceStamp.init))
       result.warnings = warnings + context.warnings
+      if rows.isEmpty { result.warnings += airports.emptyResultWarnings }
+      if arguments.values["altitude_ft"] != nil {
+        result.warnings.append(AirspaceAltitude.limitation)
+      }
       Self.annotate(&result)
       if rows.count > limit {
         result.nextCursor = try QueryCursor(
@@ -47,6 +49,16 @@ struct PeriodicQueries: Sendable {
       }
       return result
     }
+  }
+
+  /// Obstacle searches take every spatial context; other records take only coordinates or a
+  /// route, since their `airport` argument filters instead of locating.
+  private static func spatialArguments(_ arguments: ToolArguments, kinds: [String])
+    -> ToolArguments
+  {
+    guard !kinds.contains("obstacle") else { return arguments }
+    return ToolArguments(
+      arguments.values.filter { ["latitude", "longitude", "route"].contains($0.key) })
   }
 
   private static func annotate(_ result: inout ToolResult) {
@@ -114,61 +126,74 @@ struct PeriodicQueries: Sendable {
   }
 
   private static func query(
-    kinds: [String], versionIDs: [UUID], arguments: ToolArguments, geometry: Value?
-  ) throws
-    -> SQLQueryString
-  {
-    let identifier = try arguments.string("identifier")?.uppercased()
-    let airport = try arguments.string("airport")?.uppercased()
-    let text = try arguments.string("query")
-    let radius = try arguments.number("radius_nm", default: 5, range: 0.01...500) ?? 5
-    let order = try arguments.string("order") ?? "identifier"
-    guard ["identifier", "highest", "nearest"].contains(order) else {
-      throw MCPError.invalidParams("Unsupported ordering")
-    }
-    guard order != "nearest" || geometry != nil else {
-      throw MCPError.invalidParams("Nearest ordering requires coordinates")
-    }
+    kinds: [String], versionIDs: [UUID], arguments: ToolArguments, context: SpatialContext,
+    airports: AirportReferences
+  ) throws -> SQLQueryString {
+    let altitude = try arguments.number("altitude_ft", range: -2_000...100_000).map(
+      AirspaceAltitude.match)
     var query: SQLQueryString = """
       SELECT id, kind, identifier, name, airport, sequence,
         elevation_msl_ft, height_agl_ft, data::text AS payload,
         ST_AsGeoJSON(geometry)::text AS geometry
-      FROM aviation_records WHERE version_id IN (\(binds: versionIDs))
+      """
+    query += try context.measurementColumns()
+    if let altitude { query += ", \(altitude) AS altitude_match" }
+    query += """
+       FROM aviation_records WHERE version_id IN (\(binds: versionIDs))
         AND kind IN (\(binds: kinds))
       """
-    if let identifier {
+    query += try filters(arguments, kinds: kinds)
+    query += airports.predicate
+    query += try context.filter(
+      radiusNM: arguments.number("radius_nm", default: 5, range: 0.01...500) ?? 5)
+    if let altitude { query += " AND \(altitude) <> 'outside'" }
+    query += try ordering(order(arguments, kinds: kinds, context: context), context: context)
+    return query
+  }
+
+  private static func filters(_ arguments: ToolArguments, kinds: [String])
+    throws -> SQLQueryString
+  {
+    var query: SQLQueryString = ""
+    if let identifier = try arguments.string("identifier")?.uppercased() {
       query +=
         " AND (upper(identifier) = \(bind: identifier) OR upper(data->>'faa_lid') = \(bind: identifier))"
     }
     if let id = try arguments.string("record_id") { query += " AND id = \(bind: id)" }
-    if let airport, !kinds.contains("obstacle") {
-      query += " AND upper(airport) = \(bind: airport)"
-    }
-    if let text {
-      query +=
-        " AND (name ILIKE \(bind: "%" + text + "%") OR identifier ILIKE \(bind: "%" + text + "%"))"
+    if let text = try arguments.string("query") {
+      query += try SearchIndexes.predicate(matching: text)
     }
     if kinds.contains("airport") { query += try AirportFilters.predicate(arguments) }
     if kinds.contains("procedure") { query += try ProcedureFilters.predicate(arguments) }
-    if let geometry {
-      let json = try Normalization.jsonText(geometry)
-      query +=
-        " AND ST_DWithin(geometry, ST_GeomFromGeoJSON(\(bind: json))::geography, \(bind: radius * 1852))"
-    }
-    query += try ordering(order, geometry: geometry)
     return query
   }
 
-  private static func ordering(_ order: String, geometry: Value?) throws -> SQLQueryString {
+  /// The requested ordering; by default the highest obstacles, otherwise the nearest records to
+  /// a spatial context, otherwise identifiers.
+  private static func order(_ arguments: ToolArguments, kinds: [String], context: SpatialContext)
+    throws -> String
+  {
+    let order =
+      try arguments.string("order")
+      ?? (kinds.contains("obstacle")
+        ? "highest" : context.geometry != nil ? "nearest" : "identifier")
+    guard ["identifier", "highest", "nearest"].contains(order) else {
+      throw MCPError.invalidParams("Unsupported ordering")
+    }
+    guard order != "nearest" || context.geometry != nil else {
+      throw MCPError.invalidParams("Nearest ordering requires coordinates")
+    }
+    return order
+  }
+
+  /// The ORDER BY clause; identifier ordering follows the `aviation_identifier` index so that a
+  /// broad text match can stop scanning once a page is filled.
+  private static func ordering(_ order: String, context: SpatialContext) throws -> SQLQueryString {
     if order == "highest" {
       return " ORDER BY elevation_msl_ft DESC NULLS LAST, id, kind, version_id"
     }
-    if order == "nearest", let geometry {
-      let json = try Normalization.jsonText(geometry)
-      return
-        " ORDER BY ST_Distance(geometry, ST_GeomFromGeoJSON(\(bind: json))::geography), id, kind, version_id"
-    }
-    return " ORDER BY identifier, sequence NULLS LAST, id, kind, version_id"
+    if order == "nearest", let nearest = try context.nearestOrdering() { return nearest }
+    return " ORDER BY upper(identifier), sequence NULLS LAST, id, kind, version_id"
   }
 
   private static func present(_ row: any SQLRow) throws -> Value {
@@ -183,6 +208,10 @@ struct PeriodicQueries: Sendable {
     }
     if let agl = try row.decode(column: "height_agl_ft", as: Double?.self) {
       object["height_agl_ft"] = .double(agl)
+    }
+    object.merge(try SpatialContext.measurements(in: row)) { _, new in new }
+    if row.contains(column: "altitude_match") {
+      object["altitude_match"] = .string(try row.decode(column: "altitude_match", as: String.self))
     }
     if let geometry = try row.decode(column: "geometry", as: String?.self) {
       if geometry.utf8.count <= 32_768 {

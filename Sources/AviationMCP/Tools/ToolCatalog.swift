@@ -65,7 +65,7 @@ struct ToolCatalog: Sendable {
       guard let notams else {
         throw StorageError.invalidImport("The NOTAM database is not configured.")
       }
-      return try await notams.search(arguments)
+      return try await notams.search(arguments, area: NOTAMArea.resolve(arguments, store: store))
     default: return try await periodic(tool, arguments: arguments)
     }
   }

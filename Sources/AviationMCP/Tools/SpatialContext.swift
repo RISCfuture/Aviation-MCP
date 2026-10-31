@@ -3,9 +3,19 @@ import MCP
 import SQLKit
 
 struct SpatialContext {
+  private static let feetPerNauticalMile = 6_076.115
+  private static let departureHalfWidthNM = 500 / feetPerNauticalMile
+  private static let departureSplayDeg = 15.0
+
+  /// The reference distances, bearings and nearest ordering are measured from.
   var geometry: Value?
+  /// The area searched instead of a radius around `geometry`.
+  var area: Value?
   var warnings: [String] = []
   var candidates: [Value] = []
+
+  /// Whether the reference is a single position, so bearings toward records are meaningful.
+  var hasPointReference: Bool { geometry?.objectValue?["type"] == "Point" }
 
   static func resolve(
     _ arguments: ToolArguments, on sql: any SQLDatabase, snapshot: SourceSnapshot
@@ -72,13 +82,60 @@ struct SpatialContext {
       let end = ends.first(where: {
         $0.objectValue?["identifier"]?.stringValue.map(RunwayName.canonical)
           == RunwayName.canonical(runway)
-      }),
-      let geometry = end.objectValue?["departure_end"], geometry != .null
+      })?.objectValue,
+      let geometry = end["departure_end"], geometry != .null
     else {
       throw StorageError.invalidImport(
         "The requested runway departure end has no published position.")
     }
-    return Self(geometry: geometry)
+    switch try arguments.string("departure_area") ?? "sector" {
+    case "circle": return Self(geometry: geometry)
+    case "sector":
+      return try departureSector(from: end, departureEnd: geometry, arguments: arguments)
+    default: throw MCPError.invalidParams("departure_area must be sector or circle")
+    }
+  }
+
+  private static func departureSector(
+    from end: [String: Value], departureEnd: Value, arguments: ToolArguments
+  ) throws -> Self {
+    guard let departure = point(departureEnd), let course = departureCourse(end, to: departure)
+    else {
+      throw StorageError.invalidImport(
+        "The runway has no published threshold or heading to orient a departure sector; "
+          + "request departure_area circle.")
+    }
+    let length = try arguments.number("radius_nm", default: 5, range: 0.01...500) ?? 5
+    let farHalfWidth = departureHalfWidthNM + length * tan(departureSplayDeg * .pi / 180)
+    let farCenter = Geodesy.destination(from: departure, courseDeg: course, distanceNM: length)
+    let corners = [
+      (departure, departureHalfWidthNM, -90.0), (farCenter, farHalfWidth, -90),
+      (farCenter, farHalfWidth, 90), (departure, departureHalfWidthNM, 90)
+    ].map { center, halfWidth, offset in
+      Geodesy.destination(from: center, courseDeg: course + offset, distanceNM: halfWidth)
+    }
+    return Self(
+      geometry: departureEnd, area: AirspacePolygon.geometry(rings: [corners]),
+      warnings: [
+        "Obstacles are searched in a departure sector beginning 500 ft either side of the "
+          + "departure end and splaying 15° each side along the runway course for radius_nm; "
+          + "it does not assess TERPS obstacle clearance surfaces."
+      ])
+  }
+
+  private static func departureCourse(_ end: [String: Value], to departure: GeoPoint) -> Double? {
+    if let threshold = end["threshold"].flatMap(point), threshold != departure {
+      return Geodesy.initialCourse(from: threshold, to: departure)
+    }
+    return end["heading_true_deg"].flatMap { $0.doubleValue ?? $0.intValue.map(Double.init) }
+  }
+
+  private static func point(_ value: Value) -> GeoPoint? {
+    guard let coordinates = value.objectValue?["coordinates"]?.arrayValue, coordinates.count == 2,
+      let longitude = coordinates[0].doubleValue ?? coordinates[0].intValue.map(Double.init),
+      let latitude = coordinates[1].doubleValue ?? coordinates[1].intValue.map(Double.init)
+    else { return nil }
+    return GeoPoint(latitude: latitude, longitude: longitude)
   }
 
   private static func procedureGeometry(

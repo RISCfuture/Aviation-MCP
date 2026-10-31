@@ -48,15 +48,18 @@ enum ToolDefinition: String, CaseIterable, Sendable {
     case .findNavigation:
       "Find navaids, fixes, ILS, holds, FSS and AWOS records in the effective cycle."
     case .getAirway: "Get an airway with ordered source segments and restrictions."
-    case .findRoutes: "Find preferred and coded departure routes in the effective cycle."
+    case .findRoutes:
+      "Find preferred and coded departure routes by airport, origin or destination in the "
+        + "effective cycle."
     case .queryAirspace:
-      "Find published airspace and ARTCC records by identifier or available geometry; "
-        + "point and boundary records do not establish airspace containment."
+      "Find airspace containing or near a position or route, optionally at an MSL altitude, "
+        + "or by identifier or airport; ARTCC facility and boundary point records do not "
+        + "establish containment."
     case .findProcedures: "Find departures, arrivals and approaches by airport and identifier."
     case .getProcedure: "Get procedure transitions, leg restrictions and geometry coverage gaps."
     case .queryObstacles:
-      "Find obstacles near coordinates, a route, an airport/runway departure end or an exact procedure_id; "
-        + "highest ordering uses MSL elevation."
+      "Find obstacles near coordinates, a route, an airport/runway departure sector or an exact "
+        + "procedure_id; highest ordering uses MSL elevation."
     case .getAircraft:
       "Find published aircraft characteristics and performance by ICAO type identifier."
     case .getWeather:
@@ -64,7 +67,8 @@ enum ToolDefinition: String, CaseIterable, Sendable {
     case .parseWeather:
       "Parse supplied METAR, TAF or winds-aloft text with an explicit reference date."
     case .queryNOTAMs:
-      "Find overlapping NOTAMs; preserve schedules and include uncertain runway or procedure matches."
+      "Find NOTAMs overlapping a time window for an airport or position, including overlying-ARTCC "
+        + "area NOTAMs such as TFRs; runway and procedure text matches are listed first."
     case .convertCoordinates: "Convert WGS84 latitude/longitude, UTM, UPS and MGRS coordinates."
     case .computeGeometry:
       "Compute WGS84 geodesic routes, distances, true bearings or destination coordinates."
@@ -123,7 +127,11 @@ enum ToolDefinition: String, CaseIterable, Sendable {
     case .findNavigation: ["navaid", "fix", "ils", "hold", "fss", "awos"]
     case .getAirway: ["airway"]
     case .findRoutes: ["preferred_route", "coded_departure_route"]
-    case .queryAirspace: ["airspace", "artcc", "artcc_boundary", "parachute_area", "military_route"]
+    case .queryAirspace:
+      [
+        "airspace", "artcc_airspace", "artcc", "artcc_boundary", "parachute_area",
+        "military_route"
+      ]
     case .findProcedures, .getProcedure: ["procedure"]
     case .queryObstacles: ["obstacle"]
     case .getAircraft: ["aircraft"]

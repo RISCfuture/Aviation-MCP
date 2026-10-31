@@ -50,11 +50,15 @@ enum ToolSchemas {
       ]
       required = ["type", "report"]
     case .queryNOTAMs:
-      properties = pagination.merging([
-        "location": text, "start": date, "end": date,
+      properties = pagination.merging(notamArea) { _, new in new }.merging([
+        "location": described(
+          text,
+          "Airport as a FAA LID or ICAO code, or another NOTAM location such as an ARTCC; "
+            + "required unless latitude and longitude are given."),
+        "start": date, "end": date,
         "scope": enumeration(["A", "E", "W"]), "runway": text, "procedure": text
       ]) { _, new in new }
-      required = ["location", "start", "end"]
+      required = ["start", "end"]
     case .convertCoordinates:
       properties = position.merging([
         "coordinate": text, "format": enumeration(["utm", "ups", "mgrs"])
@@ -125,11 +129,72 @@ enum ToolSchemas {
 
   private static var date: Value { .object(["type": "string", "format": "date-time"]) }
 
+  private static var route: Value {
+    .object([
+      "type": "array", "minItems": 2, "maxItems": 200,
+      "items": .object(["type": "array", "minItems": 2, "maxItems": 2, "items": number])
+    ])
+  }
+
+  private static var notamArea: [String: Value] {
+    position.mapValues {
+      described($0, "Reference position for area NOTAMs; replaces the airport position.")
+    }.merging([
+      "radius_nm": described(
+        .object(["type": "number", "minimum": 1, "maximum": 200, "default": 30]),
+        "Radius around the airport or position in which overlying-ARTCC NOTAM centers "
+          + "(TFRs and other area NOTAMs) are included, in nautical miles.")
+    ]) { _, new in new }
+  }
+
+  /// Departure areas, airspace position and altitude, and route endpoint parameters.
+  private static func searchContext(_ tool: ToolDefinition) -> [String: Value] {
+    switch tool {
+    case .queryObstacles:
+      [
+        "departure_area": described(
+          enumeration(["sector", "circle"]),
+          "Area searched for an airport and runway: a sector along the runway course from the "
+            + "departure end (default), or a circle around the departure end; radius_nm sets "
+            + "its size.")
+      ]
+    case .queryAirspace:
+      [
+        "route": described(
+          route, "Route as [longitude, latitude] pairs; finds airspace the route crosses or nears."),
+        "altitude_ft": described(
+          number, "MSL altitude in feet; excludes airspace whose vertical limits exclude it.")
+      ]
+    case .findRoutes:
+      [
+        "origin": described(text, "Departure airport, as a FAA LID or ICAO code."),
+        "destination": described(text, "Arrival airport, as a FAA LID or ICAO code.")
+      ]
+    default: [:]
+    }
+  }
+
+  private static func described(_ schema: Value, _ description: String) -> Value {
+    var fields = schema.objectValue ?? [:]
+    fields["description"] = .string(description)
+    return .object(fields)
+  }
+
   private static func periodic(_ tool: ToolDefinition) -> [String: Value] {
     var properties = position.merging(pagination) { _, new in new }
     properties.merge([
-      "identifier": text, "record_id": text, "query": text, "airport": text, "radius_nm": number,
-      "order": enumeration(["identifier", "highest", "nearest"])
+      "identifier": text, "record_id": text, "radius_nm": number,
+      "airport": described(
+        text,
+        "Airport as a FAA LID or ICAO code. Routes match it as origin or destination; obstacle "
+          + "searches use it with runway to locate a departure end."),
+      "query": described(
+        .object(["type": "string", "minLength": 3, "maxLength": 16384]),
+        "Case-insensitive substring of the record identifier or name; at least 3 characters."),
+      "order": described(
+        enumeration(["identifier", "highest", "nearest"]),
+        "Result order; defaults to highest for obstacles, nearest when coordinates or a route "
+          + "are given, and identifier otherwise.")
     ]) { _, new in new }
     if tool == .findAirports {
       properties["minimum_runway_length_ft"] = number
@@ -149,11 +214,9 @@ enum ToolSchemas {
     if tool == .queryObstacles {
       properties["runway"] = text
       properties["procedure_id"] = text
-      properties["route"] = .object([
-        "type": "array", "minItems": 2, "maxItems": 200,
-        "items": .object(["type": "array", "minItems": 2, "maxItems": 2, "items": number])
-      ])
+      properties["route"] = route
     }
+    properties.merge(searchContext(tool)) { _, new in new }
     if tool.kinds.count > 1 {
       properties["kinds"] = .object([
         "type": "array", "items": enumeration(tool.kinds), "minItems": 1

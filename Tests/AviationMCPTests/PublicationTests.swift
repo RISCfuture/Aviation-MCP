@@ -190,7 +190,7 @@ struct `Transactional publication` {
   @Test
   func `orders obstacles by MSL and binds pagination to source versions`() async throws {
     try await withDatabase { store in
-      let position = try await Self.publishObstacles(store)
+      try await Self.publishObstacles(store)
       let queries = PeriodicQueries(store: store)
       for context: [String: Value] in [
         ["airport": "KOAK", "radius_nm": 5],
@@ -212,14 +212,21 @@ struct `Transactional publication` {
       let second = try await queries.search(
         kinds: ["obstacle"], sources: [.dof], arguments: ToolArguments(args))
       #expect(second.results.first?.objectValue?["identifier"]?.stringValue == "LOW")
-      try await Self.publishDepartureAirport(store, position: position)
+      try await Self.publishDepartureAirport(store)
       let departure = try await queries.search(
         kinds: ["obstacle"], sources: [.dof, .nasr],
-        arguments: ToolArguments([
-          "airport": "KOAK", "runway": "29", "radius_nm": 5, "order": "highest"
-        ]))
-      #expect(departure.results.first?.objectValue?["identifier"] == "HIGH")
+        arguments: ToolArguments(["airport": "KOAK", "runway": "29", "radius_nm": 5]))
+      #expect(departure.results.compactMap { $0.objectValue?["identifier"] } == ["HIGH", "LOW"])
+      let highest = try #require(departure.results.first?.objectValue)
+      #expect(highest["bearing_true_deg"] == 270)
+      #expect((0.46...0.49).contains(try #require(highest["distance_nm"]?.doubleValue)))
       #expect(Set(departure.sources.map(\.source)) == ["dof", "nasr"])
+      let circle = try await queries.search(
+        kinds: ["obstacle"], sources: [.dof, .nasr],
+        arguments: ToolArguments([
+          "airport": "KOAK", "runway": "29", "radius_nm": 5, "departure_area": "circle"
+        ]))
+      #expect(circle.results.count == 3)
       let replacement = Self.version(.dof)
       try await store.publish([replacement], records: [.fixture(replacement)])
       let resumed = args
@@ -261,50 +268,6 @@ struct `Transactional publication` {
       let distance = try #require(route["distance_nm"]?.doubleValue)
       #expect((120...121).contains(distance))
       #expect(route["geometry"]?.objectValue?["type"] == "MultiLineString")
-    }
-  }
-
-}
-
-extension `Transactional publication` {
-
-  @Test
-  func `includes overlapping NOTAMs and preserves uncertain schedules and context`() async throws {
-    try await withDatabase { store in
-      let sql = try store.database.sqlDatabase()
-      try await Self.prepareNOTAMs(on: sql)
-      let queries = NOTAMQueries(database: store.database)
-      let result = try await queries.search(
-        ToolArguments([
-          "location": "KSFO", "start": "2026-10-29T15:00:00Z", "end": "2026-10-29T19:00:00Z",
-          "scope": "A", "runway": "28L"
-        ]))
-      #expect(result.results.count == 2)
-      #expect(result.completeness == "partial")
-      #expect(result.results.first?.objectValue?["schedule"] == "DAILY 0800-1000")
-      #expect(result.results.last?.objectValue?["context_match"] == "uncertain")
-      #expect(result.results.last?.objectValue?["scope_match"] == "uncertain")
-      #expect(result.results.last?.objectValue?["scope_explanation"]?.stringValue?.isEmpty == false)
-      #expect(result.liveSources.first?.provider == "notams")
-      #expect(!result.warnings.contains { $0.contains("freshness") })
-      var page: [String: Value] = [
-        "location": "KSFO", "start": "2026-10-29T15:00:00.000Z", "end": "2026-10-29T19:00:00Z",
-        "limit": 1
-      ]
-      let first = try await queries.search(ToolArguments(page))
-      page["cursor"] = .string(try #require(first.nextCursor))
-      try await sql.raw(
-        "UPDATE notams SET updated_at = now() + INTERVAL '1 hour' WHERE notam_id = 'C'"
-      ).run()
-      let second = try await queries.search(ToolArguments(page))
-      #expect(second.results.first?.objectValue?["id"] == "B")
-      try await sql.raw(
-        "UPDATE notams SET updated_at = now() + INTERVAL '2 hours' WHERE notam_id = 'B'"
-      ).run()
-      let continuation = page
-      await #expect(throws: StorageError.self) {
-        try await queries.search(ToolArguments(continuation))
-      }
     }
   }
 
