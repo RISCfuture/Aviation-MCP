@@ -1,8 +1,9 @@
 import Foundation
 
-/// The admitted client's rate-limit key, bound for the duration of an MCP request.
+/// The admitted client's network (one IPv4 address or IPv6 /64), bound for the duration of an
+/// MCP tool call.
 enum WeatherClient {
-  @TaskLocal static var key: String?
+  @TaskLocal static var key: IPNetwork?
 }
 
 /// Caps each client's share of the upstream provider budgets within this process, so one client
@@ -24,7 +25,7 @@ actor ClientAllowance {
   /// Reserves units against the client's share of every applicable limit, returning `nil` when
   /// they are reserved and otherwise the time the exhausted share resets.
   func reserve(
-    provider: String, client: String, units: Double, limits: [BudgetLimit], at now: Date = .now
+    provider: String, client: IPNetwork, units: Double, limits: [BudgetLimit], at now: Date = .now
   ) throws -> Date? {
     pruneExpired(at: now)
     let windows = try windows(provider: provider, client: client, limits: limits, at: now)
@@ -38,7 +39,7 @@ actor ClientAllowance {
 
   /// Returns units reserved for a request the global budget then refused.
   func refund(
-    provider: String, client: String, units: Double, limits: [BudgetLimit], at now: Date = .now
+    provider: String, client: IPNetwork, units: Double, limits: [BudgetLimit], at now: Date = .now
   ) throws {
     for window in try windows(provider: provider, client: client, limits: limits, at: now) {
       usage[window.key] = Usage(
@@ -47,7 +48,7 @@ actor ClientAllowance {
   }
 
   private func windows(
-    provider: String, client: String, limits: [BudgetLimit], at now: Date
+    provider: String, client: IPNetwork, limits: [BudgetLimit], at now: Date
   ) throws -> [Window] {
     try limits.filter { Self.periods.contains($0.period) }.map { limit in
       let key = UsageKey(provider: provider, client: client, period: limit.period)
@@ -63,7 +64,7 @@ actor ClientAllowance {
 
   private struct UsageKey: Hashable {
     let provider: String
-    let client: String
+    let client: IPNetwork
     let period: BudgetPeriod
   }
 

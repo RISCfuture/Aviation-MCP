@@ -107,7 +107,7 @@ extension `Transactional publication` {
         allowance: ClientAllowance(fraction: 0.5)
       ) { _ in ClientResponse(status: .ok, body: ByteBuffer(string: "[]")) }
       let limits = [BudgetLimit(period: .day, units: 2)]
-      try await WeatherClient.$key.withValue("first") {
+      try await WeatherClient.$key.withValue(IPNetwork(cidr: "192.0.2.1")) {
         _ = try await http.get(
           provider: "awc", url: "https://example.invalid/a", units: 1, limits: limits)
         let refusal = await #expect(throws: WeatherFailure.self) {
@@ -116,7 +116,7 @@ extension `Transactional publication` {
         }
         #expect(refusal?.clientSpecific == true)
       }
-      try await WeatherClient.$key.withValue("second") {
+      try await WeatherClient.$key.withValue(IPNetwork(cidr: "192.0.2.2")) {
         let fetched = try await http.get(
           provider: "awc", url: "https://example.invalid/b", units: 1, limits: limits)
         #expect(!fetched.cacheHit)

@@ -9,13 +9,15 @@ struct ServerSettings: Sendable {
   let role: String
   let databaseURL: String
   let databaseWaitSeconds: Double
+  let databaseConnectionsPerEventLoop: Int
   let notamDatabaseURL: String?
   let groups: Set<DomainGroup>
   let weatherSources: Set<String>
   let origins: [String]
   let timeout: Double
-  let requestsPerMinute: Double
-  let burst: Double
+  let admission: AdmissionSettings
+  let edgeIdentity: EdgeClientIdentity
+  let runsOnFly: Bool
   let cacheSeconds: Double
   let openMeteoEndpoint: String
   let openMeteoKey: String?
@@ -37,6 +39,9 @@ struct ServerSettings: Sendable {
     }
     databaseURL = url
     databaseWaitSeconds = try Self.number("DATABASE_WAIT_SECONDS", default: 15, range: 1...30)
+    databaseConnectionsPerEventLoop = Int(
+      try Self.number(
+        "DATABASE_CONNECTIONS_PER_EVENT_LOOP", default: role == "serve" ? 6 : 2, range: 1...32))
     notamDatabaseURL = Environment.get("NOTAM_DATABASE_URL")
     let selectedGroups = Self.list("AVIATION_GROUPS", default: DomainGroup.allCases.map(\.rawValue))
     guard selectedGroups.allSatisfy({ DomainGroup(rawValue: $0) != nil }) else {
@@ -49,8 +54,9 @@ struct ServerSettings: Sendable {
     }
     origins = Self.list("MCP_ALLOWED_ORIGINS", default: ["https://aviation-mcp.org"])
     timeout = try Self.number("MCP_TIMEOUT_SECONDS", default: 30, range: 1...60)
-    requestsPerMinute = try Self.number("PUBLIC_RATE_PER_MINUTE", default: 60, range: 1...100_000)
-    burst = try Self.number("PUBLIC_RATE_BURST", default: 20, range: 1...10_000)
+    admission = try Self.admission()
+    edgeIdentity = EdgeClientIdentity(secret: Environment.get("EDGE_PROXY_SECRET"))
+    runsOnFly = Environment.get("FLY_APP_NAME") != nil
     cacheSeconds = try Self.number("WEATHER_CACHE_SECONDS", default: 900, range: 1...86400)
     openMeteoEndpoint =
       Environment.get("OPEN_METEO_ENDPOINT") ?? "https://api.open-meteo.com/v1/forecast"
@@ -62,6 +68,39 @@ struct ServerSettings: Sendable {
           "OPEN_METEO_\(limit.period.rawValue.uppercased())_LIMIT", default: limit.units,
           range: 1...1_000_000_000))
     }
+  }
+
+  private static func admission() throws -> AdmissionSettings {
+    let defaults = AdmissionSettings()
+    let networks = list("CONNECTOR_EGRESS_RANGES", default: []).filter { !$0.isEmpty }
+    let connectorNetworks = networks.compactMap { IPNetwork(cidr: $0) }
+    guard connectorNetworks.count == networks.count else {
+      throw invalid("CONNECTOR_EGRESS_RANGES")
+    }
+    return AdmissionSettings(
+      client: try policy("PUBLIC", default: defaults.client),
+      connector: try policy("CONNECTOR", default: defaults.connector),
+      connectorNetworks: connectorNetworks,
+      global: try rate("GLOBAL", default: defaults.global))
+  }
+
+  private static func policy(_ prefix: String, default fallback: AdmissionPolicy) throws
+    -> AdmissionPolicy
+  {
+    AdmissionPolicy(
+      rate: try rate(prefix, default: fallback.rate),
+      concurrency: Int(
+        try number(
+          "\(prefix)_CONCURRENCY", default: Double(fallback.concurrency), range: 1...1_000)))
+  }
+
+  private static func rate(_ prefix: String, default fallback: AdmissionRate) throws
+    -> AdmissionRate
+  {
+    AdmissionRate(
+      requestsPerMinute: try number(
+        "\(prefix)_RATE_PER_MINUTE", default: fallback.requestsPerMinute, range: 1...100_000),
+      burst: try number("\(prefix)_RATE_BURST", default: fallback.burst, range: 1...10_000))
   }
 
   private static func list(_ key: String, default fallback: [String]) -> [String] {

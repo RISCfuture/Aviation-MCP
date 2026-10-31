@@ -46,7 +46,7 @@ struct WeatherHTTP: Sendable {
   }
 
   private func reserveShare(
-    provider: String, client: String, units: Double, limits: [BudgetLimit]
+    provider: String, client: IPNetwork, units: Double, limits: [BudgetLimit]
   ) async throws {
     guard
       let retry = try await allowance.reserve(

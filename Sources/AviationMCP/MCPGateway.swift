@@ -2,16 +2,23 @@ import Foundation
 import MCP
 import Vapor
 
+/// Serves the stateless MCP Streamable HTTP endpoint, one isolated server per JSON-RPC message.
 struct MCPGateway: Sendable {
+  /// The largest request body accepted on `/mcp`.
+  static let maximumBodyBytes = 1_048_576
+  /// Protocol versions that permit JSON-RPC batches; a request without a version header uses
+  /// 2025-03-26.
+  private static let batchingProtocolVersions: Set<String> = ["2024-11-05", "2025-03-26"]
+  private static let defaultProtocolVersion = "2025-03-26"
+
   let origins: [String]
   let timeout: Duration
   let tools: [Tool]
   let call: @Sendable (CallTool.Parameters) async throws -> CallTool.Result
 
   func register(on app: Application) {
-    app.on(.POST, "mcp", body: .collect(maxSize: "1mb")) { request async throws in
-      try await respond(to: request)
-    }
+    let body = HTTPBodyStreamStrategy.collect(maxSize: ByteCount(value: Self.maximumBodyBytes))
+    app.on(.POST, "mcp", body: body) { request async throws in try await respond(to: request) }
     for method in [HTTPMethod.GET, .DELETE] {
       app.on(method, "mcp") { _ async -> Vapor.Response in
         Vapor.Response(status: .methodNotAllowed, headers: ["Allow": "POST"])
@@ -20,9 +27,67 @@ struct MCPGateway: Sendable {
   }
 
   private func respond(to request: Vapor.Request) async throws -> Vapor.Response {
-    guard (request.body.data?.readableBytes ?? 0) <= 1_048_576 else {
+    guard (request.body.data?.readableBytes ?? 0) <= Self.maximumBodyBytes else {
       throw Abort(.payloadTooLarge)
     }
+    let envelope = Envelope(request)
+    let deadline = ContinuousClock.now + timeout
+    let body = request.body.data.map { Data($0.readableBytesView) }
+    let response =
+      if let body, let batch = try? JSONDecoder().decode([Value].self, from: body) {
+        try await exchange(batch: batch, envelope: envelope, deadline: deadline)
+      } else {
+        try await exchange(body, envelope: envelope, deadline: deadline)
+      }
+    return Vapor.Response(
+      status: .init(statusCode: response.statusCode),
+      headers: HTTPHeaders(response.headers.map { ($0.key, $0.value) }),
+      body: .init(data: response.bodyData ?? Data())
+    )
+  }
+
+  private func exchange(batch items: [Value], envelope: Envelope, deadline: ContinuousClock.Instant)
+    async throws -> MCP.HTTPResponse
+  {
+    if let rejection = batchRejection(items, envelope: envelope) { return rejection }
+    var replies: [Value] = []
+    for item in items {
+      let response = try await exchange(
+        try JSONEncoder().encode(item), envelope: envelope, deadline: deadline)
+      switch response.statusCode {
+      case 202: continue
+      case 200, 400:
+        guard let data = response.bodyData else { continue }
+        replies.append(try JSONDecoder().decode(Value.self, from: data))
+      default: return response
+      }
+    }
+    guard !replies.isEmpty else { return .accepted() }
+    return .data(
+      try JSONEncoder().encode(replies), headers: [HTTPHeaderName.contentType: "application/json"])
+  }
+
+  private func batchRejection(_ items: [Value], envelope: Envelope) -> MCP.HTTPResponse? {
+    let version = envelope.headers["mcp-protocol-version"] ?? Self.defaultProtocolVersion
+    guard Self.batchingProtocolVersions.contains(version) else {
+      return .error(
+        statusCode: 400,
+        .invalidRequest("JSON-RPC batches are not supported in protocol version \(version)"))
+    }
+    guard !items.isEmpty else {
+      return .error(statusCode: 400, .invalidRequest("Batch array must not be empty"))
+    }
+    guard !items.contains(where: { $0.objectValue?["method"] == "initialize" }) else {
+      return .error(statusCode: 400, .invalidRequest("initialize must not be part of a batch"))
+    }
+    return nil
+  }
+
+  private func exchange(_ body: Data?, envelope: Envelope, deadline: ContinuousClock.Instant)
+    async throws -> MCP.HTTPResponse
+  {
+    let remaining = ContinuousClock.now.duration(to: deadline)
+    guard remaining > .zero else { throw Abort(.gatewayTimeout) }
     let transport = StatelessHTTPServerTransport(
       validationPipeline: StandardValidationPipeline(validators: [
         ExactOriginValidator(origins: origins),
@@ -44,27 +109,14 @@ struct MCPGateway: Sendable {
     }
     try await server.start(transport: transport)
     let message = MCP.HTTPRequest(
-      method: request.method.rawValue,
-      headers: request.headers.reduce(into: [:]) { headers, field in
-        headers[field.name.lowercased(), default: ""] +=
-          (headers[field.name.lowercased()] == nil ? "" : ",") + field.value
-      },
-      body: try request.body.data.map { try sdkRequestBody(Data($0.readableBytesView)) },
-      path: request.url.path
-    )
+      method: envelope.method, headers: envelope.headers,
+      body: try body.map { try sdkRequestBody($0) }, path: envelope.path)
     do {
       let response = try await boundedResponse(
-        message,
-        transport: transport,
-        invocation: invocation
-      )
+        message, transport: transport, invocation: invocation, timeout: remaining)
       await invocation.cancel()
       await server.stop()
-      return Vapor.Response(
-        status: .init(statusCode: response.statusCode),
-        headers: HTTPHeaders(response.headers.map { ($0.key, $0.value) }),
-        body: .init(data: response.bodyData ?? Data())
-      )
+      return response
     } catch {
       await invocation.cancel()
       await server.stop()
@@ -89,7 +141,8 @@ struct MCPGateway: Sendable {
   private func boundedResponse(
     _ request: MCP.HTTPRequest,
     transport: StatelessHTTPServerTransport,
-    invocation: ToolInvocation
+    invocation: ToolInvocation,
+    timeout: Duration
   ) async throws -> MCP.HTTPResponse {
     try await withTaskCancellationHandler {
       try await withThrowingTaskGroup(of: Outcome.self) { group in
@@ -117,6 +170,22 @@ struct MCPGateway: Sendable {
   private enum Outcome: Sendable {
     case response(MCP.HTTPResponse)
     case timedOut
+  }
+
+  /// The parts of the HTTP request every JSON-RPC message in it shares.
+  private struct Envelope {
+    let method: String
+    let headers: [String: String]
+    let path: String
+
+    init(_ request: Vapor.Request) {
+      method = request.method.rawValue
+      headers = request.headers.reduce(into: [:]) { headers, field in
+        headers[field.name.lowercased(), default: ""] +=
+          (headers[field.name.lowercased()] == nil ? "" : ",") + field.value
+      }
+      path = request.url.path
+    }
   }
 }
 

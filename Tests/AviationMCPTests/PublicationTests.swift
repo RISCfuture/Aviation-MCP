@@ -29,7 +29,9 @@ struct `Transactional publication` {
   func `keeps the service ready while individual datasets are unavailable`() async throws {
     try await withDatabase { store in
       try await withApp { app in
-        registerOperations(app, store: store, groups: [.airports], metrics: ServerMetrics())
+        registerOperations(
+          app, store: store, groups: [.airports], metrics: ServerMetrics(),
+          readinessLifetime: .zero)
         try await app.testing().test(.GET, "/ready") { response in
           #expect(response.status == .ok)
           let body = try response.content.decode([String: String].self)
@@ -234,25 +236,6 @@ struct `Transactional publication` {
         try await queries.search(
           kinds: ["obstacle"], sources: [.dof], arguments: ToolArguments(resumed))
       }
-    }
-  }
-
-  @Test
-  func `admits only the shared burst under concurrent requests`() async throws {
-    try await withDatabase { store in
-      let admission = AdmissionLimiter(
-        database: store.database, requestsPerMinute: 0.001, burst: 20)
-      let outcomes = try await withThrowingTaskGroup(of: AdmissionDecision.self) { group in
-        for _ in 0..<25 {
-          group.addTask { try await admission.admit(key: "192.0.2.1") }
-        }
-        var decisions: [AdmissionDecision] = []
-        for try await decision in group { decisions.append(decision) }
-        return decisions
-      }
-      #expect(outcomes.filter(\.allowed).count == 20)
-      #expect(outcomes.filter { !$0.allowed }.allSatisfy { $0.retryAfterSeconds > 0 })
-      #expect(try await admission.admit(key: "192.0.2.2").allowed)
     }
   }
 
