@@ -12,6 +12,9 @@ kill_timeout = "120s"
 [[mounts]]
   source = "pg_data"
   destination = "/data"
+  auto_extend_size_threshold = 80
+  auto_extend_size_increment = "2GB"
+  auto_extend_size_limit = "20GB"
 
 [[services]]
   protocol = "tcp"

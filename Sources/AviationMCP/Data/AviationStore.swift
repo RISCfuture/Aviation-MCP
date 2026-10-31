@@ -73,6 +73,7 @@ struct AviationStore: Sendable {
       ).run()
       try await Self.purge(on: sql)
     }
+    await reclaimPurgedSpace()
   }
 
   func purge() async throws {
@@ -80,6 +81,17 @@ struct AviationStore: Sendable {
       let sql = try database.sqlDatabase()
       try await sql.raw("SELECT pg_advisory_xact_lock(13799201)").run()
       try await Self.purge(on: sql)
+    }
+    await reclaimPurgedSpace()
+  }
+
+  /// Vacuums the tables purging deletes from in bulk while the caller still holds a connection, so
+  /// the database cannot idle and stop partway through. Autovacuum retries after a failure.
+  private func reclaimPurgedSpace() async {
+    do {
+      try await database.sqlDatabase().raw("VACUUM (ANALYZE) aviation_records, weather_cache").run()
+    } catch {
+      database.logger.warning("Vacuum after purge failed: \(error)")
     }
   }
 
@@ -186,7 +198,7 @@ struct AviationStore: Sendable {
       .run()
     try await sql.raw(
       """
-      DELETE FROM weather_cache WHERE fresh_until < now() AND
+      DELETE FROM weather_cache WHERE COALESCE(fresh_until, '-infinity') < now() AND
         COALESCE(lease_until, '-infinity') < now() AND COALESCE(retry_at, '-infinity') < now()
       """
     ).run()
