@@ -8,30 +8,46 @@ import Testing
 @Suite
 struct `Weather selection and provenance` {
   @Test
-  func `prefers aviation fields and fills missing fields from the model`() async throws {
+  func `prefers aviation fields and keeps modeled values in a separate supplement`() async throws {
     let now = Date(timeIntervalSince1970: 1_700_000_000)
     let query = WeatherQuery(
       station: "KOAK", latitude: 37.7, longitude: -122.2,
-      instant: now, fields: ["temperature_c", "wind_speed_kt"], sources: nil)
+      instant: now, fields: ["temperature_c", "wind_gust_kt", "wind_speed_kt"], sources: nil)
     let service = WeatherService(
-      awc: { _ in Self.sample(provider: "awc", instant: now, values: ["temperature_c": 18]) },
+      awc: { _ in
+        Self.sample(
+          provider: "awc", instant: now, values: ["temperature_c": 18, "wind_gust_kt": .null])
+      },
       openMeteo: { request in
         #expect(request.fields == ["wind_speed_kt"])
         return Self.sample(
           provider: "open_meteo", instant: now,
-          values: ["temperature_c": 20, "wind_speed_kt": 12])
+          values: ["temperature_c": 20, "wind_gust_kt": 25, "wind_speed_kt": 12])
       })
     let result = try await service.weather(query)
-    let fields = try #require(result.results.first?.objectValue?["fields"]?.objectValue)
+    let weather = try #require(result.results.first?.objectValue)
+    let fields = try #require(weather["fields"]?.objectValue)
     #expect(fields["temperature_c"]?.objectValue?["value"] == 18)
     #expect(fields["temperature_c"]?.objectValue?["provider"] == "awc")
-    #expect(fields["wind_speed_kt"]?.objectValue?["modeled"] == true)
+    #expect(fields["wind_gust_kt"]?.objectValue?["value"] == .null)
+    #expect(fields["wind_speed_kt"] == nil)
+    let modeled = try #require(weather["model_supplement"]?.objectValue?["fields"]?.objectValue)
+    #expect(modeled.keys.sorted() == ["wind_speed_kt"])
+    #expect(modeled["wind_speed_kt"]?.objectValue?["modeled"] == true)
+    #expect(result.completeness == "complete")
     let disabled = WeatherService(awc: service.awc, openMeteo: nil)
     var selected = query
     selected.sources = ["open_meteo"]
     let request = selected
     await #expect(throws: MCPError.self) { try await disabled.weather(request) }
+  }
 
+  @Test
+  func `reports each provider failure when no source covers the request`() async throws {
+    let now = Date(timeIntervalSince1970: 1_700_000_000)
+    let query = WeatherQuery(
+      station: "KOAK", latitude: 37.7, longitude: -122.2,
+      instant: now, fields: ["temperature_c"], sources: nil)
     let retry = now.addingTimeInterval(60)
     let budget = BudgetReport(
       provider: "open_meteo", allowed: false, requestedUnits: 1,

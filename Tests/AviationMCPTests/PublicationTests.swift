@@ -287,9 +287,9 @@ extension `Transactional publication` {
       try await store.publish([nasr, cifp], records: [airport, .fixture(cifp)])
       let query = try WeatherQuery(arguments: ToolArguments(["station": "KOAK"]))
       let resolved = try await WeatherLocation(store: store).resolve(query)
-      #expect(resolved.query.latitude == 37.7)
-      #expect(resolved.query.longitude == -122.2)
-      #expect(resolved.source?.cycle == nasr.cycle)
+      #expect(resolved.latitude == 37.7)
+      #expect(resolved.longitude == -122.2)
+      #expect(resolved.locationSource?.cycle == nasr.cycle)
       let sql = try store.database.sqlDatabase()
       try await sql.raw(
         """
@@ -299,9 +299,9 @@ extension `Transactional publication` {
         FROM aviation_records WHERE id = 'OAK'
         """
       ).run()
-      await #expect(throws: WeatherFailure.self) {
-        try await WeatherLocation(store: store).resolve(query)
-      }
+      let ambiguous = try await WeatherLocation(store: store).resolve(query)
+      #expect(ambiguous.latitude == nil)
+      #expect(ambiguous.locationProblem != nil)
     }
   }
 

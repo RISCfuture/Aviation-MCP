@@ -3,8 +3,11 @@ import MCP
 import SwiftMETAR
 
 enum AviationReports {
+  /// How long a METAR describes current conditions after its observation time.
+  static let observationLifetime: TimeInterval = 3600
+
   static func sample(metar: METAR, at instant: Date, retrievedAt: Date) throws -> WeatherSample {
-    let interval = DateInterval(start: metar.date, duration: 3600)
+    let interval = DateInterval(start: metar.date, duration: observationLifetime)
     guard interval.start <= instant && instant < interval.end else {
       throw WeatherFailure(
         provider: "awc", reason: "The observation does not cover the requested time.")
@@ -49,13 +52,19 @@ enum AviationReports {
     if values["wind_variable"] == true || values["wind_calm"] == true {
       values["wind_direction_true_deg"] = .null
     }
-    return values.mapValues { value in
+    let reportsNoGust = values["wind_report"] != nil && values["wind_gust_kt"] == nil
+    if reportsNoGust { values["wind_gust_kt"] = .null }
+    var fields = values.mapValues { value in
       WeatherField(
         value: value, provider: "awc", product: product, modeled: false,
         validFrom: interval.start, validUntil: interval.end, retrievedAt: retrievedAt,
         observationTime: product == "METAR" ? observedAt : nil,
         issueTime: product == "TAF" ? observedAt : nil)
     }
+    if reportsNoGust {
+      fields["wind_gust_kt"]?.notes = ["The \(product) wind group reports no gusts."]
+    }
+    return fields
   }
 
   private static func boundaries(_ period: TAF.Group.Period) -> [Date] {

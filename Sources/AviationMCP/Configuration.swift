@@ -85,17 +85,13 @@ private func configureWeather(_ app: Application, settings: ServerSettings) -> W
     http: http, openMeteoEndpoint: settings.openMeteoEndpoint,
     openMeteoKey: settings.openMeteoKey, openMeteoLimits: settings.openMeteoLimits)
   let awc: WeatherService.Provider = { try await providers.awc($0) }
+  let openMeteo: WeatherService.Provider = { try await providers.openMeteo($0) }
   let location = WeatherLocation(store: AviationStore(database: app.db))
-  let openMeteo: WeatherService.Provider = { query in
-    let resolved = try await location.resolve(query)
-    var sample = try await providers.openMeteo(resolved.query)
-    sample.sources = resolved.source.map { [$0] } ?? []
-    return sample
-  }
   return WeatherService(
     awc: settings.weatherSources.contains("awc") ? awc : nil,
     openMeteo: settings.weatherSources.contains("open_meteo")
-      ? openMeteo : nil)
+      ? openMeteo : nil,
+    locate: { try await location.resolve($0) })
 }
 
 private func configureNOTAMs(_ app: Application, settings: ServerSettings) throws -> NOTAMQueries? {
