@@ -324,4 +324,34 @@ extension `Normalized source imports` {
         ])
     #expect(frequencies.fields(forAirport: "ZOA").isEmpty)
   }
+
+  @Test
+  func `withholds releases that lose record families or published records`() throws {
+    var published = SourceVersion(
+      id: UUID(), source: .nasr, cycle: "2026-10-29", effectiveFrom: .now, effectiveUntil: nil,
+      checksum: "fixture", parserRevision: "fixture", validated: true)
+    published.validation = ["record_counts": ["airport": 1000, "fix": 500, "fss": 10]]
+    let gate = ReleaseCompleteness(snapshot: SourceSnapshot(versions: [.nasr: published]))
+    let staged = { (counts: [String: Int], families: [String]) in
+      var version = published
+      version.validation = [
+        ReleaseCompleteness.failedFamiliesKey: .array(families.map(Value.string))
+      ]
+      let records = counts.flatMap { kind, count in
+        (0..<count).map {
+          AviationRecord(
+            versionID: version.id, kind: kind, id: "\($0)", identifier: "\($0)", name: kind)
+        }
+      }
+      return StagedImport(versions: [version], records: records)
+    }
+    try gate.verify(staged(["airport": 950, "fix": 500, "fss": 5], []))
+    for incomplete in [
+      staged(["airport": 1000, "fix": 400, "fss": 10], []),
+      staged(["airport": 1000, "fix": 500], []),
+      staged(["airport": 1000, "fix": 500, "fss": 10], ["fix"])
+    ] {
+      #expect(throws: IncompleteReleaseError.self) { try gate.verify(incomplete) }
+    }
+  }
 }

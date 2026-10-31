@@ -5,6 +5,14 @@ import SwiftNASR
 struct NASRDiagnostics: Sendable {
   var errors = ImportDiagnostics()
   private var warnings: [String: [Value]] = [:]
+  private var failedFamilies: [String] = []
+
+  /// Import validation, listing record families that failed to parse as a whole.
+  var validation: [String: Value] {
+    errors.validation.merging(
+      [ReleaseCompleteness.failedFamiliesKey: .array(failedFamilies.map(Value.string))],
+      uniquingKeysWith: { _, families in families })
+  }
 
   mutating func record(_ error: RecordParseError) {
     switch error {
@@ -20,6 +28,7 @@ struct NASRDiagnostics: Sendable {
   }
 
   mutating func recordFamily(_ error: any Swift.Error, type: RecordType) {
+    failedFamilies.append(Self.kind(type))
     let diagnostic = errors.record(
       error, kind: Self.kind(type), details: ["phase": "record_family"])
     store(diagnostic, kind: Self.kind(type), id: nil)

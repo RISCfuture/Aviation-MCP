@@ -28,7 +28,7 @@ enum NASRImporter {
     guard !records.isEmpty else {
       throw StorageError.invalidImport("NASR contains no usable records.")
     }
-    version.validation = diagnostics.errors.validation
+    version.validation = diagnostics.validation
     return StagedImport(versions: [version], records: diagnostics.applying(to: records))
   }
 
