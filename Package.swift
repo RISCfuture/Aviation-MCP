@@ -41,10 +41,7 @@ let package = Package(
     .package(url: "https://github.com/vapor/fluent.git", exact: "4.13.0"),
     .package(url: "https://github.com/vapor/fluent-postgres-driver.git", exact: "2.14.0"),
     .package(url: "https://github.com/vapor/postgres-kit.git", exact: "2.17.0"),
-    .package(
-      url: "https://github.com/modelcontextprotocol/swift-sdk.git",
-      revision: "68300d7130f95a031284177c89e1e32fe32e7d82"
-    )
+    .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", exact: "0.12.1")
   ],
   targets: [
     .target(
