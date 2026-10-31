@@ -41,7 +41,7 @@ struct SpatialContext {
   ) async throws -> Self {
     guard let airport = try arguments.string("airport", required: true)?.uppercased(),
       let version = snapshot.versions[.nasr]
-    else { throw StorageError.unavailable(.nasr) }
+    else { throw StorageError.unavailable(.nasr, reason: snapshot.unavailability(of: .nasr)) }
     let rows = try await sql.raw(
       """
       SELECT id, identifier, name, data::text AS payload FROM aviation_records
@@ -84,7 +84,7 @@ struct SpatialContext {
   private static func procedureGeometry(
     _ identifier: String, on sql: any SQLDatabase, snapshot: SourceSnapshot
   ) async throws -> Self {
-    guard let version = snapshot.versions[.cifp] else { throw StorageError.unavailable(.cifp) }
+    let version = try snapshot.require(.cifp)
     guard
       let row = try await sql.raw(
         """

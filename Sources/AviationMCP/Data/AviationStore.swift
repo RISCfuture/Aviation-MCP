@@ -53,24 +53,8 @@ struct AviationStore: Sendable {
       }
       try await sql.raw("ANALYZE aviation_records").run()
       for version in versions { try await Self.recordValidation(version.id, on: sql) }
-      let catalog = SourceCatalog(versions: existing + versions)
-      let retained = catalog.retained(at: instant)
-      let manifestID = UUID()
-      try await sql.raw("INSERT INTO manifests(id) VALUES (\(bind: manifestID))").run()
-      for version in retained {
-        try await sql.raw(
-          """
-          INSERT INTO manifest_versions(manifest_id, version_id)
-          VALUES (\(bind: manifestID), \(bind: version.id))
-          """
-        ).run()
-      }
-      try await sql.raw(
-        """
-        INSERT INTO active_manifest(singleton, manifest_id) VALUES (TRUE, \(bind: manifestID))
-        ON CONFLICT(singleton) DO UPDATE SET manifest_id = excluded.manifest_id
-        """
-      ).run()
+      try await Self.activate(
+        SourceCatalog(versions: existing + versions).retained(at: instant), on: sql)
       try await Self.purge(on: sql)
     }
     await reclaimPurgedSpace()
@@ -80,6 +64,9 @@ struct AviationStore: Sendable {
     try await database.withSQLTransaction { database in
       let sql = try database.sqlDatabase()
       try await sql.raw("SELECT pg_advisory_xact_lock(13799201)").run()
+      let instant = try await Self.instant(on: sql)
+      let existing = try await Self.publishedVersions(on: sql)
+      try await Self.activate(SourceCatalog(versions: existing).retained(at: instant), on: sql)
       try await Self.purge(on: sql)
     }
     await reclaimPurgedSpace()
@@ -93,6 +80,25 @@ struct AviationStore: Sendable {
     } catch {
       database.logger.warning("Vacuum after purge failed: \(error)")
     }
+  }
+
+  private static func activate(_ versions: [SourceVersion], on sql: any SQLDatabase) async throws {
+    let manifestID = UUID()
+    try await sql.raw("INSERT INTO manifests(id) VALUES (\(bind: manifestID))").run()
+    for version in versions {
+      try await sql.raw(
+        """
+        INSERT INTO manifest_versions(manifest_id, version_id)
+        VALUES (\(bind: manifestID), \(bind: version.id))
+        """
+      ).run()
+    }
+    try await sql.raw(
+      """
+      INSERT INTO active_manifest(singleton, manifest_id) VALUES (TRUE, \(bind: manifestID))
+      ON CONFLICT(singleton) DO UPDATE SET manifest_id = excluded.manifest_id
+      """
+    ).run()
   }
 
   private static func publishedVersions(on sql: any SQLDatabase) async throws -> [SourceVersion] {
@@ -188,9 +194,12 @@ struct AviationStore: Sendable {
     ).run()
     try await sql.raw(
       """
-      DELETE FROM source_versions WHERE effective_until <= transaction_timestamp()
-        OR id NOT IN (SELECT version_id FROM manifest_versions)
+      DELETE FROM aviation_records WHERE version_id IN (
+        SELECT id FROM source_versions WHERE effective_until <= transaction_timestamp())
       """
+    ).run()
+    try await sql.raw(
+      "DELETE FROM source_versions WHERE id NOT IN (SELECT version_id FROM manifest_versions)"
     ).run()
     try await sql.raw("DELETE FROM provider_budgets WHERE window_end <= now()").run()
     try await sql.raw("DELETE FROM provider_cooldowns WHERE retry_at <= now()").run()
@@ -223,16 +232,16 @@ struct AviationStore: Sendable {
           "Publication requires validated, nonempty data and source metadata.")
       }
     }
-    let nasr = versions.first { $0.source == .nasr }
-    let cifp = versions.first { $0.source == .cifp }
+    let navigation = versions.filter { [.nasr, .cifp].contains($0.source) }
+    guard let first = navigation.first else { return }
     guard
-      (nasr == nil && cifp == nil)
-        || (nasr != nil && cifp != nil && nasr?.cycle == cifp?.cycle
-          && nasr?.effectiveFrom == cifp?.effectiveFrom
-          && nasr?.effectiveUntil == cifp?.effectiveUntil)
+      navigation.allSatisfy({
+        $0.cycle == first.cycle && $0.effectiveFrom == first.effectiveFrom
+          && $0.effectiveUntil == first.effectiveUntil
+      })
     else {
       throw StorageError.invalidImport(
-        "NASR and CIFP must be published together for the same effective cycle.")
+        "NASR and CIFP published together must share the same effective cycle.")
     }
   }
 }

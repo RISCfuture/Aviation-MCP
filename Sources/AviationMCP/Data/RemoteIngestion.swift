@@ -62,10 +62,10 @@ struct RemoteIngestionCommand: AsyncCommand {
 enum RemoteIngestion {
   static func validate(_ downloads: [SourceDownload]) throws {
     let sources = Set(downloads.map(\.source))
-    let allowed: [Set<String>] = [["nasr", "cifp"], ["dof"], ["aircraft"]]
+    let allowed: [Set<String>] = [["nasr", "cifp"], ["nasr"], ["cifp"], ["dof"], ["aircraft"]]
     guard allowed.contains(sources),
       sources.count == downloads.count
-    else { throw StorageError.invalidImport("Publish one source or a paired NASR/CIFP cycle.") }
+    else { throw StorageError.invalidImport("Publish one source or a NASR/CIFP cycle.") }
     for download in downloads {
       guard let url = URL(string: download.url), url.scheme == "https", url.user == nil,
         url.password == nil, url.port == nil, url.query == nil, url.fragment == nil,

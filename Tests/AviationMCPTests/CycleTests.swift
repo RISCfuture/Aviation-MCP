@@ -25,15 +25,20 @@ struct `Effective source cycles` {
   }
 
   @Test
-  func `makes expired paired sources unavailable when a replacement is missing`() {
+  func `serves NASR without CIFP and explains why CIFP is unavailable`() throws {
     let versions = [
       version(.nasr, "old", -100, 0), version(.cifp, "old", -100, 0),
       version(.nasr, "next", 0, 100), version(.dof, "current", -50, 50)
     ]
     let snapshot = SourceCatalog(versions: versions).snapshot(at: boundary)
-    #expect(snapshot.versions[.nasr] == nil)
+    #expect(snapshot.versions[.nasr]?.cycle == "next")
     #expect(snapshot.versions[.cifp] == nil)
     #expect(snapshot.versions[.dof]?.cycle == "current")
+    #expect(snapshot.unavailability(of: .nasr) == nil)
+    let reason = try #require(snapshot.unavailability(of: .cifp))
+    #expect(reason.contains("release old expired at \(boundary.ISO8601Format())"))
+    #expect(reason.contains("has not been published yet"))
+    #expect(throws: StorageError.self) { try snapshot.require(.cifp) }
   }
 
   @Test
@@ -60,9 +65,14 @@ struct `Effective source cycles` {
     let expired = version(.dof, "expired", -20, -10)
     var failed = version(.dof, "failed", -1, 10)
     failed.validated = false
-    let catalog = SourceCatalog(versions: [expired, current, failed, next, later, corrected])
+    var restamped = version(.dof, "next", 11, 20)
+    restamped.importedAt = next.importedAt.addingTimeInterval(1)
+    let catalog = SourceCatalog(versions: [
+      expired, current, failed, next, later, corrected, restamped
+    ])
     #expect(catalog.snapshot(at: boundary).versions[.dof]?.id == corrected.id)
-    #expect(Set(catalog.retained(at: boundary).map(\.id)) == Set([corrected.id, next.id]))
+    #expect(Set(catalog.retained(at: boundary).map(\.id)) == Set([corrected.id, restamped.id]))
+    #expect(catalog.retained(at: boundary.addingTimeInterval(40)).map(\.id) == [later.id])
   }
 
   private func version(_ source: SourceName, _ cycle: String, _ start: Double, _ end: Double?)

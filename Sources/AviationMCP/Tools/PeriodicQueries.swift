@@ -16,12 +16,7 @@ struct PeriodicQueries: Sendable {
       if let cursor, cursor.versionToken != snapshot.token || cursor.query != signature {
         throw StorageError.expiredCursor
       }
-      let versions = try sources.map { source in
-        guard let version = snapshot.versions[source] else {
-          throw StorageError.unavailable(source)
-        }
-        return version
-      }
+      let versions = try sources.map(snapshot.require)
       let spatialArguments =
         kinds.contains("obstacle")
         ? arguments

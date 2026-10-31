@@ -111,6 +111,7 @@ struct ToolCatalog: Sendable {
         value["version"] = try .encoded(SourceStamp(version))
       } else {
         value["status"] = "unavailable"
+        value["reason"] = snapshot.unavailability(of: source).map(Value.string)
       }
       value["nextVersion"] = try snapshot.next[source].map { try .encoded(SourceStamp($0)) }
       return .object(value)
