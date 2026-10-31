@@ -6,6 +6,7 @@ enum ProcedureExpansion {
   ) throws -> ToolResult {
     if result.nextCursor != nil {
       var candidates = result
+      candidates.nextCursor = nil
       candidates.completeness = "partial"
       candidates.warnings.append(
         "Procedure segments span multiple pages; expansion is unavailable on a partial page. "

@@ -109,6 +109,7 @@ struct `Navigation expansion` {
       ToolResult(results: [common], nextCursor: "another-page"), transition: "EXIT")
     #expect(truncated.results.first?.objectValue?["transition_boundaries"] == nil)
     #expect(truncated.completeness == "partial")
+    #expect(truncated.nextCursor == nil)
     #expect(RunwayName.matches("RW04B", requested: "4L"))
     #expect(RunwayName.matches("ALL", requested: "04R"))
     #expect(!RunwayName.matches("RW04L", requested: "04R"))
