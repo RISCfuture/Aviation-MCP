@@ -1,10 +1,10 @@
 # Hero image provenance
 
 `public/aviation-data.webp` was generated with OpenAI's built-in image-generation
-tool on October 28, 2026, using `public/terrain.webp` as the edit target and style
-reference. The generated PNG was converted to WebP at quality 86. The original
-terrain asset is preserved. Both are decorative illustrations; the overlays are
-fictional, not source data or an operational aviation chart.
+tool on October 28, 2026, using the site's earlier terrain illustration as the
+edit target and style reference. The generated PNG was converted to WebP at
+quality 86. The image is a decorative illustration; the overlays are fictional,
+not source data or an operational aviation chart.
 
 ## Generation prompt
 
