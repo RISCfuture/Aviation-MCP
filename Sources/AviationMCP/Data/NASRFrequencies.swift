@@ -108,10 +108,13 @@ private struct AirportCommunications: Sendable {
     private var remarks: [String] = []
 
     var value: Value {
-      let kilohertz = Double(frequency).map { Int(($0 * kilohertzPerMegahertz).rounded()) }
+      let kilohertz = Double(frequency).flatMap {
+        UInt(exactly: ($0 * kilohertzPerMegahertz).rounded())
+      }
       return Normalization.object([
-        "facility": facility.map(Value.string), "frequency_khz": kilohertz.map(Value.int),
-        "frequency": kilohertz == nil ? .string(frequency) : nil,
+        "facility": facility.map(Value.string),
+        "frequency": NASRNormalization.frequency(kilohertz: kilohertz),
+        "frequency_text": kilohertz == nil ? .string(frequency) : nil,
         "uses": .array(uses.map(Value.string)),
         "remarks": remarks.isEmpty ? nil : .array(remarks.map(Value.string))
       ])
