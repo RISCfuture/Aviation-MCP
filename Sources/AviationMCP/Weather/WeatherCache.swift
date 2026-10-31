@@ -117,8 +117,8 @@ struct WeatherCache: Sendable {
           provider: provider, reason: "Upstream request failed.",
           retryAt: .now.addingTimeInterval(30))
       let shared = !(error is CancellationError) && failure.clientSpecific != true
-      let retry = shared ? failure.retryAt ?? .now.addingTimeInterval(30) : Date.now
-      let text = String(data: try JSONEncoder().encode(failure), encoding: .utf8)
+      let retry = shared ? failure.retryAt ?? .now.addingTimeInterval(30) : nil
+      let text = shared ? String(data: try JSONEncoder().encode(failure), encoding: .utf8) : nil
       try await sql.raw(
         """
         UPDATE weather_cache SET lease_id = NULL, lease_until = NULL,
