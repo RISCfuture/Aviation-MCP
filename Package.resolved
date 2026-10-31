@@ -1,5 +1,5 @@
 {
-  "originHash" : "b5f59e6e8b705c38678a62264858e8ecd4a070d7a258fb7c272f70a48aa99301",
+  "originHash" : "699c6e0e087d02caf6797342e54a8033ffc1e1a957969a807c92982c0b3989f9",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -424,8 +424,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/RISCfuture/SwiftNASR.git",
       "state" : {
-        "revision" : "4edd34c8b12ad2eb70d3866794cb843ed28563bf",
-        "version" : "6.0.0"
+        "revision" : "52cbdb7399782a6a089da9ab99702acf59093923",
+        "version" : "5.0.1"
       }
     },
     {
