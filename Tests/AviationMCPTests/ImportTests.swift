@@ -203,6 +203,8 @@ struct `Normalized source imports` {
     let airspaces = complete.records.filter { $0.kind == "airspace" && $0.identifier == "KRIV" }
     #expect(Set(airspaces.compactMap { $0.data["class"]?.stringValue }) == ["C", "D"])
     #expect(Set(airspaces.map(\.id)).count == airspaces.count)
+    #expect(
+      airspaces.allSatisfy { $0.airport == "KRIV" && $0.data["geometry_status"] == "polygon" })
     let completeProcedure = try #require(complete.records.first { $0.kind == "procedure" })
     #expect(completeProcedure.geometry != nil)
     let corrupted = source.split(separator: "\n").map { line in
@@ -353,5 +355,37 @@ extension `Normalized source imports` {
     ] {
       #expect(throws: IncompleteReleaseError.self) { try gate.verify(incomplete) }
     }
+  }
+
+  @Test
+  func `builds one center polygon per altitude structure and closes each shape`() throws {
+    func segment(_ sequence: Int, _ structure: String, _ degrees: (Int, Int), closes: Bool = false)
+      -> [String: Any]
+    {
+      [
+        "recordIdentifier": "ZOA\(structure)\(sequence)", "ARTCCIdentifier": "ZOA",
+        "altitudeStructure": structure, "pointDesignator": "\(sequence)",
+        "centerName": "OAKLAND", "altitudeStructureName": structure == "L" ? "LOW" : "HIGH",
+        "position": ["latitudeArcsec": degrees.0 * 3600, "longitudeArcsec": degrees.1 * 3600],
+        "boundaryDescription": closes ? "TO POINT OF BEGINNING" : "TO", "sequenceNumber": sequence
+      ]
+    }
+    let records = [
+      segment(30, "L", (38, -121), closes: true), segment(10, "L", (37, -122)),
+      segment(20, "L", (38, -122)), segment(40, "L", (39, -122)), segment(50, "L", (40, -122)),
+      segment(60, "L", (40, -121), closes: true), segment(10, "H", (37, -122)),
+      segment(20, "H", (38, -122)), segment(30, "H", (38, -121), closes: true)
+    ]
+    let segments = try JSONDecoder().decode(
+      [ARTCCBoundarySegment].self, from: JSONSerialization.data(withJSONObject: records))
+    let centers = NASRAirspace.centerAirspaces(segments, versionID: UUID())
+    #expect(centers.map(\.id) == ["ZOA/HIGH", "ZOA/LOW"])
+    #expect(centers[0].geometry?.objectValue?["type"] == "Polygon")
+    #expect(centers[0].data["lower_limit"]?.objectValue?["value"] == 180)
+    let low = try #require(centers[1].geometry?.objectValue)
+    #expect(low["type"] == "MultiPolygon")
+    #expect(
+      low["coordinates"]?.arrayValue?.map { $0.arrayValue?.first?.arrayValue?.count } == [4, 4])
+    #expect(centers[1].data["upper_limit"] == centers[0].data["lower_limit"])
   }
 }

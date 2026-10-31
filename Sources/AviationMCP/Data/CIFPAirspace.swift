@@ -12,6 +12,7 @@ enum CIFPAirspace {
         multiple: airspace.multipleCode, type: "controlled", boundaries: airspace.boundaries,
         lower: airspace.lowerLimit, upper: airspace.upperLimit
       ).record(versionID: versionID)
+      record.airport = airspace.airspaceCenter
       record.data["class"] = airspace.airspaceClass.map { .string(String($0.rawValue)) }
       records.append(record)
     }
@@ -66,6 +67,10 @@ private struct AirspaceDefinition {
         }),
       "geometry_status": "boundary_definition_only"
     ]
+    if let polygon = AirspacePolygon.geometry(boundaries) {
+      record.geometry = polygon
+      record.data["geometry_status"] = "polygon"
+    }
     record.data["lower_limit"] = lower.map(CIFPRestrictions.altitude)
     record.data["upper_limit"] = upper.map(CIFPRestrictions.altitude)
     return record

@@ -137,6 +137,8 @@ enum NASRImporter {
     ) {
       try NASRAirspace.boundary($0, versionID: version.id)
     }
+    records += NASRAirspace.centerAirspaces(
+      await data.ARTCCBoundarySegments ?? [], versionID: version.id)
     records += diagnostics.errors.recover(
       await data.parachuteJumpAreas ?? [], kind: "parachute_area",
       identifier: \.id

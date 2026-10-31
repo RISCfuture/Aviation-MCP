@@ -3,6 +3,8 @@ import MCP
 import SwiftNASR
 
 enum NASRAirspace {
+  private static let pointOfBeginning = "POINT OF BEGINNING"
+
   static func artcc(_ center: ARTCC, versionID: UUID) throws -> AviationRecord {
     var record = NASRNormalization.base(
       version: versionID, kind: "artcc",
@@ -39,6 +41,69 @@ enum NASRAirspace {
       ])
     ])
     return record
+  }
+
+  /// One polygon record per ARTCC and altitude structure, joining the published boundary points
+  /// in sequence and closing a ring at each return to the point of beginning.
+  static func centerAirspaces(_ segments: [ARTCCBoundarySegment], versionID: UUID)
+    -> [AviationRecord]
+  {
+    Dictionary(grouping: segments) { [$0.ARTCCIdentifier, $0.altitudeStructureName] }
+      .sorted { $0.key.lexicographicallyPrecedes($1.key) }
+      .map { _, points in
+        centerAirspace(
+          points.sorted { $0.sequenceNumber < $1.sequenceNumber }, versionID: versionID)
+      }
+  }
+
+  private static func centerAirspace(_ points: [ARTCCBoundarySegment], versionID: UUID)
+    -> AviationRecord
+  {
+    let first = points[0]
+    var record = AviationRecord(
+      versionID: versionID, kind: "artcc_airspace",
+      id: first.ARTCCIdentifier + "/" + first.altitudeStructureName,
+      identifier: first.ARTCCIdentifier,
+      name: first.centerName + " " + first.altitudeStructureName)
+    record.geometry = AirspacePolygon.geometry(rings: rings(points))
+    let limits = verticalLimits(first.altitudeStructure)
+    record.data = NASRNormalization.fields([
+      "altitude_structure": .string(first.altitudeStructureName),
+      "lower_limit": limits?.lower, "upper_limit": limits?.upper,
+      "boundary_point_count": .int(points.count),
+      "geometry_scope": "boundary_polygon"
+    ])
+    return record
+  }
+
+  private static func rings(_ points: [ARTCCBoundarySegment]) -> [[GeoPoint]] {
+    var rings: [[GeoPoint]] = []
+    var current: [GeoPoint] = []
+    for point in points {
+      current.append(
+        GeoPoint(
+          latitude: Double(point.position.latitudeArcsec) / 3600,
+          longitude: Double(point.position.longitudeArcsec) / 3600))
+      if point.boundaryDescription.uppercased().contains(pointOfBeginning) {
+        rings.append(current)
+        current = []
+      }
+    }
+    if !current.isEmpty { rings.append(current) }
+    return rings
+  }
+
+  private static func verticalLimits(_ structure: ARTCCBoundarySegment.AltitudeStructure?)
+    -> (lower: Value, upper: Value)?
+  {
+    let flightLevel180: Value = .object([
+      "value": 180, "unit": "flight_level", "datum": "standard_pressure"
+    ])
+    switch structure {
+    case .low: return (.object(["reference": "ground"]), flightLevel180)
+    case .high: return (flightLevel180, .object(["reference": "unlimited"]))
+    default: return nil
+    }
   }
 
   static func parachute(_ area: ParachuteJumpArea, versionID: UUID) throws -> AviationRecord {
