@@ -10,6 +10,16 @@ struct MCPGateway: Sendable {
   /// 2025-03-26.
   private static let batchingProtocolVersions: Set<String> = ["2024-11-05", "2025-03-26"]
   private static let defaultProtocolVersion = "2025-03-26"
+  /// Guidance sent to clients at initialization.
+  private static let instructions = """
+    U.S. aviation data from FAA sources. Airports take an FAA location identifier or ICAO code \
+    (SFO or KSFO). Approaches use CIFP identifiers: I04R is ILS RWY 4R and R30-Y is RNAV (GPS) \
+    Y RWY 30. Use find_* tools to list records and get_* tools for detail; when an identifier \
+    is ambiguous, pass the record_id of one candidate. Every result names its source cycles \
+    and completeness, and expired data is never returned: a source without an effective \
+    release is reported as unavailable with the reason. Error text begins with the error code. \
+    Not for operational navigation.
+    """
 
   let origins: [String]
   let timeout: Duration
@@ -97,6 +107,7 @@ struct MCPGateway: Sendable {
     let server = Server(
       name: "Aviation MCP",
       version: "0.1.0",
+      instructions: Self.instructions,
       capabilities: .init(tools: .init())
     )
     let invocation = ToolInvocation(call: call)

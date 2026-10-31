@@ -302,7 +302,9 @@ private enum Obstacles {
 private enum Weather {
   static let query = Common.position.merging([
     "station": ToolSchemas.text(
-      "ICAO weather station, such as KSFO. Alternatively supply latitude and longitude."),
+      "Weather station as an ICAO identifier or FAA location identifier, such as KSFO or SFO. "
+        + "Alternatively supply latitude and longitude; the nearest METAR/TAF station within "
+        + "10 NM reports."),
     "time": ToolSchemas.date(
       "Time to report, ISO 8601 with a time zone, such as 2026-10-31T18:00:00Z. Defaults to now."),
     "sources": ToolSchemas.described(

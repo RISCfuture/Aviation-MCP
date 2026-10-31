@@ -77,8 +77,10 @@ enum ToolDefinition: String, CaseIterable, Sendable {
         + "maximum takeoff weight, approach category, design groups and wake category. "
         + "It is not performance data."
     case .getWeather:
-      "Get weather for a station or position at a time: AWC METAR and TAF first, then modeled "
-        + "Open-Meteo values. Altimeter is in inHg and hPa; visibility in statute miles."
+      "Get weather for a station or position at a time: the covering AWC METAR and the TAF in "
+        + "force, from the nearest reporting station when needed. Modeled Open-Meteo values are "
+        + "kept apart in model_supplement. Altimeter is in inHg and hPa; visibility in statute "
+        + "miles."
     case .parseWeather:
       "Parse supplied METAR, TAF or winds-aloft text with an explicit reference date."
     case .queryNOTAMs:
