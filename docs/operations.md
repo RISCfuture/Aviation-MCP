@@ -92,9 +92,21 @@ Aircraft snapshots have no invented expiration date. Record the provenance of
 an aircraft release timestamp, especially when only an HTTP modification time
 is available instead of a precise publication time.
 
-NASR and CIFP versions and records must be combined into one normalized bundle
-with matching effective boundaries and cycle identifiers. Publication rejects
-unpaired NASR/CIFP batches. DOF and aircraft can publish independently.
+NASR and CIFP publish independently; both switch cycles at the FAA's 0901Z
+changeover, so their effective versions always share a cycle, and a CIFP whose
+cycle differs from the effective NASR's is not served. A later import of a
+source cycle supersedes the earlier import of that cycle. DOF releases keep
+their release-date-midnight boundaries. When a source has no effective
+version, tool errors and `get_data_status` name when it expired and any staged
+successor; expired records are never served.
+
+Before publishing, each staged version is compared with the newest published
+version of its source. Publication is withheld when a record family failed to
+parse as a whole, when a kind the published version had is missing, or when a
+kind with at least 100 records drops by more than 10%. A withheld release
+records a `withheld` ingestion run and exits with status 3; the published data
+stays unchanged and expires on schedule. Runs still marked `staging` after an
+hour are marked failed when the next ingestion starts.
 
 With the ingestion credential injected into the process environment:
 
@@ -141,9 +153,15 @@ Do not run concurrent index creation alongside ingestion: its snapshot wait can
 deadlock with the publication transaction's `ANALYZE` lock.
 
 The ingestion workflow checks NASR, CIFP, DOF and aircraft independently every
-six hours. It preloads available next-cycle releases and pairs NASR/CIFP by
-effective boundaries. DOF boundaries come from the published FAA release table;
-a download without a following published boundary is not eligible for import.
+six hours and preloads available next-cycle releases. A second schedule polls
+every 20 minutes from two days before each DOF release, on the FAA's 56-day
+cadence, until that release is published. The newest linked DOF row is a
+candidate as soon as the FAA links it; it expires at the next scheduled
+release, and discovery fails with a message naming an overdue release. Each
+ingest leg fingerprints its checked releases with the ingestion image and
+skips dispatch when an earlier run published the identical set; legs run one
+at a time. Terrain publication and purge run once a day, and a manual run can
+force dispatch.
 The standalone Swift checker downloads metadata without database credentials.
 When a host rejects HEAD with HTTP 405, 501, or 503, it probes the first byte
 with a range GET and preserves the returned validators.
@@ -151,20 +169,23 @@ with a range GET and preserves the returned validators.
 Each discovered release is attempted even when an earlier cycle fails. Ingestion
 result artifacts record success, failure, or an incomplete attempt for each cycle.
 The scheduled and manually dispatched workflow opens an issue assigned to and
-mentioning `@RISCfuture` when discovery or ingestion fails, including unvalidated
-upcoming releases and published releases with parsing gaps. The issue lists effective dates and links to the workflow and
-Fly ingestion logs. Repeated failures update the same issue; a newly failing cycle
-adds a notification comment. A fully successful check closes the issue. GitHub
+mentioning `@RISCfuture` for failed jobs (including terrain and purge), failed,
+withheld or unconfirmed releases, unavailable sources, and sources expiring
+within a week (a day for DOF) with no successor staged. Parsing gaps are
+informational. The issue lists effective dates and links to the workflow and
+Fly ingestion logs. It gains a comment whenever a problem appears or changes
+status, and closes when none remain. GitHub
 delivers the assignment and mention notifications according to the user's account
 notification settings.
 
-Run `node --test .github/scripts/ingestion-alerts.test.cjs` to verify release
+Run `node --test .github/scripts/*.test.cjs` to verify run planning, release
 failure isolation and notification/recovery behavior. The workflow runs these
 checks before dispatching ingestion.
 
-Set the GitHub variable `AVIATION_INGEST_IMAGE` to a verified immutable image
-reference and secret `FLY_INGEST_API_TOKEN` to an `aviation-mcp-ingest` app-scoped
-deployment token. `scripts/run-ingestion-job.sh` starts bounded private jobs,
+Ingestion, terrain and purge jobs run the image the serving machines run,
+resolved by `scripts/deployed-image.sh` with `FLY_SERVER_API_TOKEN`. Secret
+`FLY_INGEST_API_TOKEN` is an `aviation-mcp-ingest` app-scoped deployment token
+available only to the step that dispatches machines. `scripts/run-ingestion-job.sh` starts bounded private jobs,
 checks their exit status and destroys their machines afterward. Database
 credentials are injected by Fly into the ingestion app, not GitHub Actions.
 If cleanup fails, the script reports the machine ID for operator removal.
@@ -173,8 +194,8 @@ If cleanup fails, the script reports the machine ID for operator removal.
 download provenance, and skips an unchanged release only when its parser
 revision and source validators match. Partial releases keep their parser error
 counts and bounded diagnostic samples under `validation.parse_errors`, including
-record identities, source lines, and fields when available. Query results from
-an affected version report partial completeness even when no records match.
+record identities, source lines, and fields when available. Query results report
+partial completeness when the returned records are affected.
 `get_data_status` exposes diagnostics for current and staged next releases.
 
 Invalid records are skipped while valid records continue through normalization.
@@ -182,7 +203,7 @@ NASR field errors retain the record and mark unknown fields. Rejected CIFP legs
 retain the procedure's remaining legs but withhold its derived geometry to avoid
 connecting across omitted legs. NASR route geometry is also withheld when a
 reported error may have removed a route element. Partial publication does not
-extend source expiration dates or relax NASR/CIFP pairing.
+extend source expiration dates.
 
 SwiftNASR's pinned CSV implementation cannot resume after a row error in its
 fix, FSS, or coded-departure-route parsers, and silently skips truncated CSV

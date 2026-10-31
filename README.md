@@ -9,8 +9,8 @@ Recoverable parsing errors retain valid records and flag partial coverage.
 Complete source coverage and all five original acceptance cases have not yet
 been established.
 
-Serving and custom PostgreSQL/PostGIS machines are configured to stop when idle.
-An October 28, 2026 probe with both machines stopped completed its first MCP
+The serving machine suspends and the custom PostgreSQL/PostGIS machine stops
+when idle. An October 28, 2026 probe with both machines stopped completed its first MCP
 request in 9.94 seconds without retries; the warm request took 0.31 seconds.
 These are single measurements, not latency guarantees.
 
