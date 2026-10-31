@@ -207,6 +207,7 @@ struct `Normalized source imports` {
       airspaces.allSatisfy { $0.airport == "KRIV" && $0.data["geometry_status"] == "polygon" })
     let completeProcedure = try #require(complete.records.first { $0.kind == "procedure" })
     #expect(completeProcedure.geometry != nil)
+    #expect(completeProcedure.data["approach_name"] == "RNAV (GPS) RWY 30")
     let corrupted = source.split(separator: "\n").map { line in
       guard line.contains("021MAVKC") else { return String(line) }
       var bytes = Array(line.utf8)

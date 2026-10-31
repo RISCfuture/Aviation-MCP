@@ -40,6 +40,16 @@ enum CIFPImporter {
     return StagedImport(versions: [version], records: diagnostics.applying(to: records))
   }
 
+  private static func approachDetails(_ approach: Approach) -> [String: Value] {
+    let details: [String: Value?] = [
+      "approach_name": .string(CIFPNames.approachName(approach)),
+      "approach_type": .string(approach.approachType.description),
+      "navigation_requirement": approach.navigationRequirement.map { .string($0.name) },
+      "landing": approach.landing.map { .string($0.name) }
+    ]
+    return details.compactMapValues { $0 }
+  }
+
   private static func procedures(
     _ airport: Airport, versionID: UUID, diagnostics: inout ImportDiagnostics
   ) async
@@ -55,11 +65,7 @@ enum CIFPImporter {
           runways: approach.runwayId.map { [$0] } ?? [], legs: approach.legs,
           missed: approach.missedApproachLegs
         ).record(versionID: versionID)
-        record.data["approach_type"] = .string(String(approach.approachType.rawValue))
-        record.data["navigation_requirement"] = approach.navigationRequirement.map {
-          .string(String($0.rawValue))
-        }
-        record.data["landing"] = approach.landing.map { .string(String($0.rawValue)) }
+        record.data.merge(approachDetails(approach)) { $1 }
         record.data["levels_of_service"] = approach.levelsOfService.map(CIFPRestrictions.levels)
         records.append(record)
       } catch {
@@ -71,7 +77,7 @@ enum CIFPImporter {
       do {
         let record = try await ProcedureDefinition(
           identifier: sid.identifier, airport: airport.id, type: "departure",
-          routeType: String(sid.routeType.rawValue), transition: sid.transitionId,
+          routeType: CIFPNames.routeType(sid.routeType), transition: sid.transitionId,
           runways: sid.runwayNames.sorted(), legs: sid.legs, missed: []
         ).record(versionID: versionID)
         records.append(record)
@@ -83,7 +89,7 @@ enum CIFPImporter {
       do {
         let record = try await ProcedureDefinition(
           identifier: star.identifier, airport: airport.id, type: "arrival",
-          routeType: String(star.routeType.rawValue), transition: star.transitionId,
+          routeType: CIFPNames.routeType(star.routeType), transition: star.transitionId,
           runways: star.runwayNames.sorted(), legs: star.legs, missed: []
         ).record(versionID: versionID)
         records.append(record)
