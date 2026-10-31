@@ -11,6 +11,8 @@ const DOF_CADENCE = 56 * DAY;
 const RELEASE_WINDOW_LEAD = 2 * DAY;
 /** Polling stops this long after a scheduled DOF release if it is still unpublished. */
 const RELEASE_WINDOW_TRAIL = 14 * DAY;
+/** Events that only check sources, without dispatching ingestion. */
+const CHECK_ONLY_EVENTS = new Set(["push", "pull_request"]);
 /** Terrain and purge maintenance run only in the regular run starting before this UTC hour. */
 const MAINTENANCE_HOUR = 6;
 
@@ -40,7 +42,7 @@ function plan({ eventName, schedule, now }) {
     maintenance,
     dofRelease,
   });
-  if (eventName === "push") return run(true, false, false);
+  if (CHECK_ONLY_EVENTS.has(eventName)) return run(true, false, false);
   if (eventName === "workflow_dispatch") return run(true, true, true);
   if (schedule === REGULAR_SCHEDULE)
     return run(true, true, new Date(now).getUTCHours() < MAINTENANCE_HOUR);

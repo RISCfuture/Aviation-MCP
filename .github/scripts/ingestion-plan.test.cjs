@@ -33,7 +33,7 @@ test("polls frequently only around a scheduled DOF release", () => {
   assert.equal(poll("2026-12-08T00:00:00Z").check, false);
 });
 
-test("runs maintenance once a day and only checks on push", () => {
+test("runs maintenance once a day and only checks on push or pull request", () => {
   const regular = (time) =>
     plan({
       eventName: "schedule",
@@ -43,10 +43,12 @@ test("runs maintenance once a day and only checks on push", () => {
   assert.equal(regular("2026-11-01T00:40:00Z").maintenance, true);
   assert.equal(regular("2026-11-01T06:40:00Z").maintenance, false);
   assert.equal(regular("2026-11-01T06:40:00Z").ingest, true);
-  assert.deepEqual(plan({ eventName: "push", now: 0 }), {
-    check: true,
-    ingest: false,
-    maintenance: false,
-    dofRelease: "",
-  });
+  for (const eventName of ["push", "pull_request"]) {
+    assert.deepEqual(plan({ eventName, now: 0 }), {
+      check: true,
+      ingest: false,
+      maintenance: false,
+      dofRelease: "",
+    });
+  }
 });

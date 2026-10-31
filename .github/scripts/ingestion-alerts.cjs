@@ -91,6 +91,7 @@ function coverageProblems(statuses, now) {
 function jobProblems(environment) {
   const results = {
     check: [environment.CHECK_RESULT, false],
+    image: [environment.IMAGE_RESULT, false],
     ingest: [environment.INGEST_RESULT, false],
     terrain: [environment.TERRAIN_RESULT, true],
     purge: [environment.PURGE_RESULT, true],
@@ -181,7 +182,7 @@ function issueBody({ problems: found, releases, run, environment }) {
     "@RISCfuture Aviation data needs attention: an ingestion step failed, a release was withheld, or a source is unavailable or about to expire without a replacement.",
     "The service never serves expired data. A source without an effective release is reported as unavailable until its replacement is published.",
     `[Inspect the workflow run](${run}) · [Fly ingestion logs](https://fly.io/apps/aviation-mcp-ingest/monitoring)`,
-    `Source discovery: **${environment.CHECK_RESULT}**. Ingestion: **${environment.INGEST_RESULT}**. Terrain: **${environment.TERRAIN_RESULT}**. Purge: **${environment.PURGE_RESULT}**.`,
+    `Source discovery: **${environment.CHECK_RESULT}**. Serving image: **${environment.IMAGE_RESULT}**. Ingestion: **${environment.INGEST_RESULT}**. Terrain: **${environment.TERRAIN_RESULT}**. Purge: **${environment.PURGE_RESULT}**.`,
     [
       "| Problem | Status | Detail |",
       "| --- | --- | --- |",

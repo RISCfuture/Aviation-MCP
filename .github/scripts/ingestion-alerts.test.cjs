@@ -115,6 +115,7 @@ test("alerts on failures and expiry, notifies on changes, and ignores parsing ga
   const now = Date.parse("2026-10-20T12:00:00Z");
   const succeeded = {
     CHECK_RESULT: "success",
+    IMAGE_RESULT: "success",
     INGEST_RESULT: "success",
     TERRAIN_RESULT: "skipped",
     PURGE_RESULT: "success",

@@ -1,15 +1,19 @@
 name: Source checks and ingestion
 
 on:
-  push:
-    paths:
+  pull_request:
+    paths: &ingestion-paths
       - '.github/workflows/ingestion.yml'
       - 'Sources/AviationMCP/Data/SourceChecks.swift'
       - 'Sources/AviationMCP/Data/SourceDiscovery.swift'
       - 'scripts/CheckSource.swift'
+      - 'scripts/deployed-image.sh'
       - 'scripts/run-ingestion-job.sh'
       - 'scripts/ingest-checked-sources.sh'
       - '.github/scripts/ingestion-*'
+  push:
+    branches: [main]
+    paths: *ingestion-paths
   schedule:
     # .github/scripts/ingestion-plan.cjs recognizes each run by these expressions.
     - cron: '17 */6 * * *'
@@ -25,7 +29,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: source-ingestion
+  group: ${{ github.event_name == 'pull_request' && format('source-checks-{0}', github.ref) || 'source-ingestion' }}
   cancel-in-progress: false
 
 jobs:
@@ -53,7 +57,7 @@ jobs:
       - name: Look up the polled DOF release
         id: published
         if: steps.schedule.outputs.dofRelease != ''
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: reports/dof.json
           key: dof-published-${{ steps.schedule.outputs.dofRelease }}
@@ -93,7 +97,7 @@ jobs:
       matrix:
         source: [nasr, cifp, dof, aircraft]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Compile source checker
         run: >-
           swiftc Sources/AviationMCP/Data/SourceDiscovery.swift
@@ -103,17 +107,34 @@ jobs:
         env:
           SOURCE: ${{ matrix.source }}
         run: /tmp/check-source "$SOURCE" "$SOURCE.json"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: source-${{ matrix.source }}
           path: ${{ matrix.source }}.json
           retention-days: 1
 
+  image:
+    needs: plan
+    if: needs.plan.outputs.ingest == 'true' || needs.plan.outputs.maintenance == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      reference: ${{ steps.serving.outputs.reference }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Resolve the image the server runs
+        id: serving
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_SERVER_API_TOKEN }}
+        run: |
+          reference=$(scripts/deployed-image.sh)
+          echo "reference=$reference" >> "$GITHUB_OUTPUT"
+
   ingest:
-    needs: [plan, check, test-alerts]
+    needs: [plan, check, test-alerts, image]
     if: >-
       ${{ always() && !cancelled() && needs.plan.outputs.ingest == 'true'
-        && needs.test-alerts.result == 'success' && vars.AVIATION_INGEST_IMAGE != '' }}
+        && needs.test-alerts.result == 'success' && needs.image.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 240
     strategy:
@@ -122,12 +143,11 @@ jobs:
       matrix:
         source: [navigation, dof, aircraft]
     env:
-      FLY_API_TOKEN: ${{ secrets.FLY_INGEST_API_TOKEN }}
-      AVIATION_INGEST_IMAGE: ${{ vars.AVIATION_INGEST_IMAGE }}
+      AVIATION_INGEST_IMAGE: ${{ needs.image.outputs.reference }}
       SOURCE: ${{ matrix.source }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
         with:
           pattern: source-*
           path: checked
@@ -143,7 +163,7 @@ jobs:
       - name: Reuse the results of an identical earlier publication
         id: published
         if: ${{ !inputs.force }}
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: reports/${{ matrix.source }}.json
           key: ${{ steps.fingerprint.outputs.key }}
@@ -154,10 +174,12 @@ jobs:
           mv reused.json "reports/$SOURCE.json"
       - name: Dispatch available publications
         if: steps.published.outputs.cache-hit != 'true'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_INGEST_API_TOKEN }}
         run: bash scripts/ingest-checked-sources.sh "$SOURCE" checked "reports/$SOURCE.json"
       - name: Remember the published releases
         if: steps.published.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: reports/${{ matrix.source }}.json
           key: ${{ steps.fingerprint.outputs.key }}
@@ -170,11 +192,11 @@ jobs:
           >> "$GITHUB_OUTPUT"
       - name: Stop polling for the published DOF release
         if: steps.dof.outputs.release != ''
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: reports/dof.json
           key: dof-published-${{ steps.dof.outputs.release }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: ingestion-results-${{ matrix.source }}
@@ -182,35 +204,35 @@ jobs:
           retention-days: 7
 
   terrain:
-    needs: plan
-    if: ${{ needs.plan.outputs.maintenance == 'true' && vars.AVIATION_INGEST_IMAGE != '' }}
+    needs: [plan, image]
+    if: needs.plan.outputs.maintenance == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Validate and publish terrain catalogs
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_INGEST_API_TOKEN }}
-          AVIATION_INGEST_IMAGE: ${{ vars.AVIATION_INGEST_IMAGE }}
+          AVIATION_INGEST_IMAGE: ${{ needs.image.outputs.reference }}
         run: scripts/run-ingestion-job.sh import-terrain
 
   purge:
-    needs: [plan, ingest]
+    needs: [plan, ingest, image]
     if: >-
       ${{ always() && !cancelled() && needs.plan.outputs.maintenance == 'true'
-        && vars.AVIATION_INGEST_IMAGE != '' }}
+        && needs.image.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Purge expired data and caches
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_INGEST_API_TOKEN }}
-          AVIATION_INGEST_IMAGE: ${{ vars.AVIATION_INGEST_IMAGE }}
+          AVIATION_INGEST_IMAGE: ${{ needs.image.outputs.reference }}
         run: scripts/run-ingestion-job.sh purge
 
   alert:
-    needs: [plan, check, ingest, terrain, purge]
+    needs: [plan, check, image, ingest, terrain, purge]
     if: ${{ always() && needs.plan.outputs.ingest == 'true' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
@@ -220,12 +242,12 @@ jobs:
       issues: write
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: source-*
           path: checked
           merge-multiple: true
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: ingestion-results-*
           path: reports
@@ -243,7 +265,7 @@ jobs:
       - name: Reuse the last published coverage
         id: cached-status
         if: steps.coverage.outputs.refresh != 'true'
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: published-status.json
           key: published-status-${{ github.run_id }}-${{ github.run_attempt }}
@@ -262,7 +284,7 @@ jobs:
           --output published-status.json
       - name: Remember published coverage
         if: steps.status.outcome == 'success'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: published-status.json
           key: published-status-${{ github.run_id }}-${{ github.run_attempt }}
@@ -271,6 +293,7 @@ jobs:
         uses: actions/github-script@v8
         env:
           CHECK_RESULT: ${{ needs.check.result }}
+          IMAGE_RESULT: ${{ needs.image.result }}
           INGEST_RESULT: ${{ needs.ingest.result }}
           TERRAIN_RESULT: ${{ needs.terrain.result }}
           PURGE_RESULT: ${{ needs.purge.result }}
