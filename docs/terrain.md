@@ -104,7 +104,10 @@ its original tile ETags/retrieval times and is explicitly marked as cached.
 An answer-cache hit performs no upstream requests. Cancellation kills the worker
 when its last waiting request is canceled. Worker failure does not remove valid
 blocks already cached. Different simultaneous queries receive a busy error
-rather than building an unbounded queue.
+rather than building an unbounded queue. Each client network may start a job
+while it has worker time left: a 60-second balance that each job draws down by
+its running time and that refills at a quarter of real time. A client that has
+spent it is told when to retry, so one client cannot hold the worker for others.
 
 Mount the cache on a small Fly volume to retain it through idle stops and
 replacement of the application root filesystem. A **1 GB volume costs about

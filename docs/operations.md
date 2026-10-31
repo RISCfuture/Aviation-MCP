@@ -12,7 +12,9 @@ imports prevent publication. Enabled domains still require effective source data
   purge commands. Its pools retain connections until the bounded job exits,
   keeping the database awake through distribution normalization and publication.
 - `APP_ROLE=serve` uses `DATABASE_URL` and exposes `/mcp`, `/health`, `/ready`
-  and `/metrics`. This is the default role.
+  and `/metrics`. This is the default role. Startup refuses a `DATABASE_URL`
+  whose role can modify aviation records or create objects in `public`, so a
+  serving process needs its database reachable when it boots.
 
 Use separate Fly apps for serving and private ingestion jobs so serving
 machines never receive the ingestion credential. Both can use the same image.
@@ -37,8 +39,15 @@ The dedicated `aviation_mcp_notams` role can read only `notams` and
 | `MCP_ALLOWED_ORIGINS` | `https://aviation-mcp.org` |
 | `PORT` | `8080` |
 | `MCP_TIMEOUT_SECONDS` | `30`, configurable from 1 to 60 |
-| `PUBLIC_RATE_PER_MINUTE` | `60` per IP, shared in PostgreSQL |
+| `PUBLIC_RATE_PER_MINUTE` | `60` tool calls per client network (IPv4 address or IPv6 /64), metered in memory |
 | `PUBLIC_RATE_BURST` | `20` |
+| `PUBLIC_CONCURRENCY` | `2` in-flight `/mcp` requests per client network |
+| `CONNECTOR_EGRESS_RANGES` | None; comma-separated CIDR ranges of hosted connectors, each sharing one budget |
+| `CONNECTOR_RATE_PER_MINUTE` | `600` per connector range |
+| `CONNECTOR_RATE_BURST` | `120` |
+| `CONNECTOR_CONCURRENCY` | `24` in-flight `/mcp` requests per connector range |
+| `GLOBAL_RATE_PER_MINUTE` | `1200` tool calls across all clients |
+| `GLOBAL_RATE_BURST` | `200` |
 | `WEATHER_CACHE_SECONDS` | `900` |
 | `DATABASE_WAIT_SECONDS` | `15`, bounded database cold-start acquisition wait |
 | `OPEN_METEO_ENDPOINT` | `https://api.open-meteo.com/v1/forecast` |
@@ -60,7 +69,10 @@ or geometry coverage.
 
 Quota counters are local estimates, not authoritative upstream remaining
 quota. Cache hits do not reserve upstream units. Provider failures remain
-structured tool errors; public admission failures return HTTP 429.
+structured tool errors; public admission failures return HTTP 429. Every `/mcp`
+POST holds a concurrency slot while it runs, and each `tools/call` in it draws a
+token. A JSON-RPC batch holds at most 10 messages; a request needing more tokens
+than a full bucket holds is refused with HTTP 400 `too_many_tool_calls`.
 
 ## Staging and publication
 
@@ -97,7 +109,18 @@ counts, swaps the manifest and purges obsolete data in one transaction.
 Failed transactions leave the active manifest unchanged and record a failed
 ingestion run. Only current and next versions are retained. Expired data is
 unavailable on queries even if scheduled maintenance has not run; clients must
-restart expired pagination cursors.
+restart expired pagination cursors. Cursors are authenticated with a key held
+only by the serving process, so a restart also expires them, and paging stops
+at offset 10,000: a query matching more reports partial completeness and must
+be narrowed.
+
+Deployments migrate with the new image before deploying it, and a failed
+deployment rolls back to the previous image without reverting the schema. A
+release's migrations therefore only add to the schema; a column or index the
+code stops using is dropped one release later, once rolling back no longer
+returns to an image that needs it. The `aviation_records.supplemental` column
+and the `aviation_name` and `aviation_airport` indexes are retained on that
+basis and can be dropped in the next release.
 
 The `IdentifierLookupIndex` migration indexes FAA location identifiers stored in
 record JSON alongside the primary identifier index. Both branches of identifier
@@ -185,7 +208,9 @@ source semantic parity or full geometry coverage.
 
 The GitHub workflows build all six pinned aviation libraries independently,
 build/test the server against PostGIS, check formatting and supporting files,
-and verify container startup. The integration tests require
+and smoke-test the image: it migrates a fresh PostGIS database, serves `/ready`
+under a role granted by `scripts/database-privileges.sql`, and refuses to serve
+with the migrating role. The integration tests require
 `TEST_DATABASE_URL` and reset the entire `public` schema: use a disposable test
 database only.
 

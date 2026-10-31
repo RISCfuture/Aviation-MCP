@@ -25,9 +25,10 @@ before type checking.
 
 ## Hosting and MCP routing
 
-Cloudflare Workers serves built assets on aviation-mcp.org. The Worker streams
-`/mcp`, `/health`, `/ready`, and `/metrics` to the fixed Fly origin without caching
-responses or following redirects. Unknown paths remain 404s. MCP request bodies,
+Cloudflare Workers serves built assets on aviation-mcp.org. The Worker answers
+`/health` itself and streams HTTPS POSTs to `/mcp` to the fixed Fly origin without
+caching responses or following redirects. `/ready` and `/metrics` stay on the
+origin's private network, and unknown paths remain 404s. MCP request bodies,
 protocol headers, statuses, streaming responses, and retry headers are preserved.
 Visiting the website does not wake the Fly server.
 
