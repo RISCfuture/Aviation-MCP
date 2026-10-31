@@ -73,6 +73,9 @@ test("streams MCP bodies and preserves status, protocol headers, and retry infor
   expect(response.headers.get("Cache-Control")).toBe("no-store");
   expect(response.headers.get("Via")).toBeNull();
   expect(response.headers.get("Fly-Request-Id")).toBeNull();
+  expect(response.headers.get("Strict-Transport-Security")).toBe(
+    "max-age=31536000; includeSubDomains",
+  );
   expect(await response.text()).toBe("rate limited");
   expect(upstream).toHaveBeenCalledOnce();
   expect(assetFetch).not.toHaveBeenCalled();
@@ -101,6 +104,9 @@ test("answers health checks, non-POST methods and plain HTTP at the edge", async
     env,
   );
   expect(health.status).toBe(200);
+  expect(health.headers.get("Strict-Transport-Security")).toBe(
+    "max-age=31536000; includeSubDomains",
+  );
   expect(await health.json()).toEqual({ status: "ok" });
   for (const method of ["GET", "HEAD", "OPTIONS", "DELETE"]) {
     const response = await worker.fetch(
@@ -115,6 +121,7 @@ test("answers health checks, non-POST methods and plain HTTP at the edge", async
     env,
   );
   expect(insecure.status).toBe(403);
+  expect(insecure.headers.get("Strict-Transport-Security")).toBeNull();
   expect(await insecure.json()).toMatchObject({ error: "https_required" });
   expect(upstream).not.toHaveBeenCalled();
   expect(assetFetch).not.toHaveBeenCalled();

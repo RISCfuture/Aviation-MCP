@@ -1,5 +1,7 @@
 const noStore = { "Cache-Control": "no-store" };
 const originHeaders = ["Via", "Fly-Request-Id"];
+/** Matches the static assets' HSTS header in public/_headers. */
+const transportSecurity = "max-age=31536000; includeSubDomains";
 
 /** Signs the edge-observed client address, which the origin requires and meters per client. */
 export async function signedHeaders(
@@ -94,6 +96,10 @@ export default {
     const url = new URL(request.url);
     if (url.pathname !== "/mcp" && url.pathname !== "/health")
       return env.ASSETS.fetch(request);
-    return edgeResponse(request, url) ?? proxy(request, url, env);
+    const response =
+      edgeResponse(request, url) ?? (await proxy(request, url, env));
+    if (url.protocol === "https:")
+      response.headers.set("Strict-Transport-Security", transportSecurity);
+    return response;
   },
 } satisfies ExportedHandler<Env>;
