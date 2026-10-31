@@ -177,11 +177,12 @@ struct `Normalized source imports` {
     #expect(partial.versions.first?.validation?["parse_errors"]?.objectValue?["count"] == 1)
   }
 
-  @Test
-  func `withholds procedure geometry across rejected legs`() async throws {
+  @Test(arguments: ["KHAF", "HAF "])
+  func `withholds procedure geometry across rejected legs`(airport: String) async throws {
     let fixture = try #require(
       Bundle.module.url(forResource: "KHAF", withExtension: "cifp", subdirectory: "Fixtures"))
     let source = try String(contentsOf: fixture, encoding: .utf8)
+      .replacingOccurrences(of: "KHAF", with: airport)
     let complete = try await CIFPImporter.parse(Data(source.utf8))
     #expect(complete.versions.first?.validated == true)
     let airspaces = complete.records.filter { $0.kind == "airspace" && $0.identifier == "KRIV" }
