@@ -71,6 +71,6 @@ struct AdmissionMiddleware: AsyncMiddleware {
             "{\"error\":\"server_rate_limit\",\"retry_after_seconds\":\(decision.retryAfterSeconds)}"
         ))
     }
-    return try await next.respond(to: request)
+    return try await WeatherClient.$key.withValue(key) { try await next.respond(to: request) }
   }
 }

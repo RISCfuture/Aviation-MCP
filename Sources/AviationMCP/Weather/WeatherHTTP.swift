@@ -6,6 +6,7 @@ import Vapor
 struct WeatherHTTP: Sendable {
   let cache: WeatherCache
   let budgets: ProviderBudgets
+  var allowance = ClientAllowance()
   let send: @Sendable (ClientRequest) async throws -> ClientResponse
 
   func get(provider: String, url: String, units: Double, limits: [BudgetLimit]) async throws
@@ -13,8 +14,16 @@ struct WeatherHTTP: Sendable {
   {
     let key = "\(provider):\(SHA256.hash(data: Data(url.utf8)))"
     return try await cache.value(key: key, provider: provider) {
+      let client = WeatherClient.key
+      if let client {
+        try await reserveShare(provider: provider, client: client, units: units, limits: limits)
+      }
       let report = try await budgets.reserve(provider: provider, units: units, limits: limits)
       guard report.allowed else {
+        if let client {
+          try await allowance.refund(
+            provider: provider, client: client, units: units, limits: limits)
+        }
         throw WeatherFailure(
           provider: provider, reason: "Provider budget or retry window is exhausted.",
           retryAt: report.retryAt.flatMap { ISO8601DateFormatter().date(from: $0) },
@@ -34,6 +43,19 @@ struct WeatherHTTP: Sendable {
         throw failure
       }
     }
+  }
+
+  private func reserveShare(
+    provider: String, client: String, units: Double, limits: [BudgetLimit]
+  ) async throws {
+    guard
+      let retry = try await allowance.reserve(
+        provider: provider, client: client, units: units, limits: limits)
+    else { return }
+    throw WeatherFailure(
+      provider: provider,
+      reason: "This client has used its share of the provider budget; retry after the reset time.",
+      retryAt: retry, clientSpecific: true)
   }
 
   private func fetch(provider: String, url: String, report: BudgetReport) async throws -> Value {

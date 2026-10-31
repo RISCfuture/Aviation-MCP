@@ -13,6 +13,15 @@ enum BudgetPeriod: String, Codable, CaseIterable, Sendable {
     case .month: .month
     }
   }
+
+  func interval(containing instant: Date) throws -> DateInterval {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = .gmt
+    guard let interval = calendar.dateInterval(of: component, for: instant) else {
+      throw StorageError.invalidImport("Cannot calculate provider budget window.")
+    }
+    return interval
+  }
 }
 
 struct BudgetLimit: Codable, Sendable {
@@ -118,13 +127,9 @@ struct ProviderBudgets: Sendable {
     _ limits: [BudgetLimit], provider: String, at now: Date,
     on sql: any SQLDatabase
   ) async throws -> [Window] {
-    var calendar = Calendar(identifier: .gregorian)
-    calendar.timeZone = .gmt
     var windows: [Window] = []
     for limit in limits {
-      guard let interval = calendar.dateInterval(of: limit.period.component, for: now) else {
-        throw StorageError.invalidImport("Cannot calculate provider budget window.")
-      }
+      let interval = try limit.period.interval(containing: now)
       let consumed =
         try await sql.raw(
           """

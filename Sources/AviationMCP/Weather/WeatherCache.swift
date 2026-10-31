@@ -11,6 +11,9 @@ struct CachedWeather: Sendable {
 }
 
 struct WeatherCache: Sendable {
+  private static let firstPoll = Duration.milliseconds(250)
+  private static let slowestPoll = Duration.seconds(1)
+
   let database: any Database
   var freshness: TimeInterval = 900
 
@@ -19,12 +22,15 @@ struct WeatherCache: Sendable {
     fetch: @escaping @Sendable () async throws -> Value
   ) async throws -> CachedWeather {
     let deadline = ContinuousClock.now.advanced(by: .seconds(25))
+    var poll = Self.firstPoll
     while ContinuousClock.now < deadline {
       try Task.checkCancellation()
       switch try await claim(key: key, provider: provider) {
       case .cached(let value): return value
       case .failure(let error): throw error
-      case .waiting: try await Task.sleep(for: .milliseconds(100))
+      case .waiting:
+        try await Task.sleep(for: poll)
+        poll = min(poll * 2, Self.slowestPoll)
       case .lease(let id):
         return try await fetchAndStore(key: key, provider: provider, leaseID: id, fetch: fetch)
       }
@@ -110,8 +116,8 @@ struct WeatherCache: Sendable {
         ?? WeatherFailure(
           provider: provider, reason: "Upstream request failed.",
           retryAt: .now.addingTimeInterval(30))
-      let retry =
-        error is CancellationError ? Date.now : failure.retryAt ?? .now.addingTimeInterval(30)
+      let shared = !(error is CancellationError) && failure.clientSpecific != true
+      let retry = shared ? failure.retryAt ?? .now.addingTimeInterval(30) : Date.now
       let text = String(data: try JSONEncoder().encode(failure), encoding: .utf8)
       try await sql.raw(
         """

@@ -42,6 +42,34 @@ extension `Transactional publication` {
   }
 
   @Test
+  func `limits each client's upstream share without caching its refusal for others`()
+    async throws
+  {
+    try await withDatabase { store in
+      let http = WeatherHTTP(
+        cache: WeatherCache(database: store.database),
+        budgets: ProviderBudgets(database: store.database),
+        allowance: ClientAllowance(fraction: 0.5)
+      ) { _ in ClientResponse(status: .ok, body: ByteBuffer(string: "[]")) }
+      let limits = [BudgetLimit(period: .day, units: 2)]
+      try await WeatherClient.$key.withValue("first") {
+        _ = try await http.get(
+          provider: "awc", url: "https://example.invalid/a", units: 1, limits: limits)
+        let refusal = await #expect(throws: WeatherFailure.self) {
+          try await http.get(
+            provider: "awc", url: "https://example.invalid/b", units: 1, limits: limits)
+        }
+        #expect(refusal?.clientSpecific == true)
+      }
+      try await WeatherClient.$key.withValue("second") {
+        let fetched = try await http.get(
+          provider: "awc", url: "https://example.invalid/b", units: 1, limits: limits)
+        #expect(!fetched.cacheHit)
+      }
+    }
+  }
+
+  @Test
   func `reserves weighted budgets atomically across concurrent callers`() async throws {
     try await withDatabase { store in
       let budgets = ProviderBudgets(database: store.database)

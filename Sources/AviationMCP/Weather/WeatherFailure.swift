@@ -10,6 +10,9 @@ struct WeatherFailure: AviationWeatherError, LocalizedError, Codable, Sendable {
   var retrySource = "local_estimate"
   var rateLimits: BudgetReport?
   var parsingGaps: [Value]?
+  /// True when the failure reflects only the requesting client's allowance, so the cache must not
+  /// share it with other clients.
+  var clientSpecific: Bool?
 
   var errorDescription: String? { "Weather provider unavailable." }
   var failureReason: String? { reason }
