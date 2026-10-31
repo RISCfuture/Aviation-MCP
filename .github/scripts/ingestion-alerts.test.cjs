@@ -50,7 +50,7 @@ test("identifies upcoming releases that failed or were never attempted", () => {
   );
 });
 
-test("attempts the upcoming pair after a current-cycle failure and reports both outcomes", (t) => {
+test("attempts each navigation release independently and reports withheld releases", (t) => {
   const directory = mkdtempSync(path.join(tmpdir(), "aviation-ingest-"));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   mkdirSync(path.join(directory, "checked"));
@@ -64,7 +64,15 @@ test("attempts the upcoming pair after a current-cycle failure and reports both 
     );
   writeFileSync(
     path.join(directory, "scripts/run-ingestion-job.sh"),
-    '#!/usr/bin/env bash\nset -euo pipefail\nplan=$(jq -rn --arg encoded "$2" \'$encoded | @base64d\')\nprintf "%s\\n" "$plan" >> calls.jsonl\n[[ $(jq -r ".[0].cycle" <<< "$plan") != 2026-10-01 ]]\n',
+    [
+      "#!/usr/bin/env bash",
+      "set -euo pipefail",
+      `plan=$(jq -rn --arg encoded "$2" '$encoded | @base64d')`,
+      `release=$(jq -r '.[0] | "\\(.source)/\\(.cycle)"' <<< "$plan")`,
+      "[[ $release == nasr/2026-10-01 ]] && exit 3",
+      "[[ $release != cifp/2026-10-01 ]]",
+      "",
+    ].join("\n"),
     { mode: 0o755 },
   );
   const result = spawnSync(
@@ -82,15 +90,18 @@ test("attempts the upcoming pair after a current-cycle failure and reports both 
     readFileSync(path.join(directory, "reports/navigation.json"), "utf8"),
   );
   assert.deepEqual(
-    reports.map((report) => report.status),
-    ["failure", "success"],
+    reports.map((report) => [report.downloads[0].source, report.status]),
+    [
+      ["nasr", "withheld"],
+      ["nasr", "success"],
+      ["cifp", "failure"],
+      ["cifp", "success"],
+    ],
   );
-  const calls = readFileSync(path.join(directory, "calls.jsonl"), "utf8");
-  assert.match(calls, /2026-10-29/);
-  assert.equal(reports[1].downloads.length, 2);
+  assert.ok(reports.every((report) => report.downloads.length === 1));
 });
 
-test("alerts once, notifies new failing cycles, and closes the issue after recovery", async (t) => {
+test("alerts on failures and expiry, notifies on changes, and ignores parsing gaps", async (t) => {
   const directory = mkdtempSync(path.join(tmpdir(), "aviation-alert-"));
   const originalDirectory = process.cwd();
   t.after(() => {
@@ -100,12 +111,88 @@ test("alerts once, notifies new failing cycles, and closes the issue after recov
   process.chdir(directory);
   mkdirSync("checked");
   mkdirSync("reports");
+  const { issues, comments, dependencies } = alertHarness();
+  const now = Date.parse("2026-10-20T12:00:00Z");
+  const succeeded = {
+    CHECK_RESULT: "success",
+    INGEST_RESULT: "success",
+    TERRAIN_RESULT: "skipped",
+    PURGE_RESULT: "success",
+  };
+  const failed = { ...succeeded, INGEST_RESULT: "failure" };
+
+  writePublished(coveredStatus(0));
+  writeReports([current, next], "failure");
+  await notify(dependencies, failed, now);
+  await notify(dependencies, failed, now);
+  assert.equal(issues.length, 1);
+  assert.deepEqual(issues[0].assignees, ["RISCfuture"]);
+  assert.match(issues[0].body, /actions\/runs\/123/);
+  assert.equal(comments.length, 0);
+
+  writeReports([current, next], "withheld");
+  await notify(dependencies, failed, now);
+  assert.equal(comments.length, 1);
+  assert.match(
+    comments[0].body,
+    /@RISCfuture.*nasr\/2026-10-29 \(withheld: incomplete release\)/,
+  );
+
+  writeReports([current, next], "success");
+  writePublished(coveredStatus(3));
+  await notify(dependencies, succeeded, now);
+  assert.equal(issues[0].state, "closed");
+
+  writeReports([current], "success");
+  writePublished([{ source: "nasr", status: "available", version: current }]);
+  await notify(
+    dependencies,
+    { ...succeeded, TERRAIN_RESULT: "failure" },
+    Date.parse("2026-10-25T12:00:00Z"),
+  );
+  assert.equal(issues.length, 2);
+  assert.match(issues[1].body, /nasr\/coverage \| expiring without successor/);
+  assert.match(issues[1].body, /job\/terrain \| failure/);
+});
+
+function writeReports(releases, status) {
+  writeFileSync("checked/nasr.json", JSON.stringify(releases));
+  writeFileSync(
+    "reports/navigation.json",
+    JSON.stringify(
+      releases.map((release) => ({ downloads: [release], status })),
+    ),
+  );
+}
+
+function writePublished(results) {
+  writeFileSync(
+    "published-status.json",
+    JSON.stringify({ result: { structuredContent: { results } } }),
+  );
+}
+
+function coveredStatus(parseErrors) {
+  return [
+    {
+      source: "nasr",
+      status: "available",
+      version: current,
+      nextVersion: {
+        ...next,
+        validation: { parse_errors: { count: parseErrors } },
+      },
+    },
+  ];
+}
+
+function alertHarness() {
   const issues = [];
   const comments = [];
   const api = {
     listForRepo() {},
     async create(issue) {
-      issues.push({ ...issue, number: 1, state: "open" });
+      issues.push({ ...issue, number: issues.length + 1, state: "open" });
     },
     async update(update) {
       Object.assign(
@@ -129,59 +216,5 @@ test("alerts once, notifies new failing cycles, and closes the issue after recov
     },
     core: { info() {}, warning() {} },
   };
-  const writeReports = (releases, status) => {
-    writeFileSync("checked/nasr.json", JSON.stringify(releases));
-    writeFileSync(
-      "reports/navigation.json",
-      JSON.stringify(
-        releases.map((release) => ({ downloads: [release], status })),
-      ),
-    );
-  };
-  writeReports([current], "failure");
-  const failed = { CHECK_RESULT: "success", INGEST_RESULT: "failure" };
-  await notify(dependencies, failed);
-  await notify(dependencies, failed);
-  assert.equal(issues.length, 1);
-  assert.deepEqual(issues[0].assignees, ["RISCfuture"]);
-  assert.match(issues[0].body, /actions\/runs\/123/);
-  assert.equal(comments.length, 0);
-  writeReports([current, next], "failure");
-  await notify(dependencies, failed);
-  await notify(dependencies, failed);
-  assert.equal(comments.length, 1);
-  assert.match(comments[0].body, /@RISCfuture.*nasr\/2026-10-29/);
-  writeReports([current, next], "success");
-  const writePublished = (count) =>
-    writeFileSync(
-      "published-status.json",
-      JSON.stringify({
-        result: {
-          structuredContent: {
-            results: [
-              {
-                version: current,
-                nextVersion: {
-                  ...next,
-                  validation: { parse_errors: { count } },
-                },
-              },
-            ],
-          },
-        },
-      }),
-    );
-  writePublished(3);
-  await notify(dependencies, {
-    CHECK_RESULT: "success",
-    INGEST_RESULT: "success",
-  });
-  assert.equal(issues[0].state, "open");
-  assert.match(issues[0].body, /published with gaps \| 3/);
-  writePublished(0);
-  await notify(dependencies, {
-    CHECK_RESULT: "success",
-    INGEST_RESULT: "success",
-  });
-  assert.equal(issues[0].state, "closed");
-});
+  return { issues, comments, dependencies };
+}

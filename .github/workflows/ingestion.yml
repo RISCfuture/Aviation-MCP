@@ -9,10 +9,17 @@ on:
       - 'scripts/CheckSource.swift'
       - 'scripts/run-ingestion-job.sh'
       - 'scripts/ingest-checked-sources.sh'
-      - '.github/scripts/ingestion-alerts*'
+      - '.github/scripts/ingestion-*'
   schedule:
+    # .github/scripts/ingestion-plan.cjs recognizes each run by these expressions.
     - cron: '17 */6 * * *'
+    - cron: '7,27,47 * * * *'
   workflow_dispatch:
+    inputs:
+      force:
+        description: Dispatch ingestion even for releases an earlier run already published
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -22,16 +29,62 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      check: ${{ steps.decide.outputs.check }}
+      ingest: ${{ steps.decide.outputs.ingest }}
+      maintenance: ${{ steps.schedule.outputs.maintenance }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Plan this run
+        id: schedule
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const { plan } = require('./.github/scripts/ingestion-plan.cjs');
+            const decision = plan({
+              eventName: context.eventName,
+              schedule: context.payload.schedule,
+              now: Date.now(),
+            });
+            for (const [name, value] of Object.entries(decision)) core.setOutput(name, String(value));
+      - name: Look up the polled DOF release
+        id: published
+        if: steps.schedule.outputs.dofRelease != ''
+        uses: actions/cache/restore@v4
+        with:
+          path: reports/dof.json
+          key: dof-published-${{ steps.schedule.outputs.dofRelease }}
+          lookup-only: true
+      - name: Skip polling for a published DOF release
+        id: decide
+        env:
+          CHECK: ${{ steps.schedule.outputs.check }}
+          INGEST: ${{ steps.schedule.outputs.ingest }}
+          PUBLISHED: ${{ steps.published.outputs.cache-hit == 'true' }}
+        run: |
+          if [[ "$PUBLISHED" == true ]]; then
+            CHECK=false INGEST=false
+            printf 'The polled DOF release is already published.\n'
+          fi
+          { printf 'check=%s\n' "$CHECK"; printf 'ingest=%s\n' "$INGEST"; } >> "$GITHUB_OUTPUT"
+
   test-alerts:
+    needs: plan
+    if: needs.plan.outputs.check == 'true'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
-      - run: node --test .github/scripts/ingestion-alerts.test.cjs
+      - run: node --test .github/scripts/*.test.cjs
 
   check:
+    needs: plan
+    if: needs.plan.outputs.check == 'true'
     runs-on: ubuntu-24.04
     container: swift:6.4.1-noble
     timeout-minutes: 10
@@ -57,14 +110,15 @@ jobs:
           retention-days: 1
 
   ingest:
-    needs: [check, test-alerts]
+    needs: [plan, check, test-alerts]
     if: >-
-      ${{ always() && !cancelled() && needs.test-alerts.result == 'success'
-        && github.event_name != 'push' && vars.AVIATION_INGEST_IMAGE != '' }}
+      ${{ always() && !cancelled() && needs.plan.outputs.ingest == 'true'
+        && needs.test-alerts.result == 'success' && vars.AVIATION_INGEST_IMAGE != '' }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 240
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         source: [navigation, dof, aircraft]
     env:
@@ -78,8 +132,48 @@ jobs:
           pattern: source-*
           path: checked
           merge-multiple: true
+      - name: Fingerprint the checked releases and parser image
+        id: fingerprint
+        run: |
+          files=("checked/$SOURCE.json")
+          if [[ "$SOURCE" == navigation ]]; then files=(checked/nasr.json checked/cifp.json); fi
+          digest=$({ printf '%s\n' "$AVIATION_INGEST_IMAGE"; cat "${files[@]}" 2>/dev/null || true; } \
+            | sha256sum | cut -d ' ' -f 1)
+          printf 'key=ingested-%s-%s\n' "$SOURCE" "$digest" >> "$GITHUB_OUTPUT"
+      - name: Reuse the results of an identical earlier publication
+        id: published
+        if: ${{ !inputs.force }}
+        uses: actions/cache/restore@v4
+        with:
+          path: reports/${{ matrix.source }}.json
+          key: ${{ steps.fingerprint.outputs.key }}
+      - name: Mark reused results
+        if: steps.published.outputs.cache-hit == 'true'
+        run: |
+          jq 'map(.reused = true)' "reports/$SOURCE.json" > reused.json
+          mv reused.json "reports/$SOURCE.json"
       - name: Dispatch available publications
+        if: steps.published.outputs.cache-hit != 'true'
         run: bash scripts/ingest-checked-sources.sh "$SOURCE" checked "reports/$SOURCE.json"
+      - name: Remember the published releases
+        if: steps.published.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: reports/${{ matrix.source }}.json
+          key: ${{ steps.fingerprint.outputs.key }}
+      - name: Name the newest published DOF release
+        id: dof
+        if: matrix.source == 'dof' && steps.published.outputs.cache-hit != 'true'
+        run: >-
+          printf 'release=%s\n'
+          "$(jq -r '[.[] | select(.status == "success") | .downloads[].cycle] | max // empty' reports/dof.json)"
+          >> "$GITHUB_OUTPUT"
+      - name: Stop polling for the published DOF release
+        if: steps.dof.outputs.release != ''
+        uses: actions/cache/save@v4
+        with:
+          path: reports/dof.json
+          key: dof-published-${{ steps.dof.outputs.release }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -87,9 +181,37 @@ jobs:
           path: reports/*.json
           retention-days: 7
 
+  terrain:
+    needs: plan
+    if: ${{ needs.plan.outputs.maintenance == 'true' && vars.AVIATION_INGEST_IMAGE != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate and publish terrain catalogs
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_INGEST_API_TOKEN }}
+          AVIATION_INGEST_IMAGE: ${{ vars.AVIATION_INGEST_IMAGE }}
+        run: scripts/run-ingestion-job.sh import-terrain
+
+  purge:
+    needs: [plan, ingest]
+    if: >-
+      ${{ always() && !cancelled() && needs.plan.outputs.maintenance == 'true'
+        && vars.AVIATION_INGEST_IMAGE != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Purge expired data and caches
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_INGEST_API_TOKEN }}
+          AVIATION_INGEST_IMAGE: ${{ vars.AVIATION_INGEST_IMAGE }}
+        run: scripts/run-ingestion-job.sh purge
+
   alert:
-    needs: [check, ingest]
-    if: ${{ always() && github.event_name != 'push' && github.ref == 'refs/heads/main' }}
+    needs: [plan, check, ingest, terrain, purge]
+    if: ${{ always() && needs.plan.outputs.ingest == 'true' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -108,8 +230,29 @@ jobs:
           pattern: ingestion-results-*
           path: reports
           merge-multiple: true
+      - name: Decide whether published coverage may have changed
+        id: coverage
+        env:
+          MAINTENANCE: ${{ needs.plan.outputs.maintenance }}
+        run: |
+          refresh=$MAINTENANCE
+          if jq -se 'flatten | any(.reused != true)' reports/*.json > /dev/null 2>&1; then
+            refresh=true
+          fi
+          printf 'refresh=%s\n' "$refresh" >> "$GITHUB_OUTPUT"
+      - name: Reuse the last published coverage
+        id: cached-status
+        if: steps.coverage.outputs.refresh != 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: published-status.json
+          key: published-status-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: published-status-
       - name: Inspect current and next published coverage
-        if: always()
+        id: status
+        if: >-
+          ${{ always() && (steps.coverage.outputs.refresh == 'true'
+            || steps.cached-status.outputs.cache-matched-key == '') }}
         run: >-
           curl --fail --silent --show-error --max-time 60 --retry 2
           https://aviation-mcp.org/mcp
@@ -117,38 +260,21 @@ jobs:
           --header 'Accept: application/json, text/event-stream'
           --data '{"jsonrpc":"2.0","id":"cycle-alert","method":"tools/call","params":{"name":"get_data_status"}}'
           --output published-status.json
-      - name: Notify owner of failed or incomplete release validation
+      - name: Remember published coverage
+        if: steps.status.outcome == 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: published-status.json
+          key: published-status-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Notify owner of failures, withheld releases and coverage gaps
         if: always()
         uses: actions/github-script@v8
         env:
           CHECK_RESULT: ${{ needs.check.result }}
           INGEST_RESULT: ${{ needs.ingest.result }}
+          TERRAIN_RESULT: ${{ needs.terrain.result }}
+          PURGE_RESULT: ${{ needs.purge.result }}
         with:
           script: |
             const { notify } = require('./.github/scripts/ingestion-alerts.cjs');
             await notify({ github, context, core });
-
-  terrain:
-    if: ${{ github.event_name != 'push' && vars.AVIATION_INGEST_IMAGE != '' }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - name: Validate and publish terrain catalogs
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_INGEST_API_TOKEN }}
-          AVIATION_INGEST_IMAGE: ${{ vars.AVIATION_INGEST_IMAGE }}
-        run: scripts/run-ingestion-job.sh import-terrain
-
-  purge:
-    needs: ingest
-    if: ${{ always() && !cancelled() && github.event_name != 'push' && vars.AVIATION_INGEST_IMAGE != '' }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v4
-      - name: Purge expired data and caches
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_INGEST_API_TOKEN }}
-          AVIATION_INGEST_IMAGE: ${{ vars.AVIATION_INGEST_IMAGE }}
-        run: scripts/run-ingestion-job.sh purge
