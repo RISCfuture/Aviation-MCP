@@ -1,2 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://aviation-mcp.org/</loc></url></urlset>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://aviation-mcp.org/</loc></url>
+  <url><loc>https://aviation-mcp.org/support/</loc></url>
+  <url><loc>https://aviation-mcp.org/privacy/</loc></url>
+  <url><loc>https://aviation-mcp.org/terms/</loc></url>
+</urlset>

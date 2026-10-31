@@ -4,17 +4,25 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#07110f" />
+    <meta name="color-scheme" content="dark" />
+    <meta
+      name="description"
+      content="How the hosted Aviation MCP website and MCP endpoint handle tool requests, logs, caches, and analytics."
+    />
     <title>Privacy — Aviation MCP</title>
     <link rel="stylesheet" href="/information.css" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="canonical" href="https://aviation-mcp.org/privacy" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="canonical" href="https://aviation-mcp.org/privacy/" />
   </head>
   <body>
     <main>
       <a class="brand" href="/">AVIATION / MCP</a>
       <p>Aviation MCP is operated by Tim Morgan.</p>
       <h1>Privacy</h1>
-      <p class="updated">Updated October 28, 2026</p>
+      <p class="updated">Updated October 31, 2026</p>
       <p>
         Aviation MCP processes the arguments your assistant sends to its tools.
         These can include airport and aircraft identifiers, dates, weather
@@ -54,18 +62,25 @@
         Operational logs can contain request metadata, timestamps, and error
         information. Infrastructure logs and backups follow the hosting
         provider's configured retention. The service does not maintain user
-        accounts or a conversation-history database. The website uses
-        self-hosted fonts and does not include an advertising or analytics
-        script.
+        accounts or a conversation-history database.
+      </p>
+      <h2>Website analytics</h2>
+      <p>
+        The website uses Cloudflare Web Analytics to count page views and
+        measure page-load performance. It does not set cookies or use local
+        storage, and it reports aggregate figures such as visited pages,
+        referrers, browser type, country, and load times. The MCP endpoint does
+        not use it. The website uses self-hosted fonts and does not include
+        advertising scripts.
       </p>
       <h2>Questions</h2>
       <p>
-        Use our <a href="/support">support page</a> for questions about data
+        Use our <a href="/support/">support page</a> for questions about data
         handling. Do not include private information in a public GitHub issue.
       </p>
       <nav aria-label="Information">
-        <a href="/privacy">Privacy</a><a href="/terms">Terms</a
-        ><a href="/support">Support</a>
+        <a href="/privacy/">Privacy</a><a href="/terms/">Terms</a
+        ><a href="/support/">Support</a>
       </nav>
     </main>
   </body>

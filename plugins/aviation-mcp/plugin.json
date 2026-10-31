@@ -24,9 +24,9 @@
           "Obstacle and terrain analysis"
         ],
         "websiteURL": "https://aviation-mcp.org",
-        "supportURL": "https://aviation-mcp.org/support",
-        "privacyPolicyURL": "https://aviation-mcp.org/privacy",
-        "termsOfServiceURL": "https://aviation-mcp.org/terms",
+        "supportURL": "https://aviation-mcp.org/support/",
+        "privacyPolicyURL": "https://aviation-mcp.org/privacy/",
+        "termsOfServiceURL": "https://aviation-mcp.org/terms/",
         "defaultPrompt": [
           "Show Denver’s (KDEN) runways, lengths, and surface types.",
           "On Boston’s (KBOS) ILS RWY 4R, what altitude is published at GOSHI?",
