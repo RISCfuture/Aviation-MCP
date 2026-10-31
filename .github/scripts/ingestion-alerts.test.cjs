@@ -156,6 +156,61 @@ test("alerts on failures and expiry, notifies on changes, and ignores parsing ga
   assert.match(issues[1].body, /job\/terrain \| failure/);
 });
 
+test("waits a day for a released DOF and ignores unattempted upcoming releases", async (t) => {
+  const directory = mkdtempSync(path.join(tmpdir(), "aviation-alert-"));
+  const originalDirectory = process.cwd();
+  t.after(() => {
+    process.chdir(originalDirectory);
+    rmSync(directory, { recursive: true, force: true });
+  });
+  process.chdir(directory);
+  mkdirSync("checked");
+  mkdirSync("reports");
+  const { issues, dependencies } = alertHarness();
+  const following = {
+    source: "nasr",
+    cycle: "2026-11-26",
+    effectiveFrom: "2026-11-26T09:01:00Z",
+    effectiveUntil: "2026-12-24T09:01:00Z",
+  };
+  writeFileSync("checked/nasr.json", JSON.stringify([next, following]));
+  writeFileSync("checked/cifp.json", "[]");
+  writeFileSync("checked/aircraft.json", "[]");
+  writeFileSync(
+    "reports/navigation.json",
+    JSON.stringify([{ downloads: [next], status: "success" }]),
+  );
+  writePublished([
+    {
+      source: "nasr",
+      status: "available",
+      version: next,
+      nextVersion: following,
+    },
+    {
+      source: "dof",
+      status: "unavailable",
+      reason: "dof release 20260927 expired.",
+    },
+  ]);
+  const dofUnposted = {
+    CHECK_RESULT: "failure",
+    IMAGE_RESULT: "success",
+    INGEST_RESULT: "success",
+    TERRAIN_RESULT: "skipped",
+    PURGE_RESULT: "skipped",
+  };
+
+  await notify(dependencies, dofUnposted, Date.parse("2026-11-24T06:00:00Z"));
+  assert.equal(issues.length, 0);
+
+  await notify(dependencies, dofUnposted, Date.parse("2026-11-25T06:00:00Z"));
+  assert.equal(issues.length, 1);
+  assert.match(issues[0].body, /dof\/coverage \| unavailable/);
+  assert.match(issues[0].body, /job\/check \| failure/);
+  assert.doesNotMatch(issues[0].body, /nasr\/2026-11-26 \|/);
+});
+
 function writeReports(releases, status) {
   writeFileSync("checked/nasr.json", JSON.stringify(releases));
   writeFileSync(

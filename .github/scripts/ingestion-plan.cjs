@@ -16,6 +16,12 @@ const CHECK_ONLY_EVENTS = new Set(["push", "pull_request"]);
 /** Terrain and purge maintenance run only in the regular run starting before this UTC hour. */
 const MAINTENANCE_HOUR = 6;
 
+/** Returns the instant of the latest scheduled DOF release at or before `now`. */
+function latestDofRelease(now) {
+  const cycles = Math.floor((now - DOF_REFERENCE_RELEASE) / DOF_CADENCE);
+  return DOF_REFERENCE_RELEASE + cycles * DOF_CADENCE;
+}
+
 /** Returns the scheduled DOF release whose polling window contains `now`, as YYYY-MM-DD. */
 function dofReleaseWindow(now) {
   const cycles = Math.floor(
@@ -56,6 +62,7 @@ function plan({ eventName, schedule, now }) {
 }
 
 module.exports = {
+  latestDofRelease,
   REGULAR_SCHEDULE,
   RELEASE_WINDOW_SCHEDULE,
   plan,

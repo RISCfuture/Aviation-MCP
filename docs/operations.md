@@ -170,9 +170,11 @@ Each discovered release is attempted even when an earlier cycle fails. Ingestion
 result artifacts record success, failure, or an incomplete attempt for each cycle.
 The scheduled and manually dispatched workflow opens an issue assigned to and
 mentioning `@RISCfuture` for failed jobs (including terrain and purge), failed,
-withheld or unconfirmed releases, unavailable sources, and sources expiring
-within a week (a day for DOF) with no successor staged. Parsing gaps are
-informational. The issue lists effective dates and links to the workflow and
+withheld or unconfirmed releases, unavailable sources, and NASR or CIFP
+releases expiring within a week with no successor staged. The FAA links each
+DOF only once it is released, so a missing DOF is reported only when it is
+still unposted a day after its scheduled release. Upcoming releases not yet
+attempted and parsing gaps are informational. The issue lists effective dates and links to the workflow and
 Fly ingestion logs. It gains a comment whenever a problem appears or changes
 status, and closes when none remain. GitHub
 delivers the assignment and mention notifications according to the user's account

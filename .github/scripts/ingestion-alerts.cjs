@@ -1,14 +1,21 @@
 const fs = require("node:fs");
 const path = require("node:path");
+const { latestDofRelease } = require("./ingestion-plan.cjs");
 
 const marker = "<!-- aviation-ingestion-alert -->";
 const HOUR = 3_600_000;
-/** How long before a published version expires its successor must be staged. */
+/**
+ * How long before a published version expires its successor must be staged. DOF has none:
+ * the FAA links each DOF only once it is released.
+ */
 const SUCCESSOR_LEAD = {
   nasr: 7 * 24 * HOUR,
   cifp: 7 * 24 * HOUR,
-  dof: 24 * HOUR,
 };
+/** How long after a scheduled DOF release its absence is expected rather than a problem. */
+const DOF_POSTING_GRACE = 24 * HOUR;
+/** Sources whose discovery runs as its own check job. */
+const CHECKED_SOURCES = ["nasr", "cifp", "dof", "aircraft"];
 /** Release results that need the owner's attention, rather than informational gaps. */
 const FAILED_RELEASE_STATUSES = new Set([
   "failure",
@@ -17,6 +24,8 @@ const FAILED_RELEASE_STATUSES = new Set([
   "not validated",
   "pending",
 ]);
+/** Results of releases not yet attempted; upcoming ones are covered by SUCCESSOR_LEAD instead. */
+const UNATTEMPTED_RELEASE_STATUSES = new Set(["not validated", "pending"]);
 /** Job results that do not indicate a failure for jobs that may legitimately be skipped. */
 const OPTIONAL_JOB_RESULTS = new Set(["success", "skipped"]);
 
@@ -57,9 +66,15 @@ function summarizeReleases(releases, reports, now, published = []) {
   });
 }
 
+/** Whether a just-released DOF may still be awaiting its FAA posting. */
+function awaitingDofPosting(now) {
+  return now - latestDofRelease(now) < DOF_POSTING_GRACE;
+}
+
 /** Find sources that are unavailable, or that expire soon with no successor staged. */
 function coverageProblems(statuses, now) {
   return statuses.flatMap((status) => {
+    if (status.source === "dof" && awaitingDofPosting(now)) return [];
     if (status.status === "unavailable")
       return [
         {
@@ -87,8 +102,14 @@ function coverageProblems(statuses, now) {
   });
 }
 
+/** Whether discovery failed only for a DOF the FAA has not yet posted. */
+function awaitingDofDiscovery(checked, now) {
+  const missing = CHECKED_SOURCES.filter((source) => !checked.includes(source));
+  return awaitingDofPosting(now) && missing.join() === "dof";
+}
+
 /** Find workflow jobs that failed. */
-function jobProblems(environment) {
+function jobProblems(environment, excused = new Set()) {
   const results = {
     check: [environment.CHECK_RESULT, false],
     image: [environment.IMAGE_RESULT, false],
@@ -97,6 +118,7 @@ function jobProblems(environment) {
     purge: [environment.PURGE_RESULT, true],
   };
   return Object.entries(results)
+    .filter(([job]) => !excused.has(job))
     .filter(([, [result, optional]]) =>
       optional
         ? !OPTIONAL_JOB_RESULTS.has(result ?? "skipped")
@@ -110,9 +132,13 @@ function jobProblems(environment) {
 }
 
 /** List everything that needs the owner's attention; parsing gaps alone are informational. */
-function problems({ releases, statuses, environment, now }) {
+function problems({ releases, checked = [], statuses, environment, now }) {
   const releaseProblems = releases
     .filter((release) => FAILED_RELEASE_STATUSES.has(release.status))
+    .filter(
+      (release) =>
+        !(release.upcoming && UNATTEMPTED_RELEASE_STATUSES.has(release.status)),
+    )
     .map((release) => ({
       key: `${release.source}/${release.cycle}`,
       status: release.status,
@@ -136,8 +162,9 @@ function problems({ releases, statuses, environment, now }) {
           detail: "Published source status could not be read.",
         },
       ];
+  const excused = new Set(awaitingDofDiscovery(checked, now) ? ["check"] : []);
   return [
-    ...jobProblems(environment),
+    ...jobProblems(environment, excused),
     ...discovery,
     ...releaseProblems,
     ...coverage,
@@ -153,6 +180,15 @@ function readArrays(directory) {
     .flatMap((name) =>
       JSON.parse(fs.readFileSync(path.join(directory, name), "utf8")),
     );
+}
+
+/** Name the sources whose discovery produced results. */
+function checkedSources(directory) {
+  if (!fs.existsSync(directory)) return [];
+  return fs
+    .readdirSync(directory)
+    .filter((name) => name.endsWith(".json"))
+    .map((name) => path.basename(name, ".json"));
 }
 
 /** Read the per-source results of get_data_status, or undefined when they are unavailable. */
@@ -215,7 +251,13 @@ async function notify(
     now,
     published,
   );
-  const found = problems({ releases, statuses, environment, now });
+  const found = problems({
+    releases,
+    checked: checkedSources("checked"),
+    statuses,
+    environment,
+    now,
+  });
   const repository = context.repo;
   const issues = await github.paginate(github.rest.issues.listForRepo, {
     ...repository,
