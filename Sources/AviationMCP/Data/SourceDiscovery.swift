@@ -18,6 +18,8 @@ struct SourceDiscoveryError: LocalizedError {
 }
 
 enum SourceDiscovery {
+  /// The FAA's changeover time for aeronautical information: 0901Z on the effective date.
+  static let changeover: TimeInterval = 9 * 3600 + 60
   static let obstacleSchedule =
     "https://www.faa.gov/air_traffic/flight_info/aeronav/digital_products/dof/"
   static let aircraftWorkbook =
@@ -27,7 +29,7 @@ enum SourceDiscovery {
     guard ["nasr", "cifp"].contains(source) else {
       throw SourceDiscoveryError("Unknown navigation source: \(source).")
     }
-    let reference = try date("2020-12-03", format: "yyyy-MM-dd")
+    let reference = try date("2020-12-03", format: "yyyy-MM-dd").addingTimeInterval(changeover)
     let duration: TimeInterval = 28 * 86400
     let start = reference.addingTimeInterval(
       floor(instant.timeIntervalSince(reference) / duration) * duration)

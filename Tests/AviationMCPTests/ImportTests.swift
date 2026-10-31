@@ -17,6 +17,11 @@ struct `Normalized source imports` {
     #expect(nasr.map(\.effectiveFrom) == cifp.map(\.effectiveFrom))
     #expect(nasr.map(\.cycle) == ["2026-10-01", "2026-10-29"])
     #expect(nasr[1].url.hasSuffix("29_Oct_2026_CSV.zip"))
+    #expect(nasr[1].effectiveFrom == "2026-10-29T09:01:00Z")
+    for (time, cycle) in [("08:59", "2026-10-01"), ("09:02", "2026-10-29")] {
+      let instant = try #require(ISO8601DateFormatter().date(from: "2026-10-29T\(time):00Z"))
+      #expect(try SourceDiscovery.navigation("nasr", at: instant).first?.cycle == cycle)
+    }
     let html = """
       <table><tr><th>Release Date</th></tr>
       <tr><td><a href="https://aeronav.faa.gov/Obst_Data/DOF_260927.zip">DOF</a></td>

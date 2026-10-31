@@ -13,8 +13,8 @@ enum NASRImporter {
     var diagnostics = try await load(nasr)
     let frequencies = try await NASRFrequencies.read(archive)
     let data = await nasr.data
-    guard let start = cycle.effectiveDate,
-      let end = cycle.expirationDate
+    guard let start = cycle.effectiveDate?.addingTimeInterval(SourceDiscovery.changeover),
+      let end = cycle.expirationDate?.addingTimeInterval(SourceDiscovery.changeover)
     else {
       throw StorageError.invalidImport("NASR has invalid cycle dates.")
     }

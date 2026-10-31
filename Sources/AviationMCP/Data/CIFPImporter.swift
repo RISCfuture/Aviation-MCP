@@ -3,7 +3,7 @@ import MCP
 import SwiftCIFP
 
 enum CIFPImporter {
-  static let revision = "cifp-adapter-4/d57301f98db1b850b9c57d823c7f7dcf996fc730"
+  static let revision = "cifp-adapter-5/d57301f98db1b850b9c57d823c7f7dcf996fc730"
 
   static func parse(_ bytes: Data) async throws -> StagedImport {
     var diagnostics = CIFPDiagnostics()
@@ -17,7 +17,8 @@ enum CIFPImporter {
         let sourceLine = line.flatMap { lines.indices.contains($0 - 1) ? lines[$0 - 1] : nil }
         diagnostics.record(error, line: line, sourceLine: sourceLine)
       })
-    guard let start = cifp.cycle.effectiveDate, let end = cifp.cycle.expirationDate
+    guard let start = cifp.cycle.effectiveDate?.addingTimeInterval(SourceDiscovery.changeover),
+      let end = cifp.cycle.expirationDate?.addingTimeInterval(SourceDiscovery.changeover)
     else {
       throw StorageError.invalidImport(
         "CIFP has invalid cycle dates.")
