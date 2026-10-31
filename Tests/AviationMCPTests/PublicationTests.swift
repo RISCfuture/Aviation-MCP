@@ -190,6 +190,17 @@ struct `Transactional publication` {
   }
 
   @Test
+  func `refuses query cursors a client altered or forged`() throws {
+    let genuine = try QueryCursor(versionToken: "v1", query: "q", offset: 50).encode()
+    #expect(try QueryCursor.decode(genuine).offset == 50)
+    let signature = try #require(genuine.split(separator: ".").last)
+    let forged = try JSONEncoder().encode(QueryCursor(versionToken: "v1", query: "q", offset: 60))
+      .base64EncodedString()
+    #expect(throws: StorageError.self) { try QueryCursor.decode(forged + "." + signature) }
+    #expect(throws: StorageError.self) { try QueryCursor.decode(forged) }
+  }
+
+  @Test
   func `orders obstacles by MSL and binds pagination to source versions`() async throws {
     try await withDatabase { store in
       try await Self.publishObstacles(store)

@@ -1,3 +1,4 @@
+import Crypto
 import Fluent
 import Foundation
 import MCP
@@ -51,9 +52,9 @@ struct PeriodicQueries: Sendable {
       }
       Self.annotate(&result)
       if rows.count > limit {
-        result.nextCursor = try QueryCursor(
-          versionToken: snapshot.token, query: signature, offset: (cursor?.offset ?? 0) + limit
-        ).encode()
+        try result.offerPage(
+          at: QueryCursor(
+            versionToken: snapshot.token, query: signature, offset: (cursor?.offset ?? 0) + limit))
       }
       return result
     }
@@ -252,7 +253,14 @@ struct PeriodicQueries: Sendable {
   }
 }
 
+/// A continuation token authenticated with a key that only this process holds, so a client can
+/// neither forge an offset nor reuse a cursor after the server restarts.
 struct QueryCursor: Codable {
+  /// The deepest offset paging reaches; a query matching more must be narrowed instead.
+  static let maximumOffset = 10_000
+  private static let key = SymmetricKey(size: .bits256)
+  private static let separator: Character = "."
+
   let versionToken: String
   let query: String
   let offset: Int
@@ -266,17 +274,35 @@ struct QueryCursor: Codable {
   }
 
   static func decode(_ text: String) throws -> Self {
-    guard let data = Data(base64Encoded: text) else { throw StorageError.expiredCursor }
-    do {
-      let cursor = try JSONDecoder().decode(Self.self, from: data)
-      guard (0...2_000_000).contains(cursor.offset) else { throw StorageError.expiredCursor }
-      return cursor
-    } catch {
-      throw StorageError.expiredCursor
-    }
+    let parts = text.split(separator: separator, omittingEmptySubsequences: false)
+    guard parts.count == 2, let payload = Data(base64Encoded: String(parts[0])),
+      let code = Data(base64Encoded: String(parts[1])),
+      HMAC<SHA256>.isValidAuthenticationCode(code, authenticating: payload, using: key),
+      let cursor = try? JSONDecoder().decode(Self.self, from: payload),
+      (0...maximumOffset).contains(cursor.offset)
+    else { throw StorageError.expiredCursor }
+    return cursor
   }
 
   func encode() throws -> String {
-    try JSONEncoder().encode(self).base64EncodedString()
+    let payload = try JSONEncoder().encode(self)
+    let code = HMAC<SHA256>.authenticationCode(for: payload, using: Self.key)
+    return payload.base64EncodedString() + String(Self.separator)
+      + Data(code).base64EncodedString()
+  }
+}
+
+extension ToolResult {
+  /// Offers the page at `cursor`, or marks the result partial when that page lies beyond the
+  /// deepest offset paging reaches.
+  mutating func offerPage(at cursor: QueryCursor) throws {
+    guard cursor.offset <= QueryCursor.maximumOffset else {
+      completeness = "partial"
+      warnings.append(
+        "More results match than paging reaches (\(QueryCursor.maximumOffset) records); "
+          + "narrow the query to see the rest.")
+      return
+    }
+    nextCursor = try cursor.encode()
   }
 }

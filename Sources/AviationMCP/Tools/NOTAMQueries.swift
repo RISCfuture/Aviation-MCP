@@ -35,10 +35,10 @@ struct NOTAMQueries: Sendable {
       ]
       annotate(&result, filter: filter, poll: poll, now: now)
       if rows.count > filter.limit {
-        result.nextCursor = try QueryCursor(
-          versionToken: token, query: filter.signature,
-          offset: (filter.cursor?.offset ?? 0) + filter.limit
-        ).encode()
+        try result.offerPage(
+          at: QueryCursor(
+            versionToken: token, query: filter.signature,
+            offset: (filter.cursor?.offset ?? 0) + filter.limit))
       }
       return result
     }
