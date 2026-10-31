@@ -20,6 +20,8 @@ struct SourceDiscoveryError: LocalizedError {
 enum SourceDiscovery {
   /// The FAA's changeover time for aeronautical information: 0901Z on the effective date.
   static let changeover: TimeInterval = 9 * 3600 + 60
+  /// The FAA's interval between DOF releases.
+  static let obstacleCadence: TimeInterval = 56 * 86400
   static let obstacleSchedule =
     "https://www.faa.gov/air_traffic/flight_info/aeronav/digital_products/dof/"
   static let aircraftWorkbook =
@@ -48,6 +50,32 @@ enum SourceDiscovery {
   }
 
   static func obstacles(_ html: String, at instant: Date) throws -> [SourceDownload] {
+    let schedule = try obstacleReleases(html)
+    let following: [Date?] = schedule.dropFirst().map(\.release) + [nil]
+    let candidates = zip(schedule, following).compactMap { current, next -> SourceDownload? in
+      let until = next ?? current.release.addingTimeInterval(obstacleCadence)
+      guard let url = current.url, until > instant else { return nil }
+      return SourceDownload(
+        source: "dof", cycle: String(current.release.ISO8601Format().prefix(10)), url: url,
+        effectiveFrom: current.release.ISO8601Format(), effectiveUntil: until.ISO8601Format(),
+        dateBasis: obstacleSchedule)
+    }
+    guard !candidates.isEmpty else {
+      throw SourceDiscoveryError(missingObstacleRelease(schedule, at: instant))
+    }
+    return Array(candidates.prefix(2))
+  }
+
+  static func aircraft(lastModified: String) throws -> SourceDownload {
+    let modified = try date(lastModified, format: "EEE, dd MMM yyyy HH:mm:ss zzz")
+    return SourceDownload(
+      source: "aircraft", cycle: "FAA-ACD-" + String(modified.ISO8601Format().prefix(10)),
+      url: aircraftWorkbook, effectiveFrom: modified.ISO8601Format(), effectiveUntil: nil,
+      dateBasis: "HTTP Last-Modified snapshot timestamp; publication time not supplied",
+      lastModified: lastModified)
+  }
+
+  private static func obstacleReleases(_ html: String) throws -> [(release: Date, url: String?)] {
     var schedule: [(release: Date, url: String?)] = []
     for row in try captures(#"(?is)<tr\b[^>]*>(.*?)</tr>"#, in: html) {
       let cells = try captures(#"(?is)<td\b[^>]*>(.*?)</td>"#, in: row)
@@ -60,29 +88,17 @@ enum SourceDiscovery {
       ).first
       schedule.append((release, url))
     }
-    schedule.sort { $0.release < $1.release }
-    var candidates: [SourceDownload] = []
-    for (current, next) in zip(schedule, schedule.dropFirst()) {
-      guard let url = current.url, next.release > instant else { continue }
-      candidates.append(
-        SourceDownload(
-          source: "dof", cycle: String(current.release.ISO8601Format().prefix(10)), url: url,
-          effectiveFrom: current.release.ISO8601Format(),
-          effectiveUntil: next.release.ISO8601Format(), dateBasis: obstacleSchedule))
-    }
-    guard candidates.contains(where: { $0.effectiveFrom <= instant.ISO8601Format() }) else {
-      throw SourceDiscoveryError("FAA DOF schedule has no current download with published bounds.")
-    }
-    return Array(candidates.prefix(2))
+    return schedule.sorted { $0.release < $1.release }
   }
 
-  static func aircraft(lastModified: String) throws -> SourceDownload {
-    let modified = try date(lastModified, format: "EEE, dd MMM yyyy HH:mm:ss zzz")
-    return SourceDownload(
-      source: "aircraft", cycle: "FAA-ACD-" + String(modified.ISO8601Format().prefix(10)),
-      url: aircraftWorkbook, effectiveFrom: modified.ISO8601Format(), effectiveUntil: nil,
-      dateBasis: "HTTP Last-Modified snapshot timestamp; publication time not supplied",
-      lastModified: lastModified)
+  private static func missingObstacleRelease(
+    _ schedule: [(release: Date, url: String?)], at instant: Date
+  ) -> String {
+    guard let overdue = schedule.last(where: { $0.url == nil && $0.release <= instant }) else {
+      return "FAA DOF schedule has no current download with published bounds."
+    }
+    return "The FAA has not yet posted the DOF release scheduled for "
+      + "\(overdue.release.ISO8601Format()); the previous release expired at that time."
   }
 
   private static func captures(_ pattern: String, in text: String) throws -> [String] {

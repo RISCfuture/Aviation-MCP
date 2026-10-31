@@ -33,6 +33,16 @@ struct `Normalized source imports` {
     #expect(dof.count == 1)
     #expect(dof[0].effectiveFrom == "2026-09-29T00:00:00Z")
     #expect(dof[0].effectiveUntil == "2026-11-24T00:00:00Z")
+    let releaseDay = try #require(ISO8601DateFormatter().date(from: "2026-11-24T06:00:00Z"))
+    #expect(throws: SourceDiscoveryError.self) {
+      try SourceDiscovery.obstacles(html, at: releaseDay)
+    }
+    let posted = html.replacingOccurrences(
+      of: "<td>DOF (Next)</td>",
+      with: #"<td><a href="https://aeronav.faa.gov/Obst_Data/DOF_261122.zip">DOF</a></td>"#)
+    let preloaded = try SourceDiscovery.obstacles(posted, at: now)
+    #expect(preloaded.map(\.effectiveFrom) == ["2026-09-29T00:00:00Z", "2026-11-24T00:00:00Z"])
+    #expect(preloaded[1].effectiveUntil == "2027-01-19T00:00:00Z")
     #expect(throws: SourceDiscoveryError.self) {
       try SourceDiscovery.obstacles("<table><tr><td>unrecognized layout</td></tr></table>", at: now)
     }
