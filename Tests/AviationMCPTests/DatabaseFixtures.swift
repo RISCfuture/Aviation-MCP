@@ -101,6 +101,7 @@ extension `Transactional publication` {
     try await withApp { app in
       app.databases.use(try .postgres(url: url), as: .psql)
       let sql = try app.db.sqlDatabase()
+      try await Self.requireDisposableDatabase(sql)
       try await sql.raw("DROP SCHEMA public CASCADE").run()
       try await sql.raw("CREATE SCHEMA public").run()
       try await AviationSchema().prepare(on: app.db)
@@ -108,6 +109,17 @@ extension `Transactional publication` {
       try await SearchIndexes().prepare(on: app.db)
       try await operation(AviationStore(database: app.db))
     }
+  }
+
+  /// Refuses to reset any database whose name does not mark it as a test database.
+  static func requireDisposableDatabase(_ sql: any SQLDatabase) async throws {
+    struct CurrentDatabase: Decodable { let name: String }
+    let database = try #require(
+      try await sql.raw("SELECT current_database() AS name").first(decoding: CurrentDatabase.self))
+    try #require(
+      database.name.lowercased().contains("test"),
+      "TEST_DATABASE_URL names \(database.name); its schema is reset only when the name contains “test”."
+    )
   }
 
   static func version(_ source: SourceName) -> SourceVersion {
