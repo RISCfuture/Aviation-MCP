@@ -1,5 +1,5 @@
 {
-  "originHash" : "699c6e0e087d02caf6797342e54a8033ffc1e1a957969a807c92982c0b3989f9",
+  "originHash" : "cf2276650b61515a0b9129b05ba017c62a5997ff9832e539d278ed35a8c6026e",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -328,7 +328,7 @@
     {
       "identity" : "swift-numerics",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-numerics.git",
+      "location" : "https://github.com/apple/swift-numerics",
       "state" : {
         "revision" : "0c0290ff6b24942dadb83a929ffaaa1481df04a2",
         "version" : "1.1.1"
@@ -384,7 +384,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/RISCfuture/SwiftACD.git",
       "state" : {
-        "revision" : "2d01856fb7b78b11fe614e01b5c4c4483add09f6"
+        "revision" : "2d01856fb7b78b11fe614e01b5c4c4483add09f6",
+        "version" : "0.4.0"
       }
     },
     {
@@ -392,7 +393,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/RISCfuture/SwiftCIFP.git",
       "state" : {
-        "revision" : "d57301f98db1b850b9c57d823c7f7dcf996fc730"
+        "revision" : "d57301f98db1b850b9c57d823c7f7dcf996fc730",
+        "version" : "3.0.0"
       }
     },
     {
@@ -400,7 +402,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/RISCfuture/SwiftDOF.git",
       "state" : {
-        "revision" : "5afe24c34e7ee72c9f31ae8ac23e754bc6ba1217"
+        "revision" : "26e42501eadbc12d63d4c1f41f2bf8a157f51a85",
+        "version" : "3.0.0"
       }
     },
     {
@@ -408,7 +411,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/RISCfuture/SwiftGeographic.git",
       "state" : {
-        "revision" : "5b166c0730dc3dd7ba85242ab2696556202d73a9"
+        "revision" : "5b166c0730dc3dd7ba85242ab2696556202d73a9",
+        "version" : "1.1.0"
       }
     },
     {
@@ -416,7 +420,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/RISCfuture/SwiftMETAR.git",
       "state" : {
-        "revision" : "649e70912e0c1cc21c275545bd26af126bd79326"
+        "revision" : "649e70912e0c1cc21c275545bd26af126bd79326",
+        "version" : "5.0.0"
       }
     },
     {
@@ -424,7 +429,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/RISCfuture/SwiftNASR.git",
       "state" : {
-        "revision" : "52cbdb7399782a6a089da9ab99702acf59093923",
+        "revision" : "974fa36df8f34adc65f43f5267cfde5b8517d3dc",
         "version" : "5.0.1"
       }
     },

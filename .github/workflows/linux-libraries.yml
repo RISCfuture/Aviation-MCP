@@ -22,16 +22,16 @@ jobs:
           - SwiftMETAR
           - SwiftGeographic
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7.0.1
       - name: Pull Swift toolchain
-        run: docker pull swift:6.4.1-noble
+        run: docker pull swift:6.4-noble
       - name: Build pinned library
         run: scripts/verify-linux-libraries.sh "${LIBRARY}"
         env:
           LIBRARY: ${{ matrix.library }}
       - name: Preserve build evidence
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: linux-${{ matrix.library }}
           path: .build/linux-libraries/

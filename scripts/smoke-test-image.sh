@@ -5,7 +5,7 @@
 set -euo pipefail
 
 image=${1:?Supply the image to test}
-postgis_image=${SMOKE_POSTGIS_IMAGE:-postgis/postgis:17-3.5}
+postgis_image=${SMOKE_POSTGIS_IMAGE:-postgis/postgis:18-3.6}
 port=${SMOKE_PORT:-18080}
 privileges="$(dirname "$0")/database-privileges.sql"
 network="aviation-mcp-smoke-$$"

@@ -161,7 +161,7 @@ The runtime image packages pinned Python/Rasterio dependencies. For local work:
 ```sh
 pyenv virtualenv 3.14.10 aviation-mcp-terrain
 cd terrain
-python -m pip install -r requirements.txt ruff==0.17.3
+python -m pip install -r requirements.txt 'ruff>=0.17.3'
 python -m unittest discover -s tests -v
 python -m ruff check .
 python -m ruff format --check .

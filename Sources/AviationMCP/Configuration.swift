@@ -23,6 +23,7 @@ public func configure(_ app: Application) throws {
   app.migrations.add(IdentifierLookupIndex())
   app.migrations.add(SearchIndexes())
   guard settings.role == "serve" else {
+    app.lifecycle.use(IngestionDatabaseReadiness(database: app.db))
     app.asyncCommands.use(RemoteIngestionCommand(), as: "ingest-sources")
     app.asyncCommands.use(PublishCommand(), as: "publish-bundle")
     app.asyncCommands.use(PurgeCommand(), as: "purge")
@@ -172,6 +173,18 @@ private func databaseMetricsReport(store: AviationStore) async throws -> String 
       "aviation_source_available{source=\"\(source.rawValue)\"} \(snapshot.versions[source] == nil ? 0 : 1)\n"
   }
   return body
+}
+
+private struct IngestionDatabaseReadiness: LifecycleHandler {
+  let database: any Database
+
+  func willBootAsync(_ application: Application) async throws {
+    let sql = try database.sqlDatabase()
+    try await SQLConnectionAcquisition.run(retryDelays: Array(repeating: .seconds(1), count: 14)) {
+      try await sql.raw("SELECT 1").run()
+      return .success(())
+    }
+  }
 }
 
 private struct NOTAMRoleCheck: LifecycleHandler {

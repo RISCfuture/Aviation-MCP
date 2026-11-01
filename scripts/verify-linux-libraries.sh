@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly image="${SWIFT_IMAGE:-swift:6.4.1-noble}"
+readonly image="${SWIFT_IMAGE:-swift:6.4-noble}"
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly root
 readonly output="${VERIFICATION_OUTPUT:-$root/.build/linux-libraries}"

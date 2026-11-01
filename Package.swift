@@ -17,30 +17,30 @@ let package = Package(
   products: [.executable(name: "aviation-mcp", targets: ["Run"])],
   dependencies: [
     .package(
-      url: "https://github.com/RISCfuture/SwiftNASR.git", exact: "5.0.1"),
+      url: "https://github.com/RISCfuture/SwiftNASR.git", from: "5.0.1"),
     .package(
       url: "https://github.com/RISCfuture/SwiftCIFP.git",
-      revision: "d57301f98db1b850b9c57d823c7f7dcf996fc730"),
+      from: "3.0.0"),
     .package(
       url: "https://github.com/RISCfuture/SwiftDOF.git",
-      revision: "5afe24c34e7ee72c9f31ae8ac23e754bc6ba1217"),
+      from: "3.0.0"),
     .package(
       url: "https://github.com/RISCfuture/SwiftACD.git",
-      revision: "2d01856fb7b78b11fe614e01b5c4c4483add09f6"),
+      from: "0.4.0"),
     .package(
       url: "https://github.com/RISCfuture/SwiftMETAR.git",
-      revision: "649e70912e0c1cc21c275545bd26af126bd79326"),
+      from: "5.0.0"),
     .package(
       url: "https://github.com/RISCfuture/SwiftGeographic.git",
-      revision: "5b166c0730dc3dd7ba85242ab2696556202d73a9"),
+      from: "1.1.0"),
 
-    .package(url: "https://github.com/vapor/vapor.git", exact: "4.122.3"),
-    .package(url: "https://github.com/RISCfuture/StreamingCSV.git", exact: "3.0.0"),
-    .package(url: "https://github.com/weichsel/ZIPFoundation.git", exact: "0.9.20"),
-    .package(url: "https://github.com/vapor/fluent.git", exact: "4.13.0"),
-    .package(url: "https://github.com/vapor/fluent-postgres-driver.git", exact: "2.14.0"),
-    .package(url: "https://github.com/vapor/postgres-kit.git", exact: "2.17.0"),
-    .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", exact: "0.12.1")
+    .package(url: "https://github.com/vapor/vapor.git", from: "4.122.3"),
+    .package(url: "https://github.com/RISCfuture/StreamingCSV.git", from: "3.0.0"),
+    .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.20"),
+    .package(url: "https://github.com/vapor/fluent.git", from: "4.13.0"),
+    .package(url: "https://github.com/vapor/fluent-postgres-driver.git", from: "2.14.0"),
+    .package(url: "https://github.com/vapor/postgres-kit.git", from: "2.17.0"),
+    .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.12.1")
   ],
   targets: [
     .target(

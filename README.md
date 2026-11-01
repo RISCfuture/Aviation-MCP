@@ -19,7 +19,7 @@ These are single measurements, not latency guarantees.
 Install Docker and start its daemon, then run:
 
 ```sh
-docker pull swift:6.4.1-noble
+docker pull swift:6.4-noble
 scripts/verify-linux-libraries.sh
 ```
 

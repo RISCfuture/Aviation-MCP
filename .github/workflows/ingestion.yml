@@ -3,21 +3,21 @@ name: Source checks and ingestion
 on:
   pull_request:
     paths: &ingestion-paths
-      - '.github/workflows/ingestion.yml'
-      - 'Sources/AviationMCP/Data/SourceChecks.swift'
-      - 'Sources/AviationMCP/Data/SourceDiscovery.swift'
-      - 'scripts/CheckSource.swift'
-      - 'scripts/deployed-image.sh'
-      - 'scripts/run-ingestion-job.sh'
-      - 'scripts/ingest-checked-sources.sh'
-      - '.github/scripts/ingestion-*'
+      - ".github/workflows/ingestion.yml"
+      - "Sources/AviationMCP/Data/SourceChecks.swift"
+      - "Sources/AviationMCP/Data/SourceDiscovery.swift"
+      - "scripts/CheckSource.swift"
+      - "scripts/deployed-image.sh"
+      - "scripts/run-ingestion-job.sh"
+      - "scripts/ingest-checked-sources.sh"
+      - ".github/scripts/ingestion-*"
   push:
     branches: [main]
     paths: *ingestion-paths
   schedule:
     # .github/scripts/ingestion-plan.cjs recognizes each run by these expressions.
-    - cron: '17 */6 * * *'
-    - cron: '7,27,47 * * * *'
+    - cron: "17 */6 * * *"
+    - cron: "7,27,47 * * * *"
   workflow_dispatch:
     inputs:
       force:
@@ -41,10 +41,10 @@ jobs:
       ingest: ${{ steps.decide.outputs.ingest }}
       maintenance: ${{ steps.schedule.outputs.maintenance }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7.0.1
       - name: Plan this run
         id: schedule
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9.0.0
         with:
           script: |
             const { plan } = require('./.github/scripts/ingestion-plan.cjs');
@@ -57,7 +57,7 @@ jobs:
       - name: Look up the polled DOF release
         id: published
         if: steps.schedule.outputs.dofRelease != ''
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@v6.1.0
         with:
           path: reports/dof.json
           key: dof-published-${{ steps.schedule.outputs.dofRelease }}
@@ -80,24 +80,24 @@ jobs:
     if: needs.plan.outputs.check == 'true'
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
         with:
-          node-version: '24'
+          node-version: "26.13.0"
       - run: node --test .github/scripts/*.test.cjs
 
   check:
     needs: plan
     if: needs.plan.outputs.check == 'true'
     runs-on: ubuntu-24.04
-    container: swift:6.4.1-noble
+    container: swift:6.4-noble
     timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
         source: [nasr, cifp, dof, aircraft]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7.0.1
       - name: Compile source checker
         run: >-
           swiftc Sources/AviationMCP/Data/SourceDiscovery.swift
@@ -107,7 +107,7 @@ jobs:
         env:
           SOURCE: ${{ matrix.source }}
         run: /tmp/check-source "$SOURCE" "$SOURCE.json"
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v7.0.2
         with:
           name: source-${{ matrix.source }}
           path: ${{ matrix.source }}.json
@@ -121,7 +121,7 @@ jobs:
     outputs:
       reference: ${{ steps.serving.outputs.reference }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7.0.1
       - name: Resolve the image the server runs
         id: serving
         env:
@@ -146,8 +146,8 @@ jobs:
       AVIATION_INGEST_IMAGE: ${{ needs.image.outputs.reference }}
       SOURCE: ${{ matrix.source }}
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/download-artifact@v8
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/download-artifact@v8.0.2
         with:
           pattern: source-*
           path: checked
@@ -163,7 +163,7 @@ jobs:
       - name: Reuse the results of an identical earlier publication
         id: published
         if: ${{ !inputs.force }}
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@v6.1.0
         with:
           path: reports/${{ matrix.source }}.json
           key: ${{ steps.fingerprint.outputs.key }}
@@ -179,7 +179,7 @@ jobs:
         run: bash scripts/ingest-checked-sources.sh "$SOURCE" checked "reports/$SOURCE.json"
       - name: Remember the published releases
         if: steps.published.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v6
+        uses: actions/cache/save@v6.1.0
         with:
           path: reports/${{ matrix.source }}.json
           key: ${{ steps.fingerprint.outputs.key }}
@@ -192,11 +192,11 @@ jobs:
           >> "$GITHUB_OUTPUT"
       - name: Stop polling for the published DOF release
         if: steps.dof.outputs.release != ''
-        uses: actions/cache/save@v6
+        uses: actions/cache/save@v6.1.0
         with:
           path: reports/dof.json
           key: dof-published-${{ steps.dof.outputs.release }}
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v7.0.2
         if: always()
         with:
           name: ingestion-results-${{ matrix.source }}
@@ -209,7 +209,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7.0.1
       - name: Validate and publish terrain catalogs
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_INGEST_API_TOKEN }}
@@ -224,7 +224,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7.0.1
       - name: Purge expired data and caches
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_INGEST_API_TOKEN }}
@@ -241,13 +241,13 @@ jobs:
       actions: read
       issues: write
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/download-artifact@v8
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/download-artifact@v8.0.2
         with:
           pattern: source-*
           path: checked
           merge-multiple: true
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@v8.0.2
         with:
           pattern: ingestion-results-*
           path: reports
@@ -265,7 +265,7 @@ jobs:
       - name: Reuse the last published coverage
         id: cached-status
         if: steps.coverage.outputs.refresh != 'true'
-        uses: actions/cache/restore@v6
+        uses: actions/cache/restore@v6.1.0
         with:
           path: published-status.json
           key: published-status-${{ github.run_id }}-${{ github.run_attempt }}
@@ -284,13 +284,13 @@ jobs:
           --output published-status.json
       - name: Remember published coverage
         if: steps.status.outcome == 'success'
-        uses: actions/cache/save@v6
+        uses: actions/cache/save@v6.1.0
         with:
           path: published-status.json
           key: published-status-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Notify owner of failures, withheld releases and coverage gaps
         if: always()
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9.0.0
         env:
           CHECK_RESULT: ${{ needs.check.result }}
           IMAGE_RESULT: ${{ needs.image.result }}

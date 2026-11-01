@@ -52,14 +52,18 @@ struct `Transactional publication` {
     }
   }
 
-  @Test(arguments: [(true, 2), (false, 2), (true, 100)])
-  func `retries acquisition at most three times without replaying queries`(
-    beforeQuery: Bool, failures: Int
+  @Test(arguments: [
+    (true, 2, 2, 3), (false, 2, 2, 1), (true, 100, 2, 3), (true, 4, 4, 5), (false, 4, 4, 1)
+  ])
+  func `retries acquisition within its policy without replaying queries`(
+    beforeQuery: Bool, failures: Int, retries: Int, expectedAttempts: Int
   ) async throws {
     let attempts = ConnectionAttempts()
     var value: Int?
     do {
-      value = try await SQLConnectionAcquisition.run {
+      value = try await SQLConnectionAcquisition.run(
+        retryDelays: Array(repeating: .zero, count: retries)
+      ) {
         let attempt = await attempts.advance()
         guard attempt <= failures else { return .success(42) }
         if beforeQuery { throw ChannelError.ioOnClosedChannel }
@@ -68,8 +72,8 @@ struct `Transactional publication` {
     } catch {
       #expect(error is ChannelError)
     }
-    #expect(await attempts.count == (beforeQuery ? 3 : 1))
-    #expect(value == (beforeQuery && failures == 2 ? 42 : nil))
+    #expect(await attempts.count == expectedAttempts)
+    #expect(value == (beforeQuery && failures < expectedAttempts ? 42 : nil))
   }
 
   @Test

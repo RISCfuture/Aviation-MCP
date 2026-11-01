@@ -2,9 +2,9 @@
   "name": "aviation-mcp-site",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@12.4.2",
+  "packageManager": "pnpm@12.16.1",
   "engines": {
-    "node": ">=26.7.0"
+    "node": ">=26.13.0"
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
@@ -20,22 +20,23 @@
     "types": "wrangler types"
   },
   "dependencies": {
-    "@fontsource-variable/space-grotesk": "^5.2.10",
-    "@fontsource/ibm-plex-mono": "^5.2.7"
+    "@fontsource-variable/space-grotesk": "^5.3.0",
+    "@fontsource/ibm-plex-mono": "^5.3.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@playwright/test": "^1.63.0",
-    "@types/node": "^26.6.1",
-    "eslint": "^10.10.0",
-    "globals": "^17.11.0",
-    "prettier": "^3.9.6",
-    "stylelint": "^17.15.0",
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^26.6.6",
+    "@typescript/native": "npm:typescript@^7.0.2",
+    "eslint": "^10.14.0",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.10",
+    "stylelint": "^17.16.0",
     "stylelint-config-standard": "^40.0.0",
-    "typescript": "^6.0.3",
-    "typescript-eslint": "^8.70.0",
-    "vite": "^8.3.0",
-    "vitest": "^4.1.11",
-    "wrangler": "^4.132.0"
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "typescript-eslint": "^8.72.1",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5",
+    "wrangler": "^4.156.0"
   }
 }

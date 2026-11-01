@@ -1,10 +1,10 @@
 import PostgresKit
 
 enum SQLConnectionAcquisition {
-  private static let delays: [Duration] = [.milliseconds(500), .seconds(1)]
   private static let retryWindow: Duration = .seconds(15)
 
   static func run<Value: Sendable>(
+    retryDelays: [Duration] = [.milliseconds(500), .seconds(1)],
     _ acquire: @Sendable () async throws -> Result<Value, any Error>
   ) async throws -> Value {
     let deadline = ContinuousClock.now.advanced(by: retryWindow)
@@ -15,10 +15,10 @@ enum SQLConnectionAcquisition {
       do {
         outcome = try await acquire()
       } catch {
-        guard failures < delays.count, isTransient(error),
-          ContinuousClock.now.advanced(by: delays[failures]) < deadline
+        guard failures < retryDelays.count, isTransient(error),
+          ContinuousClock.now.advanced(by: retryDelays[failures]) < deadline
         else { throw error }
-        try await Task.sleep(for: delays[failures])
+        try await Task.sleep(for: retryDelays[failures])
         failures += 1
         continue
       }

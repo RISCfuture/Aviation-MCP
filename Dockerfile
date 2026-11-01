@@ -1,4 +1,4 @@
-FROM swift:6.4.1-noble AS build
+FROM swift:6.4-noble AS build
 ARG SWIFT_BUILD_JOBS=1
 WORKDIR /workspace
 COPY Package.swift Package.resolved ./
@@ -14,8 +14,8 @@ RUN --mount=type=cache,id=aviation-swift-6.4.1,target=/workspace/.build,sharing=
     && find -L "$bin_dir" -maxdepth 1 -type d \
         \( -name '*.resources' -o -name '*.bundle' \) -exec cp -R '{}' /output/ ';'
 
-FROM swift:6.4.1-noble-slim AS runtime
-# Use the distribution's patched Python runtime with pinned application packages.
+FROM swift:6.4-noble-slim AS runtime
+# Use the distribution's patched Python runtime with application packages from terrain/requirements.txt.
 # hadolint ignore=DL3008
 RUN apt-get update \
     && apt-get install -y --no-install-recommends python3-venv ca-certificates \
