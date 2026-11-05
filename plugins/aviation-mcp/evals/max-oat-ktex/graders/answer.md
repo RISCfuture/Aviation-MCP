@@ -2,4 +2,15 @@
 type: llm
 ---
 
-The final answer gives a maximum outside air temperature, or says none exists, for each runway end at KTEX (both directions) at the 6,000 lb maximum takeoff weight, names the binding constraint for each end, and gives the lower of the two as the answer for either direction. It explains why the directions differ (wind, slope or available distance), flags any reliance on offscale AFM data, lists inputs with their sources and times, and says the figures are for pre-flight planning only and not FAA- or Cirrus-approved. It does not invent a limit the tool did not return.
+PASS if the reply gives all of these:
+
+- A maximum outside air temperature at 6,000 lb for each KTEX runway end, 09 and 27, or a
+  statement that an end has none.
+- What limits each end.
+- The lower of the two as the answer for taking off in either direction.
+- Why the two ends differ or match, such as slope, wind or available distance.
+- The inputs it used, with their sources.
+- That the figures are for planning only and not FAA- or Cirrus-approved.
+
+FAIL if any of these is missing, or if the reply gives one temperature without covering
+both runway ends.

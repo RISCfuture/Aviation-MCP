@@ -2,4 +2,15 @@
 type: llm
 ---
 
-The final answer gives the SF50 ground run and the total takeoff distance over a 50 ft obstacle for KOAK runway 28R, compares them with the available runway (TORA and TODA) with margins, and lists each correction factor (such as wind, slope or surface) with its multiplier as returned by the tool. It states the UTC time used for "in 18 hours", lists the inputs with their sources (for example NASR, TAF, Open-Meteo), says the temperature is modeled because the TAF has none, and says the figures are for pre-flight planning only and not for cockpit use. It does not present numbers the tools did not return.
+PASS if the reply gives all of these:
+
+- The SF50 ground run and the total takeoff distance over a 50 ft obstacle for KOAK
+  runway 28R, in feet.
+- The available takeoff run and takeoff distance (TORA and TODA), with the margin left.
+- At least one correction factor (such as wind, slope or surface) with its multiplier.
+- The UTC time it used for "in 18 hours".
+- Where the temperature came from, saying it is modeled because the TAF carries none.
+- That the figures are for pre-flight planning only.
+
+FAIL if any of these is missing, or if the reply calls the figures approved or fit for
+cockpit use.
