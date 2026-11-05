@@ -1,5 +1,5 @@
 {
-  "originHash" : "cf2276650b61515a0b9129b05ba017c62a5997ff9832e539d278ed35a8c6026e",
+  "originHash" : "e89643e9f8360a28727bc03e5d8c7b5e3d7feb994f79b289053cf7032281a5d8",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -47,6 +47,15 @@
       }
     },
     {
+      "identity" : "defaults",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/sindresorhus/Defaults",
+      "state" : {
+        "revision" : "00a7465a0668a87fa159e779b9d80f1f9652357e",
+        "version" : "9.0.9"
+      }
+    },
+    {
       "identity" : "eventsource",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/mattt/eventsource.git",
@@ -83,6 +92,15 @@
       }
     },
     {
+      "identity" : "measurementkit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/RISCfuture/MeasurementKit.git",
+      "state" : {
+        "revision" : "20c908d2ccefc152dfdc646f9b71b10e8f635822",
+        "version" : "1.2.1"
+      }
+    },
+    {
       "identity" : "multipart-kit",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/multipart-kit.git",
@@ -116,6 +134,15 @@
       "state" : {
         "revision" : "1a10ccea61e4248effd23b6e814999ce7bdf0ee0",
         "version" : "4.9.3"
+      }
+    },
+    {
+      "identity" : "sf50-performance",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/SF50-TOLD/SF50-Performance.git",
+      "state" : {
+        "revision" : "49cdd9111fbc7dffbec6bbf8f9411b8c82aee679",
+        "version" : "1.0.0"
       }
     },
     {

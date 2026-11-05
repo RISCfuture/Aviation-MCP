@@ -33,6 +33,8 @@ let package = Package(
     .package(
       url: "https://github.com/RISCfuture/SwiftGeographic.git",
       from: "1.1.0"),
+    .package(url: "https://github.com/SF50-TOLD/SF50-Performance.git", exact: "1.0.0"),
+    .package(url: "https://github.com/RISCfuture/MeasurementKit.git", from: "1.2.1"),
 
     .package(url: "https://github.com/vapor/vapor.git", from: "4.122.3"),
     .package(url: "https://github.com/RISCfuture/StreamingCSV.git", from: "3.0.0"),
@@ -54,6 +56,8 @@ let package = Package(
         .product(name: "SwiftACD", package: "SwiftACD"),
         .product(name: "SwiftMETAR", package: "SwiftMETAR"),
         .product(name: "SwiftGeographic", package: "SwiftGeographic"),
+        .product(name: "SF50Performance", package: "SF50-Performance"),
+        .product(name: "MeasurementKit", package: "MeasurementKit"),
         .product(name: "Vapor", package: "vapor"),
         .product(name: "Fluent", package: "fluent"),
         .product(name: "FluentPostgresDriver", package: "fluent-postgres-driver"),
@@ -69,7 +73,12 @@ let package = Package(
     ),
     .testTarget(
       name: "AviationMCPTests",
-      dependencies: ["AviationMCP", .product(name: "VaporTesting", package: "vapor")],
+      dependencies: [
+        "AviationMCP",
+        .product(name: "MeasurementKit", package: "MeasurementKit"),
+        .product(name: "SF50Performance", package: "SF50-Performance"),
+        .product(name: "VaporTesting", package: "vapor")
+      ],
       resources: [.copy("Fixtures")],
       swiftSettings: swiftSettings
     )

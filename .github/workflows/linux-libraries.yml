@@ -21,6 +21,8 @@ jobs:
           - SwiftACD
           - SwiftMETAR
           - SwiftGeographic
+          - SF50-Performance
+          - MeasurementKit
     steps:
       - uses: actions/checkout@v7.0.1
       - name: Pull Swift toolchain
