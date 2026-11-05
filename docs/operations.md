@@ -58,7 +58,8 @@ The dedicated `aviation_mcp_notams` role can read only `notams` and
 | `OPEN_METEO_MONTH_LIMIT` | `300000` |
 
 Domain groups are `airports`, `navigation`, `airspace`, `procedures`,
-`obstacles`, `aircraft`, `weather`, `notams`, `geography`, and `status`.
+`obstacles`, `aircraft`, `weather`, `notams`, `geography`, `status`, `terrain`,
+and `performance`.
 Enabling `notams` requires its connection URL. A client cannot enable an
 operator-disabled weather provider.
 

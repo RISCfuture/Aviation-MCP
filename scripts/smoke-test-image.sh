@@ -13,7 +13,7 @@ database="$network-db" server="$network-serve" refused="$network-refused"
 owner_url="postgres://postgres:smoke@$database:5432/aviation?sslmode=disable"
 serving_url="postgres://aviation_serve:smoke@$database:5432/aviation?sslmode=disable"
 # NOTAMs need their own database, so they are the one group left out.
-groups=airports,navigation,airspace,procedures,obstacles,aircraft,weather,geography,status,terrain
+groups=airports,navigation,airspace,procedures,obstacles,aircraft,weather,geography,status,terrain,performance
 
 # shellcheck disable=SC2329 # Invoked by the EXIT trap.
 cleanup() {

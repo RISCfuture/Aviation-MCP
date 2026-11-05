@@ -8,7 +8,7 @@ kill_timeout = "35s"
 
 [env]
   APP_ROLE = "serve"
-  AVIATION_GROUPS = "airports,navigation,airspace,procedures,obstacles,aircraft,weather,notams,geography,status,terrain"
+  AVIATION_GROUPS = "airports,navigation,airspace,procedures,obstacles,aircraft,weather,notams,geography,status,terrain,performance"
   PORT = "8080"
   MCP_ALLOWED_ORIGINS = "https://aviation-mcp.org"
   MCP_TIMEOUT_SECONDS = "30"

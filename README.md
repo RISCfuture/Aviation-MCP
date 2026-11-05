@@ -3,7 +3,7 @@
 Swift 6.4/Vapor aviation server using the official MCP SDK's stateless Streamable
 HTTP transport at **<https://aviation-mcp.org/mcp>**.
 
-The server exposes 17 tools for airports, navigation, airspace, procedures,
+The server exposes 21 tools for airports, navigation, airspace, procedures,
 obstacles, aircraft, weather, NOTAMs, geography, terrain and source status.
 Recoverable parsing errors retain valid records and flag partial coverage.
 Complete source coverage and all five original acceptance cases have not yet
