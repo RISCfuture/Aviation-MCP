@@ -64,8 +64,8 @@ due to the account's weekly usage limit. Neither listing is approved or publishe
    claude plugin eval . --allow-tools 'mcp__plugin_aviation-mcp_aviation__*'
    ```
 
-4. Validate the skills with `skills-ref validate plugins/aviation-mcp/skills/<name>` for
-   each skill, if `skills-ref` is installed.
+4. Validate each skill with `agentskills validate plugins/aviation-mcp/skills/<name>`. The
+   command comes from the `skills-ref` package (`pipx install skills-ref`).
 5. Run `scripts/package-plugins.sh`.
 6. From the repository root, install from the local marketplace and try one example
    question through a skill:
