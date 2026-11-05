@@ -20,7 +20,8 @@ struct MCPGateway: Sendable {
     is ambiguous, pass the record_id of one candidate. Every result names its source cycles \
     and completeness, and expired data is never returned: a source without an effective \
     release is reported as unavailable with the reason. Error text begins with the error code. \
-    Not for operational navigation.
+    The sf50_* tools are pre-flight planning aids for the Cirrus SF50, not approved performance \
+    data. Not for operational navigation.
     """
 
   let origins: [String]

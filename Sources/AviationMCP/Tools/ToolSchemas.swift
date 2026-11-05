@@ -47,15 +47,15 @@ enum ToolSchemas {
     }
   }
 
-  fileprivate static func described(_ schema: [String: Value], _ description: String) -> Value {
+  static func described(_ schema: [String: Value], _ description: String) -> Value {
     .object(schema.merging(["description": .string(description)]) { $1 })
   }
 
-  fileprivate static func text(_ description: String) -> Value {
+  static func text(_ description: String) -> Value {
     described(textSchema.objectValue ?? [:], description)
   }
 
-  fileprivate static func number(_ range: ClosedRange<Double>, _ description: String) -> Value {
+  static func number(_ range: ClosedRange<Double>, _ description: String) -> Value {
     described(
       [
         "type": "number", "minimum": .double(range.lowerBound), "maximum": .double(range.upperBound)
@@ -63,11 +63,11 @@ enum ToolSchemas {
       description)
   }
 
-  fileprivate static func boolean(_ description: String) -> Value {
+  static func boolean(_ description: String) -> Value {
     described(["type": "boolean"], description)
   }
 
-  fileprivate static func date(_ description: String) -> Value {
+  static func date(_ description: String) -> Value {
     described(["type": "string", "format": "date-time"], description)
   }
 
@@ -81,7 +81,7 @@ enum ToolSchemas {
       ], description)
   }
 
-  fileprivate static func choice(_ values: [String], _ description: String) -> Value {
+  static func choice(_ values: [String], _ description: String) -> Value {
     described(enumeration(values).objectValue ?? [:], description)
   }
 
@@ -98,6 +98,7 @@ extension ToolDefinition {
     case .queryNOTAMs: ["start", "end"]
     case .computeGeometry: ["operation"]
     case .queryTerrain: ["route", "half_width_nm"]
+    case .takeoffPerformance, .landingPerformance, .climbProfile, .takeoffLimits: sf50Required
     default: []
     }
   }
@@ -122,6 +123,7 @@ extension ToolDefinition {
     case .computeGeometry: Geography.computation
     case .queryTerrain: Terrain.query
     case .getDataStatus: [:]
+    case .takeoffPerformance, .landingPerformance, .climbProfile, .takeoffLimits: sf50Parameters
     }
   }
 }

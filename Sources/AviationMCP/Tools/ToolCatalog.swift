@@ -58,9 +58,7 @@ struct ToolCatalog: Sendable {
   ) async throws -> ToolResult {
     switch tool {
     case .getDataStatus: return try await status()
-    case .queryTerrain:
-      guard let terrain else { throw TerrainFailure(reason: "Terrain is not configured.") }
-      return try await terrain.query(arguments)
+    case .queryTerrain: return try await queryTerrain(arguments)
     case .convertCoordinates: return try GeometryTools.convert(arguments)
     case .computeGeometry:
       return try await GeometryTools(database: store.database).compute(arguments)
@@ -71,8 +69,17 @@ struct ToolCatalog: Sendable {
         throw StorageError.invalidImport("The NOTAM database is not configured.")
       }
       return try await notams.search(arguments, area: NOTAMArea.resolve(arguments, store: store))
-    default: return try await periodic(tool, arguments: arguments)
+    case .takeoffPerformance, .landingPerformance, .climbProfile, .takeoffLimits:
+      return try await PerformanceTools(store: store, weather: weather).call(tool, arguments)
+    case .findAirports, .getAirport, .findNavigation, .getAirway, .findRoutes, .queryAirspace,
+      .findProcedures, .getProcedure, .queryObstacles, .getAircraft:
+      return try await periodic(tool, arguments: arguments)
     }
+  }
+
+  private func queryTerrain(_ arguments: ToolArguments) async throws -> ToolResult {
+    guard let terrain else { throw TerrainFailure(reason: "Terrain is not configured.") }
+    return try await terrain.query(arguments)
   }
 
   private func periodic(

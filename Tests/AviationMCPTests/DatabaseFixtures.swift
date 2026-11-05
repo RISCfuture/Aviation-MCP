@@ -142,6 +142,33 @@ extension `Transactional publication` {
     ]
     return airport
   }
+
+  /// The mixed-runway airport with a paved runway 10L/28R as well. 28R publishes its elevation,
+  /// heading, slope and declared distances; 10L publishes only its threshold, so its heading,
+  /// slope and distances are derived.
+  static func airportWithRunwayEnds(_ version: SourceVersion) -> AviationRecord {
+    var airport = airportWithMixedRunways(version)
+    airport.elevationMSLFeet = 9
+    airport.geometry = Normalization.point(latitude: 37.72, longitude: -122.22)
+    let east = Normalization.point(latitude: 37.70, longitude: -122.20)
+    let west = Normalization.point(latitude: 37.71, longitude: -122.23)
+    let runway: Value = .object([
+      "identifier": "10L/28R", "length_ft": 10_000, "paved": true, "materials": ["ASPH"],
+      "ends": [
+        .object([
+          "identifier": "28R", "threshold": east, "departure_end": west,
+          "threshold_elevation_msl_ft": 6, "heading_true_deg": 295, "gradient_percent": 0.1,
+          "tora_ft": 10_000, "toda_ft": 10_500, "lda_ft": 9_000
+        ]),
+        .object([
+          "identifier": "10L", "threshold": west, "departure_end": east,
+          "threshold_elevation_msl_ft": 16
+        ])
+      ]
+    ])
+    airport.data["runways"] = .array((airport.data["runways"]?.arrayValue ?? []) + [runway])
+    return airport
+  }
 }
 
 extension `Transactional publication` {

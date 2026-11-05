@@ -2,7 +2,7 @@ import MCP
 
 enum DomainGroup: String, CaseIterable, Sendable {
   case airports, navigation, airspace, procedures, obstacles, aircraft, weather, notams, geography,
-    status, terrain
+    status, terrain, performance
 }
 
 enum ToolDefinition: String, CaseIterable, Sendable {
@@ -23,6 +23,10 @@ enum ToolDefinition: String, CaseIterable, Sendable {
   case computeGeometry = "compute_geometry"
   case getDataStatus = "get_data_status"
   case queryTerrain = "query_terrain"
+  case takeoffPerformance = "sf50_takeoff_performance"
+  case landingPerformance = "sf50_landing_performance"
+  case climbProfile = "sf50_climb_profile"
+  case takeoffLimits = "sf50_takeoff_limits"
 
   var group: DomainGroup {
     switch self {
@@ -37,6 +41,7 @@ enum ToolDefinition: String, CaseIterable, Sendable {
     case .convertCoordinates, .computeGeometry: .geography
     case .getDataStatus: .status
     case .queryTerrain: .terrain
+    case .takeoffPerformance, .landingPerformance, .climbProfile, .takeoffLimits: .performance
     }
   }
 
@@ -95,8 +100,29 @@ enum ToolDefinition: String, CaseIterable, Sendable {
     case .queryTerrain:
       "Find native-cell terrain maxima within a coordinate route corridor, "
         + "with optional conservative supplied-gradient comparison in EGM2008."
+    case .takeoffPerformance:
+      "Cirrus SF50 Vision Jet takeoff ground run and distance over a 50 ft screen, with the wind, "
+        + "slope and surface corrections applied, takeoff climb gradient, margins against the "
+        + "runway, an optional obstacle and AFM limitation notes. Runway data and weather are "
+        + "looked up and can be overridden. \(Self.planningOnly)"
+    case .landingPerformance:
+      "Cirrus SF50 Vision Jet landing Vref, ground run and distance from 50 ft, with corrections "
+        + "for wind, slope, surface and runway contamination, the AFM go-around climb gradient, "
+        + "margins against the runway and AFM limitation notes. \(Self.planningOnly)"
+    case .climbProfile:
+      "Cirrus SF50 Vision Jet climb gradient and rate by altitude from the field to a top "
+        + "altitude, for the takeoff (91 KIAS), enroute-obstacle (120 KIAS) and enroute climb "
+        + "schedules with and without ice protection, using forecast winds aloft. Gives ground "
+        + "gradients along a course and a minimum gradient for query_terrain. \(Self.planningOnly)"
+    case .takeoffLimits:
+      "Cirrus SF50 Vision Jet maximum takeoff weight, or maximum outside air temperature at a "
+        + "weight, for one runway end or every end of an airport, with the constraint that "
+        + "limits each. \(Self.planningOnly)"
     }
   }
+
+  private static let planningOnly =
+    "For pre-flight planning only, not for cockpit use; not FAA- or Cirrus-approved."
 
   var title: String {
     switch self {
@@ -117,6 +143,10 @@ enum ToolDefinition: String, CaseIterable, Sendable {
     case .computeGeometry: "Compute distance and bearings"
     case .getDataStatus: "Get data availability and cycles"
     case .queryTerrain: "Query terrain elevations"
+    case .takeoffPerformance: "Calculate SF50 takeoff performance"
+    case .landingPerformance: "Calculate SF50 landing performance"
+    case .climbProfile: "Calculate SF50 climb profile"
+    case .takeoffLimits: "Calculate SF50 takeoff limits"
     }
   }
 
@@ -125,13 +155,13 @@ enum ToolDefinition: String, CaseIterable, Sendable {
       name: rawValue, title: title, description: description, inputSchema: ToolSchemas.input(self),
       annotations: .init(
         title: title, readOnlyHint: true, destructiveHint: false, idempotentHint: true,
-        openWorldHint: group == .weather || group == .notams || group == .terrain),
+        openWorldHint: [.weather, .notams, .terrain, .performance].contains(group)),
       outputSchema: ToolSchemas.output)
   }
 
   var periodicSources: [SourceName] {
     switch group {
-    case .airports, .navigation: [.nasr]
+    case .airports, .navigation, .performance: [.nasr]
     case .airspace: [.nasr, .cifp]
     case .procedures: [.cifp]
     case .obstacles: [.dof]
