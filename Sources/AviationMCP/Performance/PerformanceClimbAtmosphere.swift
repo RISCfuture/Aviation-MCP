@@ -47,9 +47,10 @@ struct ClimbAtmosphere {
       return
     }
     if overrides.temperatureC == nil, !forecast.isEmpty {
-      observations = forecast
+      observations = Self.fromField(
+        forecast, surfaceTemperatureC: temperatureC?.value, fieldFt: fieldElevationFt)
       column = Sourced("forecast", .openMeteo, time: levelsTime)
-      surfaceTemperatureC = nil
+      surfaceTemperatureC = temperatureC
       return
     }
     let calm = Self.calmColumn(
@@ -106,25 +107,35 @@ struct ClimbAtmosphere {
   }
 
   /// The forecast levels with their temperatures replaced by the standard atmosphere shifted to
-  /// the surface temperature, and a surface level carrying the lowest level's wind.
+  /// the surface temperature, beginning at the field.
   private static func shifted(
     _ forecast: [ClimbProfileGenerator.WindsAloftObservation], surfaceTemperatureC: Double,
     fieldFt: Double
   ) -> [ClimbProfileGenerator.WindsAloftObservation] {
     let deviation = surfaceTemperatureC - isaTemperature(altitudeFt: fieldFt)
-    var levels = forecast.map {
+    let levels = forecast.map {
       ClimbProfileGenerator.WindsAloftObservation(
         altitudeFt: $0.altitudeFt,
         temperatureC: isaTemperature(altitudeFt: $0.altitudeFt) + deviation,
         windDirectionDeg: $0.windDirectionDeg, windSpeedKts: $0.windSpeedKts)
     }
-    if let lowest = forecast.first, lowest.altitudeFt > fieldFt {
-      levels.insert(
-        .init(
-          altitudeFt: fieldFt, temperatureC: surfaceTemperatureC,
-          windDirectionDeg: lowest.windDirectionDeg, windSpeedKts: lowest.windSpeedKts), at: 0)
-    }
-    return levels
+    return fromField(levels, surfaceTemperatureC: surfaceTemperatureC, fieldFt: fieldFt)
+  }
+
+  /// The levels with one at the field beneath them, where the lowest is above it: the field
+  /// level carries the surface temperature, or the lowest level's deviation from the standard
+  /// atmosphere when none is known, and the lowest level's wind.
+  private static func fromField(
+    _ levels: [ClimbProfileGenerator.WindsAloftObservation], surfaceTemperatureC: Double?,
+    fieldFt: Double
+  ) -> [ClimbProfileGenerator.WindsAloftObservation] {
+    guard let lowest = levels.first, lowest.altitudeFt > fieldFt else { return levels }
+    let deviation = lowest.temperatureC - isaTemperature(altitudeFt: lowest.altitudeFt)
+    let field = ClimbProfileGenerator.WindsAloftObservation(
+      altitudeFt: fieldFt,
+      temperatureC: surfaceTemperatureC ?? isaTemperature(altitudeFt: fieldFt) + deviation,
+      windDirectionDeg: lowest.windDirectionDeg, windSpeedKts: lowest.windSpeedKts)
+    return [field] + levels
   }
 
   private static func observation(_ level: MCP.Value) -> ClimbProfileGenerator

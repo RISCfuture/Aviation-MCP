@@ -352,13 +352,13 @@ private enum PackageFigures {
     ]
   }
 
-  /// A G2+ climb profile at 5,800 lb in the fixture forecast's two pressure levels.
+  /// A G2+ climb profile at 5,800 lb from the field, at the METAR's temperature and the lowest
+  /// level's wind, through the fixture forecast's two pressure levels.
   static func forecastClimb() throws -> ClimbProfile {
-    func feet(meters: Double) -> Double {
-      Measurement(value: meters, unit: UnitLength.meters).converted(to: .feet).value
-    }
+    func feet(meters: Double) -> Double { meters / 0.304_8 }
     return try ClimbProfileGenerator.generate(
       windsAloft: [
+        .init(altitudeFt: 6, temperatureC: 15, windDirectionDeg: 290, windSpeedKts: 20),
         .init(
           altitudeFt: feet(meters: 780), temperatureC: 12, windDirectionDeg: 290,
           windSpeedKts: 20),
