@@ -1,0 +1,22 @@
+{
+  "name": "aviation-mcp",
+  "version": "1.1.0",
+  "description": "Query U.S. aviation data, worldwide terrain and Cirrus SF50 performance with source cycles, provenance, and explicit coverage gaps.",
+  "author": {
+    "name": "Tim Morgan",
+    "url": "https://aviation-mcp.org"
+  },
+  "homepage": "https://aviation-mcp.org",
+  "repository": "https://github.com/RISCfuture/Aviation-MCP",
+  "privacyPolicyUrl": "https://aviation-mcp.org/privacy/",
+  "license": "MIT",
+  "keywords": [
+    "aviation",
+    "airports",
+    "weather",
+    "notams",
+    "terrain",
+    "performance",
+    "sf50"
+  ]
+}

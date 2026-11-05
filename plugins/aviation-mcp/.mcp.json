@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "aviation": {
+      "type": "http",
+      "url": "https://aviation-mcp.org/mcp"
+    }
+  }
+}
