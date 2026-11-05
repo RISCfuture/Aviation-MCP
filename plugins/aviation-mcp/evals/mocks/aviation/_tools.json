@@ -1,0 +1,1542 @@
+{
+  "tools": [
+    {
+      "name": "find_airports",
+      "description": "Search current FAA airports by identifier, name, position, runway length or surface. Records include runways, elevation in feet MSL and CTAF/UNICOM frequencies.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "description": "nextCursor from the previous page; repeat every other argument unchanged.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "facility_type": {
+            "description": "Landing facility type.",
+            "enum": [
+              "AIRPORT",
+              "BALLOONPORT",
+              "SEAPLANE BASE",
+              "GLIDERPORT",
+              "HELIPORT",
+              "ULTRALIGHT"
+            ],
+            "type": "string"
+          },
+          "identifier": {
+            "description": "Airport identifier: FAA location identifier or ICAO code, such as SQL or KSQL.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "latitude": {
+            "description": "Latitude in decimal degrees (WGS84); north is positive. Requires longitude.",
+            "maximum": 90,
+            "minimum": -90,
+            "type": "number"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Maximum records per page, 1–200. Defaults to 50.",
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "longitude": {
+            "description": "Longitude in decimal degrees (WGS84); east is positive, so U.S. longitudes are negative. Requires latitude.",
+            "maximum": 180,
+            "minimum": -180,
+            "type": "number"
+          },
+          "minimum_runway_length_ft": {
+            "description": "Require a runway at least this many feet long.",
+            "maximum": 30000,
+            "minimum": 0,
+            "type": "number"
+          },
+          "order": {
+            "description": "nearest sorts by distance from latitude/longitude, which it requires, and is the default when they are given; identifier sorts alphabetically and is the default otherwise.",
+            "enum": [
+              "identifier",
+              "nearest"
+            ],
+            "type": "string"
+          },
+          "paved": {
+            "description": "Require a runway with a paved (true) or unpaved (false) surface. With minimum_runway_length_ft, the same runway must satisfy both.",
+            "type": "boolean"
+          },
+          "public_use": {
+            "description": "true returns only public-use airports; false only private-use airports.",
+            "type": "boolean"
+          },
+          "query": {
+            "description": "Case-insensitive substring of the airport identifier or name. At least 3 characters.",
+            "maxLength": 16384,
+            "minLength": 3,
+            "type": "string"
+          },
+          "radius_nm": {
+            "default": 5,
+            "description": "Search radius in nautical miles around the spatial context. Defaults to 5.",
+            "maximum": 500,
+            "minimum": 0.01,
+            "type": "number"
+          }
+        },
+        "required": [],
+        "type": "object"
+      }
+    },
+    {
+      "name": "get_airport",
+      "description": "Get one airport and its runways by FAA location identifier or ICAO code (SQL or KSQL). An identifier shared by several airports returns candidates; select one with record_id.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "identifier": {
+            "description": "Airport identifier: FAA location identifier or ICAO code, such as SQL or KSQL.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "record_id": {
+            "description": "The id of one record from an earlier result, to select a single candidate.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "identifier"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "find_navigation",
+      "description": "Find navaids, fixes, ILS facilities, holds, flight service stations and AWOS/ASOS stations in the current cycle by identifier, name or position.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "airport": {
+            "description": "Airport of ILS and FSS records, as an FAA location identifier or ICAO code.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "cursor": {
+            "description": "nextCursor from the previous page; repeat every other argument unchanged.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "identifier": {
+            "description": "Exact identifier of a navaid (SFO), fix (GOSHI), ILS facility, hold, FSS or AWOS.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "kinds": {
+            "description": "Record kinds to search. Defaults to all: navaid, fix, ils, hold, fss, awos.",
+            "items": {
+              "enum": [
+                "navaid",
+                "fix",
+                "ils",
+                "hold",
+                "fss",
+                "awos"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "latitude": {
+            "description": "Latitude in decimal degrees (WGS84); north is positive. Requires longitude.",
+            "maximum": 90,
+            "minimum": -90,
+            "type": "number"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Maximum records per page, 1–200. Defaults to 50.",
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "longitude": {
+            "description": "Longitude in decimal degrees (WGS84); east is positive, so U.S. longitudes are negative. Requires latitude.",
+            "maximum": 180,
+            "minimum": -180,
+            "type": "number"
+          },
+          "order": {
+            "description": "nearest sorts by distance from latitude/longitude, which it requires, and is the default when they are given; identifier sorts alphabetically and is the default otherwise.",
+            "enum": [
+              "identifier",
+              "nearest"
+            ],
+            "type": "string"
+          },
+          "query": {
+            "description": "Case-insensitive substring of the record identifier or name. At least 3 characters.",
+            "maxLength": 16384,
+            "minLength": 3,
+            "type": "string"
+          },
+          "radius_nm": {
+            "default": 5,
+            "description": "Search radius in nautical miles around the spatial context. Defaults to 5.",
+            "maximum": 500,
+            "minimum": 0.01,
+            "type": "number"
+          }
+        },
+        "required": [],
+        "type": "object"
+      }
+    },
+    {
+      "name": "get_airway",
+      "description": "Get an airway's ordered fixes with MEA, MOCA, distance and magnetic course per segment. Supply entry_fix and exit_fix to return only that portion, in travel order.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "entry_fix": {
+            "description": "Fix or navaid identifier where the returned portion starts. Requires exit_fix.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "exit_fix": {
+            "description": "Fix or navaid identifier where the returned portion ends. Requires entry_fix.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "identifier": {
+            "description": "Airway designation, such as V25, J80 or T319.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "include_geometry": {
+            "default": false,
+            "description": "Include line and polygon GeoJSON geometry, which can be large. Point positions are always included. Defaults to false.",
+            "type": "boolean"
+          },
+          "record_id": {
+            "description": "The id of one record from an earlier result, to select a single candidate.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "identifier"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "find_routes",
+      "description": "Find preferred IFR routes and coded departure routes by origin, destination or identifier; airport matches either end.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "airport": {
+            "description": "Airport at either end of the route, as an FAA location identifier or ICAO code.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "cursor": {
+            "description": "nextCursor from the previous page; repeat every other argument unchanged.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "destination": {
+            "description": "Arrival airport, as an FAA location identifier or ICAO code.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "identifier": {
+            "description": "Coded departure route code or preferred route designator.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "kinds": {
+            "description": "Record kinds to search. Defaults to all: preferred_route, coded_departure_route.",
+            "items": {
+              "enum": [
+                "preferred_route",
+                "coded_departure_route"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Maximum records per page, 1–200. Defaults to 50.",
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "origin": {
+            "description": "Departure airport, as an FAA location identifier or ICAO code.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "query": {
+            "description": "Case-insensitive substring of the route identifier or name, such as a destination identifier. At least 3 characters.",
+            "maxLength": 16384,
+            "minLength": 3,
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
+      }
+    },
+    {
+      "name": "query_airspace",
+      "description": "Find airspace containing or near a position or route, optionally at an MSL altitude, or by identifier or airport. Results give distance_nm and whether the reference is inside; ARTCC facility and boundary point records do not establish containment.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "airport": {
+            "description": "Airport whose controlled airspace to return, as an FAA location identifier or ICAO code.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "altitude_ft": {
+            "description": "Altitude in feet MSL; excludes airspace whose vertical limits exclude it.",
+            "maximum": 100000,
+            "minimum": -1500,
+            "type": "number"
+          },
+          "cursor": {
+            "description": "nextCursor from the previous page; repeat every other argument unchanged.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "identifier": {
+            "description": "Exact record identifier.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "include_geometry": {
+            "default": false,
+            "description": "Include line and polygon GeoJSON geometry, which can be large. Point positions are always included. Defaults to false.",
+            "type": "boolean"
+          },
+          "kinds": {
+            "description": "Record kinds to search. Defaults to all: airspace, artcc_airspace, artcc, artcc_boundary, parachute_area, military_route.",
+            "items": {
+              "enum": [
+                "airspace",
+                "artcc_airspace",
+                "artcc",
+                "artcc_boundary",
+                "parachute_area",
+                "military_route"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "latitude": {
+            "description": "Latitude in decimal degrees (WGS84); north is positive. Requires longitude.",
+            "maximum": 90,
+            "minimum": -90,
+            "type": "number"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Maximum records per page, 1–200. Defaults to 50.",
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "longitude": {
+            "description": "Longitude in decimal degrees (WGS84); east is positive, so U.S. longitudes are negative. Requires latitude.",
+            "maximum": 180,
+            "minimum": -180,
+            "type": "number"
+          },
+          "order": {
+            "description": "nearest sorts by distance from latitude/longitude, which it requires, and is the default when they are given; identifier sorts alphabetically and is the default otherwise.",
+            "enum": [
+              "identifier",
+              "nearest"
+            ],
+            "type": "string"
+          },
+          "query": {
+            "description": "Case-insensitive substring of the record identifier or name. At least 3 characters.",
+            "maxLength": 16384,
+            "minLength": 3,
+            "type": "string"
+          },
+          "radius_nm": {
+            "default": 5,
+            "description": "Search radius in nautical miles around the spatial context. Defaults to 5.",
+            "maximum": 500,
+            "minimum": 0.01,
+            "type": "number"
+          },
+          "route": {
+            "description": "Route as [longitude, latitude] pairs; finds airspace the route crosses or nears.",
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "maxItems": 200,
+            "minItems": 2,
+            "type": "array"
+          }
+        },
+        "required": [],
+        "type": "object"
+      }
+    },
+    {
+      "name": "find_procedures",
+      "description": "List an airport's approaches, departures and arrivals as summaries: identifier, approach name, runways, transition and fix sequence, one record per transition. Use get_procedure for legs and altitude and speed restrictions.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "airport": {
+            "description": "Airport as an FAA location identifier or ICAO code, such as BOS or KBOS.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "cursor": {
+            "description": "nextCursor from the previous page; repeat every other argument unchanged.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "identifier": {
+            "description": "CIFP procedure identifier. Approaches are the type letter and runway, such as I04R for ILS RWY 4R or R30-Y for RNAV (GPS) Y RWY 30; departures and arrivals use their computer code, such as PORTE3.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Maximum records per page, 1–200. Defaults to 50.",
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "procedure_type": {
+            "description": "Procedure type.",
+            "enum": [
+              "approach",
+              "departure",
+              "arrival"
+            ],
+            "type": "string"
+          },
+          "runway": {
+            "description": "Runway served, such as 4R or 04R.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "transition": {
+            "description": "Transition name; returns that transition and routes common to all transitions.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
+      }
+    },
+    {
+      "name": "get_procedure",
+      "description": "Get a procedure's legs with altitude and speed restrictions, joining the common route to an optional transition. available_transitions lists each transition's initial fix and altitude. Approaches use CIFP identifiers: I04R is ILS RWY 4R.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "airport": {
+            "description": "Airport as an FAA location identifier or ICAO code, such as BOS or KBOS.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "identifier": {
+            "description": "CIFP procedure identifier. Approaches are the type letter and runway, such as I04R for ILS RWY 4R or R30-Y for RNAV (GPS) Y RWY 30; departures and arrivals use their computer code, such as PORTE3.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "include_geometry": {
+            "default": false,
+            "description": "Include line and polygon GeoJSON geometry, which can be large. Point positions are always included. Defaults to false.",
+            "type": "boolean"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Maximum records per page, 1–200. Defaults to 50.",
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "procedure_type": {
+            "description": "Procedure type.",
+            "enum": [
+              "approach",
+              "departure",
+              "arrival"
+            ],
+            "type": "string"
+          },
+          "record_id": {
+            "description": "The id of one record from an earlier result, to select a single candidate.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "transition": {
+            "description": "Transition to join to the common route, such as GOSHI; available_transitions lists them. Without it, only the common or final route is expanded.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "identifier"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "query_obstacles",
+      "description": "Find obstacles near coordinates, a route, an airport/runway departure sector or an exact procedure_id; highest ordering uses MSL elevation.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "airport": {
+            "description": "Airport of a runway departure search, as an FAA location identifier or ICAO code. Requires runway.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "cursor": {
+            "description": "nextCursor from the previous page; repeat every other argument unchanged.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "departure_area": {
+            "description": "Area searched for an airport and runway: sector (default) splays 15° either side of the runway course from 500 ft either side of the departure end; circle is centered on the departure end. Neither is a TERPS assessment.",
+            "enum": [
+              "sector",
+              "circle"
+            ],
+            "type": "string"
+          },
+          "identifier": {
+            "description": "Digital Obstacle File obstacle number.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "latitude": {
+            "description": "Latitude in decimal degrees (WGS84); north is positive. Requires longitude.",
+            "maximum": 90,
+            "minimum": -90,
+            "type": "number"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Maximum records per page, 1–200. Defaults to 50.",
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "longitude": {
+            "description": "Longitude in decimal degrees (WGS84); east is positive, so U.S. longitudes are negative. Requires latitude.",
+            "maximum": 180,
+            "minimum": -180,
+            "type": "number"
+          },
+          "order": {
+            "description": "highest (default) sorts by MSL elevation; nearest sorts by distance from the spatial context; identifier sorts alphabetically.",
+            "enum": [
+              "highest",
+              "nearest",
+              "identifier"
+            ],
+            "type": "string"
+          },
+          "procedure_id": {
+            "description": "Exact procedure id from find_procedures; searches its determinable path.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "radius_nm": {
+            "default": 5,
+            "description": "Search radius in nautical miles around the coordinates, route or procedure path, or the length of a runway departure area; at most 50. Defaults to 5.",
+            "maximum": 50,
+            "minimum": 0.01,
+            "type": "number"
+          },
+          "route": {
+            "description": "Route as [longitude, latitude] pairs; searches within radius_nm of it.",
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "maxItems": 200,
+            "minItems": 2,
+            "type": "array"
+          },
+          "runway": {
+            "description": "Runway whose departure area is searched. Requires airport.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
+      }
+    },
+    {
+      "name": "get_aircraft",
+      "description": "Get FAA Aircraft Characteristics Database data for an ICAO type designator: dimensions, maximum takeoff weight, approach category, design groups and wake category. It is not performance data.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "identifier": {
+            "description": "ICAO aircraft type designator, such as C172, B738 or SF50.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "identifier"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "get_weather",
+      "description": "Get weather for a station or position at a time: the covering AWC METAR and the TAF in force, from the nearest reporting station when needed. Modeled Open-Meteo values are kept apart in model_supplement. Altimeter is in inHg and hPa; visibility in statute miles.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "fields": {
+            "description": "Weather fields to return. Defaults to all.",
+            "items": {
+              "enum": [
+                "temperature_c",
+                "dewpoint_c",
+                "altimeter_inhg",
+                "altimeter_hpa",
+                "wind_speed_kt",
+                "wind_direction_true_deg",
+                "wind_gust_kt",
+                "visibility",
+                "cloud_layers",
+                "pressure_levels"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "latitude": {
+            "description": "Latitude in decimal degrees (WGS84); north is positive. Requires longitude.",
+            "maximum": 90,
+            "minimum": -90,
+            "type": "number"
+          },
+          "longitude": {
+            "description": "Longitude in decimal degrees (WGS84); east is positive, so U.S. longitudes are negative. Requires latitude.",
+            "maximum": 180,
+            "minimum": -180,
+            "type": "number"
+          },
+          "sources": {
+            "description": "Providers in priority order: awc (METAR and TAF) and open_meteo (modeled forecast). Defaults to both.",
+            "items": {
+              "enum": [
+                "awc",
+                "open_meteo"
+              ],
+              "type": "string"
+            },
+            "maxItems": 2,
+            "minItems": 1,
+            "type": "array"
+          },
+          "station": {
+            "description": "Weather station as an ICAO identifier or FAA location identifier, such as KSFO or SFO. Alternatively supply latitude and longitude; the nearest METAR/TAF station within 10 NM reports.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "time": {
+            "description": "Time to report, ISO 8601 with a time zone, such as 2026-10-31T18:00:00Z. Defaults to now.",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
+      }
+    },
+    {
+      "name": "parse_weather",
+      "description": "Parse supplied METAR, TAF or winds-aloft text with an explicit reference date.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "reference_date": {
+            "description": "A time near the report's issue, ISO 8601 with a time zone, used to resolve its day-of-month groups. Defaults to now.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "report": {
+            "description": "Raw report text.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": {
+            "description": "Report type.",
+            "enum": [
+              "metar",
+              "taf",
+              "winds_aloft"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "report"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "query_notams",
+      "description": "Find NOTAMs overlapping a time window for an airport or position, including overlying-ARTCC area NOTAMs such as TFRs; runway and procedure text matches are listed first.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "description": "nextCursor from the previous page; repeat every other argument unchanged.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "end": {
+            "description": "End of the time window, ISO 8601 with a time zone. NOTAMs overlapping the window match.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "latitude": {
+            "description": "Reference latitude for area NOTAMs, decimal degrees. Requires longitude.",
+            "maximum": 90,
+            "minimum": -90,
+            "type": "number"
+          },
+          "limit": {
+            "default": 50,
+            "description": "Maximum records per page, 1–200. Defaults to 50.",
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "location": {
+            "description": "Airport as an FAA location identifier or ICAO code (SFO or KSFO), or another NOTAM location such as an ARTCC. Required unless latitude and longitude are given.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "longitude": {
+            "description": "Reference longitude for area NOTAMs, decimal degrees; west is negative. Requires latitude.",
+            "maximum": 180,
+            "minimum": -180,
+            "type": "number"
+          },
+          "procedure": {
+            "description": "Procedure name to match in NOTAM text; matches sort first and the rest are included as uncertain.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "radius_nm": {
+            "default": 30,
+            "description": "Radius in nautical miles around the airport or position within which overlying-ARTCC NOTAM centers (TFRs and other area NOTAMs) are included. Defaults to 30.",
+            "maximum": 200,
+            "minimum": 1,
+            "type": "number"
+          },
+          "runway": {
+            "description": "Runway to match as a whole word in NOTAM text, such as 4R (also matches 04R); matches sort first and the rest are included as uncertain.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "scope": {
+            "description": "Q-line scope: A aerodrome, E en route, W navigation warning.",
+            "enum": [
+              "A",
+              "E",
+              "W"
+            ],
+            "type": "string"
+          },
+          "start": {
+            "description": "Start of the time window, ISO 8601 with a time zone.",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "convert_coordinates",
+      "description": "Convert WGS84 latitude/longitude, UTM, UPS and MGRS coordinates.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "coordinate": {
+            "description": "UTM, UPS or MGRS coordinate to convert. Requires format.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "format": {
+            "description": "Format of coordinate.",
+            "enum": [
+              "utm",
+              "ups",
+              "mgrs"
+            ],
+            "type": "string"
+          },
+          "latitude": {
+            "description": "Latitude in decimal degrees (WGS84); north is positive. Requires longitude.",
+            "maximum": 90,
+            "minimum": -90,
+            "type": "number"
+          },
+          "longitude": {
+            "description": "Longitude in decimal degrees (WGS84); east is positive, so U.S. longitudes are negative. Requires latitude.",
+            "maximum": 180,
+            "minimum": -180,
+            "type": "number"
+          }
+        },
+        "required": [],
+        "type": "object"
+      }
+    },
+    {
+      "name": "compute_geometry",
+      "description": "Compute WGS84 geodesic distances and initial true bearings, destination points, or densified route paths.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "coordinates": {
+            "description": "Points for distance and route, as [longitude, latitude] pairs.",
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "maxItems": 200,
+            "minItems": 2,
+            "type": "array"
+          },
+          "course_true_deg": {
+            "description": "True course to project along, degrees.",
+            "maximum": 360,
+            "minimum": 0,
+            "type": "number"
+          },
+          "distance_nm": {
+            "description": "Distance to project, nautical miles.",
+            "maximum": 20000,
+            "minimum": 0,
+            "type": "number"
+          },
+          "latitude": {
+            "description": "Start latitude for destination, decimal degrees.",
+            "maximum": 90,
+            "minimum": -90,
+            "type": "number"
+          },
+          "longitude": {
+            "description": "Start longitude for destination, decimal degrees; west is negative.",
+            "maximum": 180,
+            "minimum": -180,
+            "type": "number"
+          },
+          "operation": {
+            "description": "destination projects latitude/longitude along course_true_deg for distance_nm. distance returns the geodesic distance and initial true bearing along coordinates. route also returns the densified geodesic path as GeoJSON.",
+            "enum": [
+              "destination",
+              "distance",
+              "route"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "operation"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "get_data_status",
+      "description": "Report each source's effective cycle, availability, parse errors and next version.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "required": [],
+        "type": "object"
+      }
+    },
+    {
+      "name": "query_terrain",
+      "description": "Find native-cell terrain maxima within a coordinate route corridor, with optional conservative supplied-gradient comparison in EGM2008.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "clearance_ft": {
+            "description": "Required clearance above terrain, feet.",
+            "maximum": 10000,
+            "minimum": 0,
+            "type": "number"
+          },
+          "gradient_ft_per_nm": {
+            "description": "Climb gradient, feet per nautical mile.",
+            "maximum": 2000,
+            "minimum": 0,
+            "type": "number"
+          },
+          "half_width_nm": {
+            "description": "Corridor half-width either side of the centerline, nautical miles.",
+            "maximum": 2,
+            "minimum": 0.05,
+            "type": "number"
+          },
+          "route": {
+            "description": "Corridor centerline as [longitude, latitude] pairs.",
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "maxItems": 20,
+            "minItems": 2,
+            "type": "array"
+          },
+          "starting_altitude_ft": {
+            "description": "Altitude at the first route point in feet above the EGM2008 geoid, for a climb comparison. Requires gradient_ft_per_nm, clearance_ft and vertical_datum.",
+            "maximum": 60000,
+            "minimum": -1500,
+            "type": "number"
+          },
+          "vertical_datum": {
+            "description": "Vertical datum of starting_altitude_ft; required for a climb comparison.",
+            "enum": [
+              "EGM2008"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "route",
+          "half_width_nm"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "sf50_takeoff_performance",
+      "description": "Cirrus SF50 Vision Jet takeoff ground run and distance over a 50 ft screen, with the wind, slope and surface corrections applied, takeoff climb gradient, margins against the runway, an optional obstacle and AFM limitation notes. Runway data and weather are looked up and can be overridden. For pre-flight planning only, not for cockpit use; not FAA- or Cirrus-approved.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "aircraft_generation": {
+            "description": "SF50 generation: g1, g2, g2_updated_thrust (G2 with the updated thrust schedule), g2_plus or g3.",
+            "enum": [
+              "g1",
+              "g2",
+              "g2_updated_thrust",
+              "g2_plus",
+              "g3"
+            ],
+            "type": "string"
+          },
+          "airport": {
+            "description": "Airport as an FAA location identifier or ICAO code, such as OAK or KOAK; runway data comes from the current NASR cycle and weather from the nearest report and forecast.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "altimeter_inhg": {
+            "description": "Altimeter setting in inches of mercury.",
+            "maximum": 32,
+            "minimum": 26,
+            "type": "number"
+          },
+          "available_takeoff_distance_ft": {
+            "description": "Takeoff distance available (TODA) in feet. Defaults to the published TODA, or to the takeoff run available.",
+            "maximum": 30000,
+            "minimum": 0,
+            "type": "number"
+          },
+          "available_takeoff_run_ft": {
+            "description": "Takeoff run available (TORA) in feet, such as one a NOTAM shortens. Required without airport.",
+            "maximum": 30000,
+            "minimum": 0,
+            "type": "number"
+          },
+          "elevation_ft": {
+            "description": "Runway elevation in feet MSL, replacing the threshold elevation. Required without airport.",
+            "maximum": 15000,
+            "minimum": -1500,
+            "type": "number"
+          },
+          "model": {
+            "description": "tabular (default) interpolates the AFM tables and reports offscale or not available outside them; regression extrapolates and reports an uncertainty.",
+            "enum": [
+              "tabular",
+              "regression"
+            ],
+            "type": "string"
+          },
+          "obstacle_distance_ft": {
+            "description": "Distance of the obstacle beyond the departure end of the runway in feet. Requires obstacle_height_ft.",
+            "maximum": 100000,
+            "minimum": 0,
+            "type": "number"
+          },
+          "obstacle_height_ft": {
+            "description": "Height of an obstacle above the runway in feet. Requires obstacle_distance_ft.",
+            "maximum": 3000,
+            "minimum": 0,
+            "type": "number"
+          },
+          "runway": {
+            "description": "Runway end, such as 28R. Required with airport.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "runway_heading_true_deg": {
+            "description": "Runway true heading in degrees. Required without airport.",
+            "maximum": 360,
+            "minimum": 0,
+            "type": "number"
+          },
+          "safety_factor": {
+            "description": "Multiplier applied to the calculated distances. Defaults to 1.",
+            "maximum": 3,
+            "minimum": 1,
+            "type": "number"
+          },
+          "slope_percent": {
+            "description": "Runway slope in percent, positive uphill in the direction of travel.",
+            "maximum": 5,
+            "minimum": -5,
+            "type": "number"
+          },
+          "surface": {
+            "description": "Runway surface; turf applies the AFM unpaved correction.",
+            "enum": [
+              "paved",
+              "grooved",
+              "pfc",
+              "turf"
+            ],
+            "type": "string"
+          },
+          "temperature_c": {
+            "description": "Outside air temperature in °C.",
+            "maximum": 60,
+            "minimum": -60,
+            "type": "number"
+          },
+          "time": {
+            "description": "Time of the takeoff or landing, ISO 8601 with a time zone. Defaults to now. Weather is the METAR within an hour, otherwise the TAF and the Open-Meteo model.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "weight_lb": {
+            "description": "Aircraft weight in pounds.",
+            "maximum": 7000,
+            "minimum": 3000,
+            "type": "number"
+          },
+          "wind_direction_true_deg": {
+            "description": "Wind direction in degrees true, the direction the wind blows from.",
+            "maximum": 360,
+            "minimum": 0,
+            "type": "number"
+          },
+          "wind_speed_kt": {
+            "description": "Steady wind speed in knots.",
+            "maximum": 100,
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "aircraft_generation",
+          "weight_lb"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "sf50_landing_performance",
+      "description": "Cirrus SF50 Vision Jet landing Vref, ground run and distance from 50 ft, with corrections for wind, slope, surface and runway contamination, the AFM go-around climb gradient, margins against the runway and AFM limitation notes. For pre-flight planning only, not for cockpit use; not FAA- or Cirrus-approved.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "aircraft_generation": {
+            "description": "SF50 generation: g1, g2, g2_updated_thrust (G2 with the updated thrust schedule), g2_plus or g3.",
+            "enum": [
+              "g1",
+              "g2",
+              "g2_updated_thrust",
+              "g2_plus",
+              "g3"
+            ],
+            "type": "string"
+          },
+          "airport": {
+            "description": "Airport as an FAA location identifier or ICAO code, such as OAK or KOAK; runway data comes from the current NASR cycle and weather from the nearest report and forecast.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "altimeter_inhg": {
+            "description": "Altimeter setting in inches of mercury.",
+            "maximum": 32,
+            "minimum": 26,
+            "type": "number"
+          },
+          "available_landing_distance_ft": {
+            "description": "Landing distance available (LDA) in feet, such as one a NOTAM shortens. Required without airport.",
+            "maximum": 30000,
+            "minimum": 0,
+            "type": "number"
+          },
+          "contamination": {
+            "description": "Runway contamination. water_or_slush and slush_or_wet_snow require contamination_depth_in; rwycc requires rwycc.",
+            "enum": [
+              "wet",
+              "water_or_slush",
+              "slush_or_wet_snow",
+              "dry_snow",
+              "compact_snow",
+              "rwycc"
+            ],
+            "type": "string"
+          },
+          "contamination_depth_in": {
+            "description": "Contaminant depth in inches.",
+            "maximum": 4,
+            "minimum": 0,
+            "type": "number"
+          },
+          "elevation_ft": {
+            "description": "Runway elevation in feet MSL, replacing the threshold elevation. Required without airport.",
+            "maximum": 15000,
+            "minimum": -1500,
+            "type": "number"
+          },
+          "flaps": {
+            "description": "Landing flap setting; the _ice settings are with ice protection on. Defaults to 100.",
+            "enum": [
+              "up",
+              "up_ice",
+              "50",
+              "50_ice",
+              "100"
+            ],
+            "type": "string"
+          },
+          "model": {
+            "description": "tabular (default) interpolates the AFM tables and reports offscale or not available outside them; regression extrapolates and reports an uncertainty.",
+            "enum": [
+              "tabular",
+              "regression"
+            ],
+            "type": "string"
+          },
+          "runway": {
+            "description": "Runway end, such as 28R. Required with airport.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "runway_heading_true_deg": {
+            "description": "Runway true heading in degrees. Required without airport.",
+            "maximum": 360,
+            "minimum": 0,
+            "type": "number"
+          },
+          "rwycc": {
+            "description": "Runway condition code, 1–6, for contamination rwycc.",
+            "maximum": 6,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "safety_factor": {
+            "description": "Multiplier applied to the calculated distances. Defaults to 1.",
+            "maximum": 3,
+            "minimum": 1,
+            "type": "number"
+          },
+          "slope_percent": {
+            "description": "Runway slope in percent, positive uphill in the direction of travel.",
+            "maximum": 5,
+            "minimum": -5,
+            "type": "number"
+          },
+          "surface": {
+            "description": "Runway surface; turf applies the AFM unpaved correction.",
+            "enum": [
+              "paved",
+              "grooved",
+              "pfc",
+              "turf"
+            ],
+            "type": "string"
+          },
+          "temperature_c": {
+            "description": "Outside air temperature in °C.",
+            "maximum": 60,
+            "minimum": -60,
+            "type": "number"
+          },
+          "time": {
+            "description": "Time of the takeoff or landing, ISO 8601 with a time zone. Defaults to now. Weather is the METAR within an hour, otherwise the TAF and the Open-Meteo model.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "vref_additive_kt": {
+            "description": "Speed added to Vref in knots. Defaults to 0.",
+            "maximum": 20,
+            "minimum": 0,
+            "type": "number"
+          },
+          "weight_lb": {
+            "description": "Aircraft weight in pounds.",
+            "maximum": 7000,
+            "minimum": 3000,
+            "type": "number"
+          },
+          "wind_direction_true_deg": {
+            "description": "Wind direction in degrees true, the direction the wind blows from.",
+            "maximum": 360,
+            "minimum": 0,
+            "type": "number"
+          },
+          "wind_speed_kt": {
+            "description": "Steady wind speed in knots.",
+            "maximum": 100,
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "aircraft_generation",
+          "weight_lb"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "sf50_climb_profile",
+      "description": "Cirrus SF50 Vision Jet climb gradient and rate by altitude from the field to a top altitude, for the takeoff (91 KIAS), enroute-obstacle (120 KIAS) and enroute climb schedules with and without ice protection, using forecast winds aloft. Gives ground gradients along a course and a minimum gradient for query_terrain. For pre-flight planning only, not for cockpit use; not FAA- or Cirrus-approved.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "aircraft_generation": {
+            "description": "SF50 generation: g1, g2, g2_updated_thrust (G2 with the updated thrust schedule), g2_plus or g3.",
+            "enum": [
+              "g1",
+              "g2",
+              "g2_updated_thrust",
+              "g2_plus",
+              "g3"
+            ],
+            "type": "string"
+          },
+          "airport": {
+            "description": "Airport as an FAA location identifier or ICAO code, such as OAK or KOAK; runway data comes from the current NASR cycle and weather from the nearest report and forecast.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "altimeter_inhg": {
+            "description": "Altimeter setting in inches of mercury.",
+            "maximum": 32,
+            "minimum": 26,
+            "type": "number"
+          },
+          "course_true_deg": {
+            "description": "True course flown during the climb, for ground gradients in the winds aloft.",
+            "maximum": 360,
+            "minimum": 0,
+            "type": "number"
+          },
+          "elevation_ft": {
+            "description": "Field elevation in feet MSL where the climb starts. Required without airport.",
+            "maximum": 15000,
+            "minimum": -1500,
+            "type": "number"
+          },
+          "model": {
+            "description": "tabular (default) interpolates the AFM tables and reports offscale or not available outside them; regression extrapolates and reports an uncertainty.",
+            "enum": [
+              "tabular",
+              "regression"
+            ],
+            "type": "string"
+          },
+          "runway": {
+            "description": "Runway end whose threshold elevation the climb starts from.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "temperature_c": {
+            "description": "Surface temperature in °C. Replaces the forecast column with a calm one that holds this temperature's deviation from the standard atmosphere all the way up.",
+            "maximum": 60,
+            "minimum": -60,
+            "type": "number"
+          },
+          "time": {
+            "description": "Time of the climb, ISO 8601 with a time zone. Defaults to now. Winds aloft come from the Open-Meteo model at this hour.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "top_altitude_ft": {
+            "description": "Altitude in feet MSL the climb ends at.",
+            "maximum": 31000,
+            "minimum": 0,
+            "type": "number"
+          },
+          "weight_lb": {
+            "description": "Aircraft weight in pounds.",
+            "maximum": 7000,
+            "minimum": 3000,
+            "type": "number"
+          }
+        },
+        "required": [
+          "aircraft_generation",
+          "weight_lb",
+          "top_altitude_ft"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "name": "sf50_takeoff_limits",
+      "description": "Cirrus SF50 Vision Jet maximum takeoff weight, or maximum outside air temperature at a weight, for one runway end or every end of an airport, with the constraint that limits each. For pre-flight planning only, not for cockpit use; not FAA- or Cirrus-approved.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "aircraft_generation": {
+            "description": "SF50 generation: g1, g2, g2_updated_thrust (G2 with the updated thrust schedule), g2_plus or g3.",
+            "enum": [
+              "g1",
+              "g2",
+              "g2_updated_thrust",
+              "g2_plus",
+              "g3"
+            ],
+            "type": "string"
+          },
+          "airport": {
+            "description": "Airport as an FAA location identifier or ICAO code, such as OAK or KOAK; runway data comes from the current NASR cycle and weather from the nearest report and forecast.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "altimeter_inhg": {
+            "description": "Altimeter setting in inches of mercury.",
+            "maximum": 32,
+            "minimum": 26,
+            "type": "number"
+          },
+          "available_takeoff_distance_ft": {
+            "description": "Takeoff distance available (TODA) in feet. Defaults to the published TODA, or to the takeoff run available.",
+            "maximum": 30000,
+            "minimum": 0,
+            "type": "number"
+          },
+          "available_takeoff_run_ft": {
+            "description": "Takeoff run available (TORA) in feet, such as one a NOTAM shortens. Required without airport.",
+            "maximum": 30000,
+            "minimum": 0,
+            "type": "number"
+          },
+          "elevation_ft": {
+            "description": "Runway elevation in feet MSL, replacing the threshold elevation. Required without airport.",
+            "maximum": 15000,
+            "minimum": -1500,
+            "type": "number"
+          },
+          "minimum_weight_lb": {
+            "description": "Lightest weight the weight search considers. Defaults to 5,000 lb, the lightest weight the AFM takeoff data covers.",
+            "maximum": 7000,
+            "minimum": 3000,
+            "type": "number"
+          },
+          "model": {
+            "description": "tabular (default) interpolates the AFM tables and reports offscale or not available outside them; regression extrapolates and reports an uncertainty.",
+            "enum": [
+              "tabular",
+              "regression"
+            ],
+            "type": "string"
+          },
+          "obstacle_distance_ft": {
+            "description": "Distance of the obstacle beyond the departure end of the runway in feet. Requires obstacle_height_ft.",
+            "maximum": 100000,
+            "minimum": 0,
+            "type": "number"
+          },
+          "obstacle_height_ft": {
+            "description": "Height of an obstacle above the runway in feet. Requires obstacle_distance_ft.",
+            "maximum": 3000,
+            "minimum": 0,
+            "type": "number"
+          },
+          "runway": {
+            "description": "Runway end, such as 15. Omit to calculate every end of the airport.",
+            "maxLength": 16384,
+            "minLength": 1,
+            "type": "string"
+          },
+          "runway_heading_true_deg": {
+            "description": "Runway true heading in degrees. Required without airport.",
+            "maximum": 360,
+            "minimum": 0,
+            "type": "number"
+          },
+          "safety_factor": {
+            "description": "Multiplier applied to the calculated distances. Defaults to 1.",
+            "maximum": 3,
+            "minimum": 1,
+            "type": "number"
+          },
+          "slope_percent": {
+            "description": "Runway slope in percent, positive uphill in the direction of travel.",
+            "maximum": 5,
+            "minimum": -5,
+            "type": "number"
+          },
+          "solve_for": {
+            "description": "weight finds the maximum takeoff weight at the conditions; temperature finds the maximum outside air temperature at weight_lb.",
+            "enum": [
+              "weight",
+              "temperature"
+            ],
+            "type": "string"
+          },
+          "surface": {
+            "description": "Runway surface; turf applies the AFM unpaved correction.",
+            "enum": [
+              "paved",
+              "grooved",
+              "pfc",
+              "turf"
+            ],
+            "type": "string"
+          },
+          "temperature_c": {
+            "description": "Outside air temperature in °C.",
+            "maximum": 60,
+            "minimum": -60,
+            "type": "number"
+          },
+          "time": {
+            "description": "Time of the takeoff or landing, ISO 8601 with a time zone. Defaults to now. Weather is the METAR within an hour, otherwise the TAF and the Open-Meteo model.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "weight_lb": {
+            "description": "Takeoff weight in pounds. Required when solve_for is temperature.",
+            "maximum": 7000,
+            "minimum": 3000,
+            "type": "number"
+          },
+          "wind_direction_true_deg": {
+            "description": "Wind direction in degrees true, the direction the wind blows from.",
+            "maximum": 360,
+            "minimum": 0,
+            "type": "number"
+          },
+          "wind_speed_kt": {
+            "description": "Steady wind speed in knots.",
+            "maximum": 100,
+            "minimum": 0,
+            "type": "number"
+          }
+        },
+        "required": [
+          "aircraft_generation",
+          "solve_for"
+        ],
+        "type": "object"
+      }
+    }
+  ]
+}
