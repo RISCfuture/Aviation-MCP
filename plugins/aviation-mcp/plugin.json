@@ -60,34 +60,10 @@
               "expected_behavior": "Fetch current aviation reports for all three stations and compare cloud ceilings, visibility, and winds with observation times and provenance. Actual values vary; do not treat FEW or SCT as a ceiling or modeled forecasts as observations. Report unavailable fields."
             },
             {
-              "description": "NOTAM time overlap",
-              "prompt": "What NOTAMs affect Chicago O’Hare (KORD) over the next six hours?",
-              "tools_triggered": "query_notams",
-              "expected_behavior": "Use an explicit current six-hour window, follow pagination, summarize matching current notices, and retain original text, validity, freshness, and any uncertain schedule or context warnings. Counts change with live ingestion."
-            },
-            {
-              "description": "Terrain corridor",
-              "prompt": "What’s the highest terrain within 1 NM on either side of a direct route from Truckee (KTRK) to Mammoth Yosemite (KMMH)?",
-              "tools_triggered": "get_airport, query_terrain",
-              "expected_behavior": "Resolve both airport positions and query a 1 NM half-width corridor. Report the maximum elevation and location with EGM2008 datum, source and coverage. Do not claim clearance or completeness when geometry or budget limits leave gaps."
-            },
-            {
               "description": "SF50 takeoff distance",
               "prompt": "I’m flying a G2+ SF50 out of Oakland (KOAK) runway 28R in 18 hours at 5,800 lb. What will my ground run and total takeoff distance be, and what correction factors apply?",
               "tools_triggered": "get_airport, query_notams, sf50_takeoff_performance",
               "expected_behavior": "Convert the departure time to an explicit UTC time, check NOTAMs for 28R and its reciprocal, and call sf50_takeoff_performance with generation g2_plus, 5800 lb, KOAK 28R and that time. Report the ground run and the total distance over a 50 ft obstacle against TORA and TODA, each correction multiplier from the breakdowns, and every input’s origin; note that the TAF has no temperature, so the OAT is modeled. Keep any offscale or not-available status and the planning-only disclaimer. Figures vary with the forecast."
-            },
-            {
-              "description": "SF50 maximum temperature both directions",
-              "prompt": "What’s the hottest outside air temperature at which my G2 SF50 can still take off from Telluride (KTEX) in either direction at maximum takeoff weight?",
-              "tools_triggered": "sf50_takeoff_limits",
-              "expected_behavior": "Call sf50_takeoff_limits with solve_for temperature, weight 6000 lb, generation g2 and airport KTEX without a runway, so every end is calculated. Report the maximum OAT and binding constraint for each end and the lower of the two, explain how wind and slope make the directions differ, and flag reliance on offscale data. Do not invent a limit when the result is null; keep the planning-only disclaimer."
-            },
-            {
-              "description": "SF50 go-around at Aspen",
-              "prompt": "Is a go-around possible in my G2 SF50 landing at Aspen (KASE) runway 15 tomorrow at 2 pm, at 5,400 lb?",
-              "tools_triggered": "sf50_landing_performance, find_procedures, get_procedure, sf50_climb_profile, query_terrain, query_obstacles",
-              "expected_behavior": "State the local time zone and the UTC time used. Report Vref, landing distance against LDA, and the AFM go-around gradient check. For each approach, use the missed-approach legs, the SF50 climb profile along the missed-approach course in true, and a terrain and obstacle comparison from the missed-approach point. Use 200 ft/NM unless the chart publishes more, and say CIFP does not carry chart climb gradients. Treat not_established as inconclusive, and never call the go-around safe or certified."
             },
             {
               "description": "SF50 departure climb versus terrain",

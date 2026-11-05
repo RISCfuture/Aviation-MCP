@@ -79,10 +79,11 @@ due to the account's weekly usage limit. Neither listing is approved or publishe
 
 Upload `dist/plugins/aviation-mcp-openai-<version>.zip` at
 <https://platform.openai.com/plugins> using the verified publisher identity, then connect
-the server and resolve the portal's domain challenge if asked. The package contains nine
-positive and three negative review cases; the four SF50 cases cover takeoff distance at
-KOAK, maximum temperature at KTEX, a go-around at KASE and a departure climb at KASE. The
-publisher identity must match the submission account before review.
+the server and resolve the portal's domain challenge if asked. The portal requires exactly
+five positive review cases; the package has those and three negative cases. The two SF50
+cases cover takeoff distance at KOAK and a departure climb at KASE; the plugin evals also
+cover maximum temperature at KTEX and a go-around at KASE. The publisher identity must
+match the submission account before review.
 
 The review cases describe expected behavior. Tool-level probes are documented
 in [website verification](../site/examples-verification.md); those probes do not
