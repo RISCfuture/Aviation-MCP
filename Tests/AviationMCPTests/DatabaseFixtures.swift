@@ -123,11 +123,13 @@ extension `Transactional publication` {
   }
 
   static func version(_ source: SourceName) -> SourceVersion {
-    SourceVersion(
-      id: UUID(), source: source, cycle: "fixture",
+    let id = UUID()
+    return SourceVersion(
+      id: id, source: source, cycle: "fixture",
       effectiveFrom: Date(timeIntervalSince1970: 0),
       effectiveUntil: source == .aircraft ? nil : Date(timeIntervalSince1970: 4_000_000_000),
-      checksum: String(repeating: "a", count: 64), parserRevision: "fixture", validated: true)
+      checksum: Normalization.checksum(Data(id.uuidString.utf8)), parserRevision: "fixture",
+      validated: true)
   }
 
   static func airportWithMixedRunways(_ version: SourceVersion) -> AviationRecord {

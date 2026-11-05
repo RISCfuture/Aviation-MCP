@@ -31,7 +31,7 @@ struct RemoteIngestionCommand: AsyncCommand {
     }
     let service = IngestionService(store: store)
     let logger = context.application.logger
-    try await service.ingest(
+    let changed = try await service.ingest(
       source: downloads.map(\.source).joined(separator: "+"),
       checksum: Normalization.checksum(data), parserRevision: "source-download-1"
     ) {
@@ -52,10 +52,13 @@ struct RemoteIngestionCommand: AsyncCommand {
           versions: batch.versions + source.versions, records: batch.records + source.records)
       }
       logger.info(
-        "Publishing normalized source batch", metadata: ["records": "\(batch.records.count)"])
+        "Normalized source batch", metadata: ["records": "\(batch.records.count)"])
       return batch
     }
-    context.console.info("Source publication completed.")
+    context.console.info(
+      changed
+        ? "Source publication completed."
+        : "The release repeats published content; nothing changed.")
   }
 }
 
@@ -91,7 +94,7 @@ enum RemoteIngestion {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: directory) }
-    let archive = try await fetch(download, to: directory)
+    let (archive, received) = try await fetch(download, to: directory)
     let batch: StagedImport
     switch download.source {
     case "nasr": batch = try await NASRImporter.parse(archive)
@@ -121,31 +124,38 @@ enum RemoteIngestion {
       }
       var version = version
       version.validation = (version.validation ?? [:]).merging(
-        ["download": try .encoded(download)], uniquingKeysWith: { _, new in new })
+        ["download": try .encoded(received)], uniquingKeysWith: { _, new in new })
       return version
     }
     return StagedImport(versions: versions, records: batch.records)
   }
 
-  private static func fetch(_ download: SourceDownload, to directory: URL) async throws -> URL {
+  /// Downloads the release and returns it with the validators of the copy received. The FAA's CDN
+  /// serves identical copies with different validators, so only an aircraft snapshot, whose
+  /// release time is its Last-Modified time, must match the checked validators; the other sources
+  /// are checked against the dates parsed from their content.
+  private static func fetch(
+    _ download: SourceDownload, to directory: URL
+  ) async throws -> (URL, SourceDownload) {
     guard let url = URL(string: download.url) else {
       throw StorageError.invalidImport("Invalid URL.")
     }
-    var request = URLRequest(url: url, timeoutInterval: 240)
-    if let modified = download.lastModified {
-      request.setValue(modified, forHTTPHeaderField: "If-Unmodified-Since")
-    }
-    let (temporary, response) = try await URLSession.shared.download(for: request)
+    let (temporary, response) = try await URLSession.shared.download(
+      for: URLRequest(url: url, timeoutInterval: 240))
     defer { try? FileManager.default.removeItem(at: temporary) }
-    guard let response = response as? HTTPURLResponse, response.statusCode == 200,
-      download.etag.map({ $0 == response.value(forHTTPHeaderField: "ETag") }) != false
-    else {
-      throw StorageError.invalidImport("Source changed or failed during download; check it again.")
+    guard let response = response as? HTTPURLResponse, response.statusCode == 200 else {
+      throw StorageError.invalidImport("The source download failed; check it again.")
+    }
+    var received = download
+    received.etag = response.value(forHTTPHeaderField: "ETag")
+    received.lastModified = response.value(forHTTPHeaderField: "Last-Modified")
+    guard download.source != "aircraft" || received.lastModified == download.lastModified else {
+      throw StorageError.invalidImport("The aircraft snapshot changed; check it again.")
     }
     let destination = directory.appendingPathComponent(
       download.source == "aircraft" ? "FAA.xlsx" : "source.zip")
     try FileManager.default.moveItem(at: temporary, to: destination)
-    return destination
+    return (destination, received)
   }
 
   private static func extract(

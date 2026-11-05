@@ -8,16 +8,27 @@ struct IngestionService: Sendable {
 
   let store: AviationStore
 
+  /// Stages a release with `operation` and publishes it, returning false when its content is
+  /// already published.
+  @discardableResult
   func ingest(
     source: String, checksum: String, parserRevision: String,
     operation: @Sendable () async throws -> StagedImport
-  ) async throws {
+  ) async throws -> Bool {
     try await failAbandonedRuns()
     let run = IngestionRun(source: source, checksum: checksum, parserRevision: parserRevision)
     try await run.create(on: store.database)
     do {
       let staged = try await operation()
-      try ReleaseCompleteness(snapshot: try await store.snapshot()).verify(staged)
+      let snapshot = try await store.snapshot()
+      if staged.isPublished(in: Array(snapshot.versions.values) + Array(snapshot.next.values)) {
+        run.outcome = "unchanged"
+        run.details = ["versions": staged.versions.map(\.cycle).joined(separator: ",")]
+        run.finishedAt = .now
+        try await run.update(on: store.database)
+        return false
+      }
+      try ReleaseCompleteness(snapshot: snapshot).verify(staged)
       try await store.publish(staged.versions, records: staged.records)
       let errors = staged.versions.reduce(0) { $0 + $1.parseErrorCount }
       run.outcome = errors == 0 ? "published" : "published_partial"
@@ -38,6 +49,7 @@ struct IngestionService: Sendable {
     }
     run.finishedAt = .now
     try await run.update(on: store.database)
+    return true
   }
 
   private func failAbandonedRuns() async throws {

@@ -96,7 +96,10 @@ is available instead of a precise publication time.
 NASR and CIFP publish independently; both switch cycles at the FAA's 0901Z
 changeover, so their effective versions always share a cycle, and a CIFP whose
 cycle differs from the effective NASR's is not served. A later import of a
-source cycle supersedes the earlier import of that cycle. DOF releases keep
+source cycle supersedes the earlier import of that cycle. An import whose content
+and parser revision match a published version is recorded as an `unchanged` run
+and not republished, because the FAA's CDN serves identical files with differing
+`ETag` and `Last-Modified` validators. DOF releases keep
 their release-date-midnight boundaries. When a source has no effective
 version, tool errors and `get_data_status` name when it expired and any staged
 successor; expired records are never served.

@@ -5,6 +5,17 @@ import MCP
 struct StagedImport: Codable, Sendable {
   let versions: [SourceVersion]
   let records: [AviationRecord]
+
+  /// Whether each version repeats the cycle, content and parser of a published version.
+  func isPublished(in published: [SourceVersion]) -> Bool {
+    !versions.isEmpty
+      && versions.allSatisfy { version in
+        published.contains {
+          $0.source == version.source && $0.cycle == version.cycle
+            && $0.checksum == version.checksum && $0.parserRevision == version.parserRevision
+        }
+      }
+  }
 }
 
 enum Normalization {

@@ -14,8 +14,9 @@ struct EntryPoint {
       try await app.asyncShutdown()
       exit(IncompleteReleaseError.exitStatus)
     } catch {
+      app.logger.critical("\(String(reflecting: error))")
       try await app.asyncShutdown()
-      throw error
+      exit(EXIT_FAILURE)
     }
     try await app.asyncShutdown()
   }

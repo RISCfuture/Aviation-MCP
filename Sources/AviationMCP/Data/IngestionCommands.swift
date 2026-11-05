@@ -15,11 +15,13 @@ struct PublishCommand: AsyncCommand {
     decoder.dateDecodingStrategy = .iso8601
     let batch = try decoder.decode(StagedImport.self, from: data)
     let service = IngestionService(store: AviationStore(database: context.application.db))
-    try await service.ingest(
+    let published = try await service.ingest(
       source: batch.versions.map(\.source.rawValue).joined(separator: "+"),
       checksum: Normalization.checksum(data), parserRevision: "normalized-bundle-1"
     ) { batch }
-    context.console.info("Published \(batch.records.count) records.")
+    context.console.info(
+      published
+        ? "Published \(batch.records.count) records." : "The bundle repeats published content.")
   }
 }
 

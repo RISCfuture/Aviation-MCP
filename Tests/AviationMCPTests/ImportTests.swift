@@ -60,6 +60,18 @@ struct `Normalized source imports` {
   }
 
   @Test
+  func `recognizes a reimport of published content`() {
+    let version = { (checksum: String) in
+      SourceVersion(
+        id: UUID(), source: .dof, cycle: "20260927", effectiveFrom: .now, effectiveUntil: nil,
+        checksum: checksum, parserRevision: DOFImporter.revision, validated: true)
+    }
+    let published = version("fixture")
+    #expect(StagedImport(versions: [version("fixture")], records: []).isPublished(in: [published]))
+    #expect(!StagedImport(versions: [version("revised")], records: []).isPublished(in: [published]))
+  }
+
+  @Test
   func `normalizes NASR coordinates and preserves unrepresentable optional fields`() async throws {
     let csv = "\"EFF_DATE\",\"ARPT_ID\"\n\"2026/10/01\",\"OAK\"\n"
     let cycle = try await NASRCycle.parse(
