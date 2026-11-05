@@ -1,27 +1,28 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "aviation-mcp",
-  "version": "1.0.0",
-  "description": "Query U.S. aviation data and worldwide terrain with source cycles, provenance, and explicit coverage gaps.",
+  "version": "1.1.0",
+  "description": "Query U.S. aviation data, worldwide terrain and Cirrus SF50 performance with source cycles, provenance, and explicit coverage gaps.",
   "author": {
     "name": "Tim Morgan",
     "url": "https://aviation-mcp.org"
   },
   "homepage": "https://aviation-mcp.org",
   "repository": "https://github.com/RISCfuture/Aviation-MCP",
-  "keywords": ["aviation", "airports", "weather", "notams", "terrain"],
+  "keywords": ["aviation", "airports", "weather", "notams", "terrain", "performance", "sf50"],
   "extensions": {
     "com.openai": {
       "interface": {
         "displayName": "Aviation Data",
         "shortDescription": "Aviation data and terrain",
-        "longDescription": "Look up U.S. airports, runways, navigation, airspace, instrument procedures, obstacles, aircraft characteristics, aviation weather, and NOTAMs. Analyze worldwide Copernicus terrain and compute geographic distances and bearings. Results identify source cycles, units, altitude datums, provenance, and coverage gaps. No Aviation MCP account is required. For research and planning; not certified navigation, dispatch, or obstacle-clearance approval.",
+        "longDescription": "Look up U.S. airports, runways, navigation, airspace, instrument procedures, obstacles, aircraft characteristics, aviation weather, and NOTAMs. Analyze worldwide Copernicus terrain and compute geographic distances and bearings. Plan Cirrus SF50 Vision Jet takeoffs, landings, climbs, and takeoff limits from current runway data and weather, with skills that combine them with NOTAMs, procedures, terrain, and obstacles. Results identify source cycles, units, altitude datums, provenance, and coverage gaps. No Aviation MCP account is required. For research and planning; not certified navigation, dispatch, or obstacle-clearance approval, and SF50 figures are not FAA- or Cirrus-approved.",
         "developerName": "Tim Morgan",
         "category": "Productivity",
         "capabilities": [
           "Airport and procedure lookup",
           "Weather and NOTAM queries",
-          "Obstacle and terrain analysis"
+          "Obstacle and terrain analysis",
+          "SF50 performance planning"
         ],
         "websiteURL": "https://aviation-mcp.org",
         "supportURL": "https://aviation-mcp.org/support/",
@@ -69,6 +70,30 @@
               "prompt": "What’s the highest terrain within 1 NM on either side of a direct route from Truckee (KTRK) to Mammoth Yosemite (KMMH)?",
               "tools_triggered": "get_airport, query_terrain",
               "expected_behavior": "Resolve both airport positions and query a 1 NM half-width corridor. Report the maximum elevation and location with EGM2008 datum, source and coverage. Do not claim clearance or completeness when geometry or budget limits leave gaps."
+            },
+            {
+              "description": "SF50 takeoff distance",
+              "prompt": "I’m flying a G2+ SF50 out of Oakland (KOAK) runway 28R in 18 hours at 5,800 lb. What will my ground run and total takeoff distance be, and what correction factors apply?",
+              "tools_triggered": "get_airport, query_notams, sf50_takeoff_performance",
+              "expected_behavior": "Convert the departure time to an explicit UTC time, check NOTAMs for 28R and its reciprocal, and call sf50_takeoff_performance with generation g2_plus, 5800 lb, KOAK 28R and that time. Report the ground run and the total distance over a 50 ft obstacle against TORA and TODA, each correction multiplier from the breakdowns, and every input’s origin; note that the TAF has no temperature, so the OAT is modeled. Keep any offscale or not-available status and the planning-only disclaimer. Figures vary with the forecast."
+            },
+            {
+              "description": "SF50 maximum temperature both directions",
+              "prompt": "What’s the hottest outside air temperature at which my G2 SF50 can still take off from Telluride (KTEX) in either direction at maximum takeoff weight?",
+              "tools_triggered": "sf50_takeoff_limits",
+              "expected_behavior": "Call sf50_takeoff_limits with solve_for temperature, weight 6000 lb, generation g2 and airport KTEX without a runway, so every end is calculated. Report the maximum OAT and binding constraint for each end and the lower of the two, explain how wind and slope make the directions differ, and flag reliance on offscale data. Do not invent a limit when the result is null; keep the planning-only disclaimer."
+            },
+            {
+              "description": "SF50 go-around at Aspen",
+              "prompt": "Is a go-around possible in my G2 SF50 landing at Aspen (KASE) runway 15 tomorrow at 2 pm, at 5,400 lb?",
+              "tools_triggered": "sf50_landing_performance, find_procedures, get_procedure, sf50_climb_profile, query_terrain, query_obstacles",
+              "expected_behavior": "State the local time zone and the UTC time used. Report Vref, landing distance against LDA, and the AFM go-around gradient check. For each approach, use the missed-approach legs, the SF50 climb profile along the missed-approach course in true, and a terrain and obstacle comparison from the missed-approach point. Use 200 ft/NM unless the chart publishes more, and say CIFP does not carry chart climb gradients. Treat not_established as inconclusive, and never call the go-around safe or certified."
+            },
+            {
+              "description": "SF50 departure climb versus terrain",
+              "prompt": "Will my G2+ SF50 at 5,900 lb out-climb the terrain taking off from Aspen (KASE) runway 15 right now?",
+              "tools_triggered": "get_airport, sf50_takeoff_performance, sf50_climb_profile, query_obstacles, query_terrain",
+              "expected_behavior": "Use current weather and a climb profile along the departure course in true to get the takeoff-schedule ground gradient. Start the EGM2008 terrain comparison at the departure end with the departure-end elevation, within a corridor of at most 2 NM. Compare DOF obstacles MSL to MSL, and the published or standard 200 ft/NM requirement. Report margins, coverage gaps, and that not_established is inconclusive. Never claim certified obstacle clearance; keep the planning-only disclaimer."
             }
           ],
           "negative": [
@@ -94,7 +119,7 @@
         "demo_recording_url": "https://aviation-mcp.org/review/aviation-data-demo.mp4"
       },
       "publication": {
-        "release_notes": "Initial public release exposing 17 read-only aviation, terrain, and geographic tools."
+        "release_notes": "Adds four Cirrus SF50 performance tools (takeoff, landing, climb profile and takeoff limits) for 21 read-only tools in all, and seven skills that combine them with runway data, weather, NOTAMs, procedures, terrain and obstacles."
       }
     }
   }
