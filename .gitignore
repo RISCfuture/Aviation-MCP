@@ -12,3 +12,5 @@ site/.dev.vars
 site/test-results/
 site/playwright-report/
 site/worker-configuration.d.ts
+plugins/aviation-mcp/evals/results/
+dist/plugins/
