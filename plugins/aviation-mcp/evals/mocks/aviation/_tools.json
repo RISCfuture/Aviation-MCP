@@ -1001,21 +1001,66 @@
       }
     },
     {
-      "name": "sf50_takeoff_performance",
-      "description": "Cirrus SF50 Vision Jet takeoff ground run and distance over a 50 ft screen, with the wind, slope and surface corrections applied, takeoff climb gradient, margins against the runway, an optional obstacle and AFM limitation notes. Runway data and weather are looked up and can be overridden. For pre-flight planning only, not for cockpit use; not FAA- or Cirrus-approved.",
+      "name": "takeoff_performance",
+      "description": "Takeoff ground run and distance over a 50 ft screen for the Cirrus SF50 Vision Jet or Cirrus SR22, chosen by aircraft, with the wind, slope, surface and wet-turf corrections the manual gives, takeoff climb gradient, margins against the runway, an optional obstacle and limitation notes. Runway data and weather are looked up and can be overridden. For pre-flight planning only, not for cockpit use; not FAA- or manufacturer-approved.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
-          "aircraft_generation": {
-            "description": "SF50 generation: g1, g2, g2_updated_thrust (G2 with the updated thrust schedule), g2_plus or g3.",
-            "enum": [
-              "g1",
-              "g2",
-              "g2_updated_thrust",
-              "g2_plus",
-              "g3"
+          "air_conditioner": {
+            "description": "Whether the air conditioner is on for takeoff, for an aircraft with the air_conditioner_correction capability. Defaults to false.",
+            "type": "boolean"
+          },
+          "aircraft": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "generation": {
+                    "description": "Cirrus SF50 generation: g1, g2, g2_updated_thrust (G2 with the updated thrust schedule, SB5X-72-01), g2_plus or g3.",
+                    "enum": [
+                      "g1",
+                      "g2",
+                      "g2_updated_thrust",
+                      "g2_plus",
+                      "g3"
+                    ],
+                    "type": "string"
+                  },
+                  "type": {
+                    "const": "sf50"
+                  }
+                },
+                "required": [
+                  "type",
+                  "generation"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "hartzell_propeller": {
+                    "description": "Whether the Hartzell composite propeller is installed (POH supplement 13772-129).",
+                    "type": "boolean"
+                  },
+                  "turbonormalized": {
+                    "description": "Whether the Tornado Alley turbonormalizing system is installed (STC SA10588SC).",
+                    "type": "boolean"
+                  },
+                  "type": {
+                    "const": "sr22"
+                  }
+                },
+                "required": [
+                  "type",
+                  "hartzell_propeller",
+                  "turbonormalized"
+                ],
+                "type": "object"
+              }
             ],
-            "type": "string"
+            "description": "The aircraft and its installed options. Each result lists the aircraft's capabilities, the manuals its figures come from, and any output those manuals have no figures for.",
+            "type": "object"
           },
           "airport": {
             "description": "Airport as an FAA location identifier or ICAO code, such as OAK or KOAK; runway data comes from the current NASR cycle and weather from the nearest report and forecast.",
@@ -1038,6 +1083,24 @@
           "available_takeoff_run_ft": {
             "description": "Takeoff run available (TORA) in feet, such as one a NOTAM shortens. Required without airport.",
             "maximum": 30000,
+            "minimum": 0,
+            "type": "number"
+          },
+          "contamination": {
+            "description": "Runway contamination, where the aircraft's manuals have figures for it: an aircraft with the contamination capability takes any type on landing, and one with wet_unpaved_correction takes wet on a turf runway for takeoff and landing. water_or_slush and slush_or_wet_snow require contamination_depth_in; rwycc requires rwycc.",
+            "enum": [
+              "wet",
+              "water_or_slush",
+              "slush_or_wet_snow",
+              "dry_snow",
+              "compact_snow",
+              "rwycc"
+            ],
+            "type": "string"
+          },
+          "contamination_depth_in": {
+            "description": "Contaminant depth in inches.",
+            "maximum": 4,
             "minimum": 0,
             "type": "number"
           },
@@ -1079,6 +1142,12 @@
             "minimum": 0,
             "type": "number"
           },
+          "rwycc": {
+            "description": "Runway condition code, 1–6, for contamination rwycc.",
+            "maximum": 6,
+            "minimum": 1,
+            "type": "integer"
+          },
           "safety_factor": {
             "description": "Multiplier applied to the calculated distances. Defaults to 1.",
             "maximum": 3,
@@ -1092,7 +1161,7 @@
             "type": "number"
           },
           "surface": {
-            "description": "Runway surface; turf applies the AFM unpaved correction.",
+            "description": "Runway surface; turf applies the manual's unpaved correction.",
             "enum": [
               "paved",
               "grooved",
@@ -1113,9 +1182,9 @@
             "type": "string"
           },
           "weight_lb": {
-            "description": "Aircraft weight in pounds.",
-            "maximum": 7000,
-            "minimum": 3000,
+            "description": "Aircraft weight in pounds, no more than the aircraft's maximum for the operation.",
+            "maximum": 6000,
+            "minimum": 1000,
             "type": "number"
           },
           "wind_direction_true_deg": {
@@ -1132,28 +1201,69 @@
           }
         },
         "required": [
-          "aircraft_generation",
+          "aircraft",
           "weight_lb"
         ],
         "type": "object"
       }
     },
     {
-      "name": "sf50_landing_performance",
-      "description": "Cirrus SF50 Vision Jet landing Vref, ground run and distance from 50 ft, with corrections for wind, slope, surface and runway contamination, the AFM go-around climb gradient, margins against the runway and AFM limitation notes. For pre-flight planning only, not for cockpit use; not FAA- or Cirrus-approved.",
+      "name": "landing_performance",
+      "description": "Landing ground run and distance from 50 ft for the Cirrus SF50 Vision Jet or Cirrus SR22, chosen by aircraft, with corrections for wind, slope, surface and runway contamination where the manual gives them, Vref and the go-around climb gradient or the balked landing climb where it has them, margins against the runway and limitation notes. For pre-flight planning only, not for cockpit use; not FAA- or manufacturer-approved.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
-          "aircraft_generation": {
-            "description": "SF50 generation: g1, g2, g2_updated_thrust (G2 with the updated thrust schedule), g2_plus or g3.",
-            "enum": [
-              "g1",
-              "g2",
-              "g2_updated_thrust",
-              "g2_plus",
-              "g3"
+          "aircraft": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "generation": {
+                    "description": "Cirrus SF50 generation: g1, g2, g2_updated_thrust (G2 with the updated thrust schedule, SB5X-72-01), g2_plus or g3.",
+                    "enum": [
+                      "g1",
+                      "g2",
+                      "g2_updated_thrust",
+                      "g2_plus",
+                      "g3"
+                    ],
+                    "type": "string"
+                  },
+                  "type": {
+                    "const": "sf50"
+                  }
+                },
+                "required": [
+                  "type",
+                  "generation"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "hartzell_propeller": {
+                    "description": "Whether the Hartzell composite propeller is installed (POH supplement 13772-129).",
+                    "type": "boolean"
+                  },
+                  "turbonormalized": {
+                    "description": "Whether the Tornado Alley turbonormalizing system is installed (STC SA10588SC).",
+                    "type": "boolean"
+                  },
+                  "type": {
+                    "const": "sr22"
+                  }
+                },
+                "required": [
+                  "type",
+                  "hartzell_propeller",
+                  "turbonormalized"
+                ],
+                "type": "object"
+              }
             ],
-            "type": "string"
+            "description": "The aircraft and its installed options. Each result lists the aircraft's capabilities, the manuals its figures come from, and any output those manuals have no figures for.",
+            "type": "object"
           },
           "airport": {
             "description": "Airport as an FAA location identifier or ICAO code, such as OAK or KOAK; runway data comes from the current NASR cycle and weather from the nearest report and forecast.",
@@ -1174,7 +1284,7 @@
             "type": "number"
           },
           "contamination": {
-            "description": "Runway contamination. water_or_slush and slush_or_wet_snow require contamination_depth_in; rwycc requires rwycc.",
+            "description": "Runway contamination, where the aircraft's manuals have figures for it: an aircraft with the contamination capability takes any type on landing, and one with wet_unpaved_correction takes wet on a turf runway for takeoff and landing. water_or_slush and slush_or_wet_snow require contamination_depth_in; rwycc requires rwycc.",
             "enum": [
               "wet",
               "water_or_slush",
@@ -1198,7 +1308,7 @@
             "type": "number"
           },
           "flaps": {
-            "description": "Landing flap setting; the _ice settings are with ice protection on. Defaults to 100.",
+            "description": "Landing flap setting, among those the aircraft's manuals give figures for; the _ice settings are with ice protection on. Defaults to 100.",
             "enum": [
               "up",
               "up_ice",
@@ -1247,7 +1357,7 @@
             "type": "number"
           },
           "surface": {
-            "description": "Runway surface; turf applies the AFM unpaved correction.",
+            "description": "Runway surface; turf applies the manual's unpaved correction.",
             "enum": [
               "paved",
               "grooved",
@@ -1268,15 +1378,15 @@
             "type": "string"
           },
           "vref_additive_kt": {
-            "description": "Speed added to Vref in knots. Defaults to 0.",
+            "description": "Speed added to Vref in knots, for an aircraft with the vref capability. Defaults to 0.",
             "maximum": 20,
             "minimum": 0,
             "type": "number"
           },
           "weight_lb": {
-            "description": "Aircraft weight in pounds.",
-            "maximum": 7000,
-            "minimum": 3000,
+            "description": "Aircraft weight in pounds, no more than the aircraft's maximum for the operation.",
+            "maximum": 6000,
+            "minimum": 1000,
             "type": "number"
           },
           "wind_direction_true_deg": {
@@ -1293,28 +1403,69 @@
           }
         },
         "required": [
-          "aircraft_generation",
+          "aircraft",
           "weight_lb"
         ],
         "type": "object"
       }
     },
     {
-      "name": "sf50_climb_profile",
-      "description": "Cirrus SF50 Vision Jet climb gradient and rate by altitude from the field to a top altitude, for the takeoff (91 KIAS), enroute-obstacle (120 KIAS) and enroute climb schedules with and without ice protection, using forecast winds aloft. Gives ground gradients along a course and a minimum gradient for query_terrain. For pre-flight planning only, not for cockpit use; not FAA- or Cirrus-approved.",
+      "name": "climb_profile",
+      "description": "Climb gradient and rate by altitude from the field to a top altitude for the Cirrus SF50 Vision Jet or Cirrus SR22, chosen by aircraft, for each climb schedule the manual has (takeoff and enroute, and the SF50's enroute-obstacle and ice-protection schedules), using forecast winds aloft, with the SR22's time, fuel and distance to climb. Gives ground gradients along a course and a minimum gradient for query_terrain. For pre-flight planning only, not for cockpit use; not FAA- or manufacturer-approved.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
-          "aircraft_generation": {
-            "description": "SF50 generation: g1, g2, g2_updated_thrust (G2 with the updated thrust schedule), g2_plus or g3.",
-            "enum": [
-              "g1",
-              "g2",
-              "g2_updated_thrust",
-              "g2_plus",
-              "g3"
+          "aircraft": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "generation": {
+                    "description": "Cirrus SF50 generation: g1, g2, g2_updated_thrust (G2 with the updated thrust schedule, SB5X-72-01), g2_plus or g3.",
+                    "enum": [
+                      "g1",
+                      "g2",
+                      "g2_updated_thrust",
+                      "g2_plus",
+                      "g3"
+                    ],
+                    "type": "string"
+                  },
+                  "type": {
+                    "const": "sf50"
+                  }
+                },
+                "required": [
+                  "type",
+                  "generation"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "hartzell_propeller": {
+                    "description": "Whether the Hartzell composite propeller is installed (POH supplement 13772-129).",
+                    "type": "boolean"
+                  },
+                  "turbonormalized": {
+                    "description": "Whether the Tornado Alley turbonormalizing system is installed (STC SA10588SC).",
+                    "type": "boolean"
+                  },
+                  "type": {
+                    "const": "sr22"
+                  }
+                },
+                "required": [
+                  "type",
+                  "hartzell_propeller",
+                  "turbonormalized"
+                ],
+                "type": "object"
+              }
             ],
-            "type": "string"
+            "description": "The aircraft and its installed options. Each result lists the aircraft's capabilities, the manuals its figures come from, and any output those manuals have no figures for.",
+            "type": "object"
           },
           "airport": {
             "description": "Airport as an FAA location identifier or ICAO code, such as OAK or KOAK; runway data comes from the current NASR cycle and weather from the nearest report and forecast.",
@@ -1366,20 +1517,20 @@
             "type": "string"
           },
           "top_altitude_ft": {
-            "description": "Altitude in feet MSL the climb ends at.",
+            "description": "Altitude in feet MSL the climb ends at, no higher than the aircraft's maximum operating altitude.",
             "maximum": 31000,
             "minimum": 0,
             "type": "number"
           },
           "weight_lb": {
-            "description": "Aircraft weight in pounds.",
-            "maximum": 7000,
-            "minimum": 3000,
+            "description": "Aircraft weight in pounds, no more than the aircraft's maximum for the operation.",
+            "maximum": 6000,
+            "minimum": 1000,
             "type": "number"
           }
         },
         "required": [
-          "aircraft_generation",
+          "aircraft",
           "weight_lb",
           "top_altitude_ft"
         ],
@@ -1387,21 +1538,62 @@
       }
     },
     {
-      "name": "sf50_takeoff_limits",
-      "description": "Cirrus SF50 Vision Jet maximum takeoff weight, or maximum outside air temperature at a weight, for one runway end or every end of an airport, with the constraint that limits each. For pre-flight planning only, not for cockpit use; not FAA- or Cirrus-approved.",
+      "name": "takeoff_limits",
+      "description": "Maximum takeoff weight, or maximum outside air temperature at a weight, for the Cirrus SF50 Vision Jet or Cirrus SR22, chosen by aircraft, for one runway end or every end of an airport, with the constraint that limits each. For pre-flight planning only, not for cockpit use; not FAA- or manufacturer-approved.",
       "inputSchema": {
         "additionalProperties": false,
         "properties": {
-          "aircraft_generation": {
-            "description": "SF50 generation: g1, g2, g2_updated_thrust (G2 with the updated thrust schedule), g2_plus or g3.",
-            "enum": [
-              "g1",
-              "g2",
-              "g2_updated_thrust",
-              "g2_plus",
-              "g3"
+          "aircraft": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "generation": {
+                    "description": "Cirrus SF50 generation: g1, g2, g2_updated_thrust (G2 with the updated thrust schedule, SB5X-72-01), g2_plus or g3.",
+                    "enum": [
+                      "g1",
+                      "g2",
+                      "g2_updated_thrust",
+                      "g2_plus",
+                      "g3"
+                    ],
+                    "type": "string"
+                  },
+                  "type": {
+                    "const": "sf50"
+                  }
+                },
+                "required": [
+                  "type",
+                  "generation"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "hartzell_propeller": {
+                    "description": "Whether the Hartzell composite propeller is installed (POH supplement 13772-129).",
+                    "type": "boolean"
+                  },
+                  "turbonormalized": {
+                    "description": "Whether the Tornado Alley turbonormalizing system is installed (STC SA10588SC).",
+                    "type": "boolean"
+                  },
+                  "type": {
+                    "const": "sr22"
+                  }
+                },
+                "required": [
+                  "type",
+                  "hartzell_propeller",
+                  "turbonormalized"
+                ],
+                "type": "object"
+              }
             ],
-            "type": "string"
+            "description": "The aircraft and its installed options. Each result lists the aircraft's capabilities, the manuals its figures come from, and any output those manuals have no figures for.",
+            "type": "object"
           },
           "airport": {
             "description": "Airport as an FAA location identifier or ICAO code, such as OAK or KOAK; runway data comes from the current NASR cycle and weather from the nearest report and forecast.",
@@ -1427,6 +1619,24 @@
             "minimum": 0,
             "type": "number"
           },
+          "contamination": {
+            "description": "Runway contamination, where the aircraft's manuals have figures for it: an aircraft with the contamination capability takes any type on landing, and one with wet_unpaved_correction takes wet on a turf runway for takeoff and landing. water_or_slush and slush_or_wet_snow require contamination_depth_in; rwycc requires rwycc.",
+            "enum": [
+              "wet",
+              "water_or_slush",
+              "slush_or_wet_snow",
+              "dry_snow",
+              "compact_snow",
+              "rwycc"
+            ],
+            "type": "string"
+          },
+          "contamination_depth_in": {
+            "description": "Contaminant depth in inches.",
+            "maximum": 4,
+            "minimum": 0,
+            "type": "number"
+          },
           "elevation_ft": {
             "description": "Runway elevation in feet MSL, replacing the threshold elevation. Required without airport.",
             "maximum": 15000,
@@ -1434,9 +1644,9 @@
             "type": "number"
           },
           "minimum_weight_lb": {
-            "description": "Lightest weight the weight search considers. Defaults to 5,000 lb, the lightest weight the AFM takeoff data covers.",
-            "maximum": 7000,
-            "minimum": 3000,
+            "description": "Lightest weight the weight search considers. Defaults to the lightest weight the aircraft's takeoff tables cover.",
+            "maximum": 6000,
+            "minimum": 1000,
             "type": "number"
           },
           "model": {
@@ -1471,6 +1681,12 @@
             "minimum": 0,
             "type": "number"
           },
+          "rwycc": {
+            "description": "Runway condition code, 1–6, for contamination rwycc.",
+            "maximum": 6,
+            "minimum": 1,
+            "type": "integer"
+          },
           "safety_factor": {
             "description": "Multiplier applied to the calculated distances. Defaults to 1.",
             "maximum": 3,
@@ -1492,7 +1708,7 @@
             "type": "string"
           },
           "surface": {
-            "description": "Runway surface; turf applies the AFM unpaved correction.",
+            "description": "Runway surface; turf applies the manual's unpaved correction.",
             "enum": [
               "paved",
               "grooved",
@@ -1514,8 +1730,8 @@
           },
           "weight_lb": {
             "description": "Takeoff weight in pounds. Required when solve_for is temperature.",
-            "maximum": 7000,
-            "minimum": 3000,
+            "maximum": 6000,
+            "minimum": 1000,
             "type": "number"
           },
           "wind_direction_true_deg": {
@@ -1532,7 +1748,7 @@
           }
         },
         "required": [
-          "aircraft_generation",
+          "aircraft",
           "solve_for"
         ],
         "type": "object"

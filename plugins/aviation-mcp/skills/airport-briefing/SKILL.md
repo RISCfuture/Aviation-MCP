@@ -1,14 +1,15 @@
 ---
 name: airport-briefing
-description: Brief a U.S. airport for a flight with Aviation MCP data — runways and declared distances, elevation and remarks, current and forecast weather, NOTAMs for the time window, instrument approaches, departures and arrivals, airspace, and the currency of every data source. Use when the user asks to brief, review or "tell me about" an airport before a departure or arrival, wants the conditions, NOTAMs and procedures at an airport for a time, or as the first step before Cirrus SF50 performance planning.
+description: Brief a U.S. airport for a flight with Aviation MCP data — runways and declared distances, elevation and remarks, current and forecast weather, NOTAMs for the time window, instrument approaches, departures and arrivals, airspace, and the currency of every data source. Use when the user asks to brief, review or "tell me about" an airport before a departure or arrival, wants the conditions, NOTAMs and procedures at an airport for a time, or as the first step before Cirrus SF50 or SR22 performance planning.
 ---
 
 # Airport briefing
 
 ## Safety
 
-- Planning aid only. This data is not certified for navigation or dispatch, and SF50
-  figures from these tools are not FAA- or Cirrus-approved and are not for cockpit use.
+- Planning aid only. This data is not certified for navigation or dispatch, and performance
+  figures from these tools are not approved by the FAA, the aircraft manufacturer or any
+  supplement holder and are not for cockpit use.
 - Never invent, estimate or interpolate a figure the tools did not return. If something is
   missing, name it and the input that would supply it.
 - Pass through every non-`value` status (`uncertain`, `offscale_high`, `offscale_low`,
@@ -58,6 +59,6 @@ description: Brief a U.S. airport for a flight with Aviation MCP data — runway
 3. Weather at the time: observed, forecast, conditional groups, modeled values labeled.
 4. NOTAMs by group, with numbers, validity and schedules; uncertain matches last.
 5. Procedures and airspace.
-6. Items that would change an SF50 performance calculation, with a pointer to the matching
-   skill (sf50-takeoff-planning, sf50-landing-and-go-around,
-   sf50-departure-climb-vs-terrain, sf50-performance-limits).
+6. Items that would change an SF50 or SR22 performance calculation, with a pointer to the
+   matching skill (takeoff-planning, landing-and-go-around, departure-climb-vs-terrain,
+   performance-limits).

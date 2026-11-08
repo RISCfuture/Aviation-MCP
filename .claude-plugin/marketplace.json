@@ -5,13 +5,13 @@
     "url": "https://aviation-mcp.org"
   },
   "metadata": {
-    "description": "Aviation MCP: U.S. aviation data, worldwide terrain and Cirrus SF50 performance planning."
+    "description": "Aviation MCP: U.S. aviation data, worldwide terrain and Cirrus SF50 and SR22 performance planning."
   },
   "plugins": [
     {
       "name": "aviation-mcp",
       "source": "./plugins/aviation-mcp",
-      "description": "Query U.S. aviation data, worldwide terrain and Cirrus SF50 performance with source cycles, provenance, and explicit coverage gaps.",
+      "description": "Query U.S. aviation data, worldwide terrain and Cirrus SF50 and SR22 performance with source cycles, provenance, and explicit coverage gaps.",
       "category": "productivity",
       "homepage": "https://aviation-mcp.org"
     }

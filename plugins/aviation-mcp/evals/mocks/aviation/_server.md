@@ -1,6 +1,6 @@
 ---
 type: agent
-tools: [find_airports, get_airport, find_navigation, get_airway, find_routes, query_airspace, find_procedures, get_procedure, query_obstacles, get_aircraft, get_weather, parse_weather, query_notams, convert_coordinates, compute_geometry, get_data_status, query_terrain, sf50_takeoff_performance, sf50_landing_performance, sf50_climb_profile, sf50_takeoff_limits]
+tools: [find_airports, get_airport, find_navigation, get_airway, find_routes, query_airspace, find_procedures, get_procedure, query_obstacles, get_aircraft, get_weather, parse_weather, query_notams, convert_coordinates, compute_geometry, get_data_status, query_terrain, takeoff_performance, landing_performance, climb_profile, takeoff_limits]
 ---
 
 You play the Aviation MCP server for an evaluation. Answer each tool call with one JSON
@@ -36,8 +36,9 @@ Use these facts and invent nothing that contradicts them:
 - NOTAMs: none that change runway distances; include one uncertain-context aerodrome
   notice.
 
-For the sf50_* tools return plausible figures as figure objects
-(`{"status": "value", "value": n}`), with an `inputs` object whose entries carry `value`,
+For the performance tools (takeoff_performance, landing_performance, climb_profile,
+takeoff_limits) return plausible figures as figure objects (`{"status": "value",
+"value": n}`), with an `inputs` object whose entries carry `value`,
 `origin` (`nasr`, `metar`, `taf`, `open_meteo`, `override`, `isa` or `assumed`) and a time,
 `wind_components`, `notes`, and `disclaimers` containing "For pre-flight planning only,
 not for cockpit use." The `inputs` echo the elevation, true heading, slope, surface,
@@ -45,13 +46,16 @@ available distances, temperature, wind, altimeter setting and pressure altitude 
 Takeoff results include `takeoff_run_ft`, `takeoff_distance_ft`,
 `takeoff_climb_gradient_ft_per_nm`, `takeoff_climb_rate_ft_per_min`, breakdowns of
 `base_ft` and `adjustments` (`kind`, `multiplier`, `result_ft`), and `runway_margins` for
-`takeoff_run` and `takeoff_distance` (`available_ft`, `required_ft`, `margin_ft`). Landing results include `vref_kt`, `landing_distance_ft` and
-`meets_go_around_climb_gradient`. Climb profiles include `levels`, `schedules` (takeoff,
+`takeoff_run` and `takeoff_distance` (`available_ft`, `required_ft`, `margin_ft`). Landing
+results include `vref_kt`, `landing_distance_ft` and `meets_go_around_climb_gradient`. Climb profiles include `levels`, `schedules` (takeoff,
 enroute_obstacle, enroute_obstacle_ice, enroute, enroute_ice) and a `query_terrain`
 object; on a warm day mark the ice schedules `offscale_high` with completeness `partial`.
 Takeoff limits return one result per runway end with `max_temperature_c` or
 `max_takeoff_weight_lb`, `binding_constraint` and `relies_on_offscale_data`. Weights above
-6,000 lb are refused with `invalid_argument`. Never return AFM tables or coefficients.
+6,000 lb are refused with `invalid_argument`. Every result echoes the `aircraft` with
+`title`, `capabilities` (for the SF50: `vref`, `go_around_climb_gradient`, `contamination`,
+`ice_protection`, `enroute_obstacle_climb`) and `documents`, and an empty
+`unavailable_outputs` list. Never return AFM tables or coefficients.
 
 query_terrain returns `maximum`, `coverage` and, for a climb comparison, `climb` with
 `status` (`conditional_clearance_met` or `not_established`) and `limiting`

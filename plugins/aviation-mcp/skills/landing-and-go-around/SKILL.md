@@ -1,14 +1,15 @@
 ---
-name: sf50-landing-and-go-around
-description: Assess a Cirrus SF50 Vision Jet landing and whether a go-around or missed approach is possible — Vref, landing distance against LDA, runway contamination and RwyCC, the AFM go-around climb gradient, and the missed-approach climb versus the required gradient, terrain and obstacles for each approach. Use for questions like "is a go-around possible from KASE runway 15 tomorrow at 2pm?", SF50 landing distance on a wet or snowy runway, or whether the SF50 can make a missed-approach climb gradient. Combines sf50_landing_performance, find_procedures, get_procedure, sf50_climb_profile, query_terrain and query_obstacles.
+name: landing-and-go-around
+description: Assess a Cirrus SF50 Vision Jet or SR22 landing and whether a go-around, balked landing or missed approach is possible — landing distance against LDA, runway contamination and RwyCC (SF50) or wet grass (SR22), Vref and the AFM go-around climb gradient (SF50) or the POH balked landing climb (SR22), and the missed-approach climb versus the required gradient, terrain and obstacles for each approach. Use for questions like "is a go-around possible from KASE runway 15 tomorrow at 2pm?", SF50 landing distance on a wet or snowy runway, "how far do I roll landing my SR22 on wet grass?", "can my SR22 make the missed-approach climb gradient?", or whether the SF50 can make a missed-approach climb gradient. Combines landing_performance, find_procedures, get_procedure, climb_profile, query_terrain and query_obstacles.
 ---
 
-# SF50 landing and go-around
+# Landing and go-around
 
 ## Safety
 
-- Planning aid only. SF50 figures from these tools are not FAA- or Cirrus-approved and are
-  not for cockpit use; say so whenever you report them.
+- Planning aid only. Figures from these tools are not approved by the FAA, the aircraft
+  manufacturer or any supplement holder and are not for cockpit use; say so whenever you
+  report them.
 - Never invent, estimate or interpolate a figure the tools did not return. If something is
   missing, name it and the input that would supply it.
 - Pass through every non-`value` status (`uncertain`, `offscale_high`, `offscale_low`,
@@ -19,28 +20,45 @@ description: Assess a Cirrus SF50 Vision Jet landing and whether a go-around or 
 
 ## Inputs to collect
 
-- `aircraft_generation` (ask if unknown; never assume) and the **landing** weight
-  (`weight_lb`), not the takeoff weight.
+- `aircraft`, an object chosen by `type` (ask if unknown; never assume):
+  - SF50: `{"type": "sf50", "generation": "g2"}`, with `generation` one of `g1`, `g2`,
+    `g2_updated_thrust`, `g2_plus` or `g3`.
+  - SR22 (pre-G3 wing): `{"type": "sr22", "hartzell_propeller": false,
+    "turbonormalized": false}`. Ask whether the aircraft has the Hartzell composite
+    propeller supplement and the Tornado Alley turbonormalizing supplement; both are
+    required.
+- The **landing** weight (`weight_lb`), not the takeoff weight. The tool refuses weights
+  above the aircraft's maximum.
 - `airport`, `runway` and the arrival time, converted by performance-weather-for-time.
-- `flaps`: `100` by default; also `50` and `up`, and `50_ice` or `up_ice` when ice
-  protection is on.
+- `flaps`: `100` by default. The SR22 has only `100`. The SF50 also takes `50` and `up`,
+  and `50_ice` or `up_ice` when ice protection is on. Any other setting is refused with
+  `invalid_argument`.
 - NOTAM inputs from notams-to-performance-inputs: `available_landing_distance_ft`,
-  `contamination`, `contamination_depth_in`, `rwycc`.
+  `contamination`, `contamination_depth_in`, `rwycc`. The SF50 takes every contamination
+  type. The SR22 takes only wet grass: `contamination: "wet"` with `surface: "turf"`.
+- `vref_additive_kt`, only for an aircraft with a Vref (the SF50). It is refused without
+  one.
 
 ## Steps
 
-1. **Landing.** Call `sf50_landing_performance`:
+1. **Landing.** Call `landing_performance`:
 
    ```json
-   {"aircraft_generation": "g2", "weight_lb": 5400, "airport": "KASE", "runway": "15",
-    "time": "2026-11-05T21:00:00Z"}
+   {"aircraft": {"type": "sf50", "generation": "g2"}, "weight_lb": 5400, "airport": "KASE",
+    "runway": "15", "time": "2026-11-05T21:00:00Z"}
    ```
 
-   Read `vref_kt`, `landing_run_ft`, `landing_distance_ft` (from 50 ft), the breakdowns,
-   `runway_margins.landing_distance` and `meets_go_around_climb_gradient`. That last field
-   is the AFM go-around gradient check at these conditions. If it is false or not a `value`,
-   say a go-around is not established by the AFM data, and continue only to show the
-   missed-approach picture.
+   Read `landing_run_ft`, `landing_distance_ft` (from 50 ft), the breakdowns and
+   `runway_margins.landing_distance`, and the outputs the aircraft's `capabilities` give:
+   - SF50 (`vref`, `go_around_climb_gradient`): `vref_kt` and
+     `meets_go_around_climb_gradient`. That field is the AFM go-around gradient check at
+     these conditions. If it is false or not a `value`, say a go-around is not established
+     by the AFM data, and continue only to show the missed-approach picture.
+   - SR22 (`balked_landing_climb`): `balked_landing_climb_gradient_ft_per_nm` and
+     `balked_landing_climb_rate_ft_per_min`, the POH balked landing climb at these
+     conditions. Use them in place of the go-around check. The SR22 POH has no Vref and
+     no go-around gradient check: `vref_kt` and `meets_go_around_climb_gradient` are
+     listed in `unavailable_outputs` and absent. Never supply a Vref.
 2. **Approaches.** Call `find_procedures` with `airport` and `procedure_type: "approach"`.
    Call it without `runway` as well: circling approaches list no runway (`runways: []`,
    `landing: "circle_to_land"`), yet they may be how you reach runway 15. If the result
@@ -59,16 +77,18 @@ description: Assess a Cirrus SF50 Vision Jet landing and whether a go-around or 
 5. **Course in true.** Missed-approach course true = magnetic + east variation, taking
    the variation from a runway end in `get_airport` as `heading_true_deg −
    heading_magnetic_deg`.
-6. **Climb.** Call `sf50_climb_profile` with the landing weight, `airport`, `runway`,
+6. **Climb.** Call `climb_profile` with the landing weight, `airport`, `runway`,
    `time`, `course_true_deg` (the initial missed-approach course in true) and
    `top_altitude_ft` (the highest missed-approach altitude constraint, usually the hold).
-   - The tool has no go-around configuration. The `takeoff` schedule (91 KIAS) is the
-     closest proxy for the initial climb; `enroute_obstacle` (120 KIAS) applies later.
-     Say which you used.
+   - The tool has no go-around configuration. The `takeoff` schedule (SF50 91 KIAS) is the
+     closest proxy for the initial climb; the SF50's `enroute_obstacle` (120 KIAS) applies
+     later. The SR22 has `takeoff` and `enroute` schedules only. Say which you used.
+   - For the SR22, compare the balked landing climb from step 1 with the required
+     gradient as well.
    - Use `schedules.takeoff.minimum_ground_gradient_ft_per_nm`. A headwind on the
      missed-approach course raises the ground gradient; a tailwind lowers it. The `levels`
      array gives gradients per 1,000 ft if the requirement applies only up to an altitude.
-   - `bands_without_gradient` and non-`value` statuses mean the AFM data does not cover
+   - `bands_without_gradient` and non-`value` statuses mean the manual's data does not cover
      part of the climb. The ice schedules are often offscale on a warm day; report that, but
      it does not affect the non-ice verdict.
 7. **Terrain.** Call `query_terrain`:
@@ -93,7 +113,7 @@ description: Assess a Cirrus SF50 Vision Jet landing and whether a go-around or 
 
 ## Verdict per approach
 
-| Approach | Required (source) | SF50 ground gradient (schedule) | Margin | Terrain | Obstacles | NOTAMs | Verdict |
+| Approach | Required (source) | Ground gradient (schedule) | Margin | Terrain | Obstacles | NOTAMs | Verdict |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | RNAV (GPS)-F | 200 ft/NM (standard; chart not checked) | `<n>` ft/NM (takeoff) | `<n>` ft/NM | `conditional_clearance_met` | `<list>` | `<ids>` | Meets on these inputs |
 
@@ -102,8 +122,10 @@ go-around safe or certified.
 
 ## Answer format
 
-1. Landing: Vref, landing distance against LDA with margin, contamination effect, and the
-   AFM go-around check.
+1. Landing: landing distance against LDA with margin, contamination effect, and for the
+   SF50 Vref and the AFM go-around check, or for the SR22 the balked landing climb
+   gradient and rate. Note any `unavailable_outputs`.
 2. The per-approach verdict table.
 3. Inputs with origin and time; NOTAMs applied and uncertain.
-4. The disclaimers from the results.
+4. The disclaimers from the results, including the manuals' configuration notes, and the
+   aircraft's `documents`.

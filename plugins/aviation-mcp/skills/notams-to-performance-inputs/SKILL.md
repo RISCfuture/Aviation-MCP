@@ -1,6 +1,6 @@
 ---
 name: notams-to-performance-inputs
-description: Turn NOTAMs into Cirrus SF50 performance inputs. Use before any sf50_takeoff_performance, sf50_landing_performance, sf50_takeoff_limits or sf50_climb_profile call that names an airport, runway and time, and whenever a user asks how NOTAMs affect a takeoff, landing, go-around or departure — runway closures, shortened runways, declared-distance changes, displaced or relocated thresholds, FICON contamination and RwyCC, cranes and other temporary obstacles, lighting or NAVAID outages, and amended or not-authorized procedures. Produces the tool overrides and a baseline-versus-NOTAM table, and keeps schedules, reciprocal-runway notices and uncertain matches visible.
+description: Turn NOTAMs into Cirrus SF50 and SR22 performance inputs. Use before any takeoff_performance, landing_performance, takeoff_limits or climb_profile call that names an airport, runway and time, and whenever a user asks how NOTAMs affect a takeoff, landing, go-around or departure — runway closures, shortened runways, declared-distance changes, displaced or relocated thresholds, FICON contamination and RwyCC, cranes and other temporary obstacles, lighting or NAVAID outages, and amended or not-authorized procedures. Produces the tool overrides and a baseline-versus-NOTAM table, and keeps schedules, reciprocal-runway notices and uncertain matches visible.
 ---
 
 # NOTAMs to performance inputs
@@ -10,8 +10,9 @@ each one into the matching performance-tool override, or a reason no calculation
 
 ## Safety
 
-- Planning aid only. SF50 figures from these tools are not FAA- or Cirrus-approved and are
-  not for cockpit use; say so whenever you report them.
+- Planning aid only. Figures from these tools are not approved by the FAA, the aircraft
+  manufacturer or any supplement holder and are not for cockpit use; say so whenever you
+  report them.
 - Never invent, estimate or interpolate a figure the tools did not return. If something is
   missing, name it and the input that would supply it.
 - Pass through every non-`value` status (`uncertain`, `offscale_high`, `offscale_low`,
@@ -62,8 +63,13 @@ or `scope_match: "uncertain"`. Read those too; they are uncertain, not irrelevan
 - FICON codes are given by thirds in the direction of the runway number. For the
   reciprocal, read them in reverse. Use the lowest code that applies to the landing roll and
   say which third it came from.
-- `sf50_takeoff_performance` has no contamination input. Never apply a landing factor to a
-  takeoff. Say that contaminated takeoff figures are not available from these tools.
+- `takeoff_performance` takes contamination only for the SR22's wet-grass correction
+  (`contamination: "wet"` with `surface: "turf"`). For every other contaminated takeoff, never
+  apply a landing factor; say that contaminated takeoff figures are not available from
+  these tools.
+- The SF50 takes contamination on landing only. The SR22 takes only `wet` on a `turf`
+  surface, on takeoff and landing; any other contamination is refused with
+  `invalid_argument`. Say that the aircraft's manual has no figures for it.
 - Every contaminated landing (anything but `wet`) carries a supplemental-data disclaimer.
   Keep it.
 
