@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#07110f" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="robots" content="noindex" />
+    <meta
+      name="description"
+      content="The Aviation MCP performance tools for the Cirrus SF50 Vision Jet and the Cirrus SR22, with example questions."
+    />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <title>Aircraft performance — Aviation MCP</title>
+    <link rel="stylesheet" href="/src/style.css" />
+    <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/tabs.ts"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <svg
+      class="icon-library"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <symbol id="arrow-up-right" viewBox="0 0 24 24">
+        <path d="M5 19 19 5M5 5h14v14" />
+      </symbol>
+      <symbol id="copy" viewBox="0 0 24 24">
+        <path d="M9 9h11v12H9zM5 16H3V3h12v2" />
+      </symbol>
+      <symbol id="compass" viewBox="0 0 60 60">
+        <circle cx="30" cy="30" r="21" />
+        <path d="M30 0v60M0 30h60" />
+        <path class="needle" d="m30 8 6 22-6 22-6-22Z" />
+      </symbol>
+    </svg>
+    <header class="header wrap">
+      <a class="brand" href="/" aria-label="Aviation MCP home"
+        ><svg class="brand-mark" aria-hidden="true"><use href="#compass" /></svg
+        ><span>AVIATION / <strong>MCP</strong></span></a
+      >
+      <nav aria-label="Main navigation">
+        <a href="/#about">About</a><a href="/#tools">Tools</a
+        ><a href="/#connect">Connect</a>
+        <a class="github-link" href="https://github.com/RISCfuture/Aviation-MCP"
+          >GitHub
+          <svg class="icon" aria-hidden="true">
+            <use href="#arrow-up-right" /></svg
+        ></a>
+      </nav>
+    </header>
+    <main id="main">
+      <section
+        class="showcase section wrap performance"
+        aria-labelledby="performance-title"
+      >
+        <h1 id="performance-title">Aircraft<br /><em>performance tools</em></h1>
+        <p class="section-deck showcase-deck">
+          Four tools calculate takeoff, landing, climb and takeoff limits from
+          current runway data and weather. Each takes an
+          <code>aircraft</code> object, and each result says which manuals its
+          figures come from and which outputs those manuals don’t cover.
+        </p>
+        <div class="aircraft-tabs" data-tabs>
+          <nav class="tab-list" aria-label="Aircraft">
+            <a id="tab-sf50" href="#sf50">Cirrus SF50</a
+            ><a id="tab-sr22" href="#sr22">Cirrus SR22</a>
+          </nav>
+
+          <section class="tab-panel" id="sf50" aria-labelledby="sf50-title">
+            <h2 id="sf50-title">Cirrus SF50 <em>Vision Jet</em></h2>
+            <div class="aircraft-config">
+              <div>
+                <span class="label">Aircraft object</span>
+                <code class="aircraft-object"
+                  >{"type": "sf50", "generation": "g2_plus"}</code
+                >
+              </div>
+              <dl>
+                <dt><code>generation</code></dt>
+                <dd>
+                  <code>g1</code>, <code>g2</code>,
+                  <code>g2_updated_thrust</code> (a G2 with SB5X-72-01),
+                  <code>g2_plus</code> or <code>g3</code>. The G2+, G3 and
+                  updated G2 use the Updated Thrust Schedule supplement
+                  (31452-111) over the G2 AFM.
+                </dd>
+              </dl>
+            </div>
+            <div class="coverage-note capability-note">
+              <div>
+                <span class="label">In the AFM</span>
+                <p>
+                  Vref, the go-around climb gradient check, contaminated-runway
+                  landings (wet, water or slush, slush or wet snow, dry snow,
+                  compact snow and RwyCC), ice protection, and the
+                  enroute-obstacle climb.
+                </p>
+              </div>
+              <div>
+                <span class="label">Not in the AFM</span>
+                <p>
+                  Balked landing climb, time, fuel and distance to climb, and
+                  the air conditioner and wet grass corrections. Results list
+                  these under <code>unavailable_outputs</code>.
+                </p>
+              </div>
+            </div>
+            <div class="tool-showcase">
+              <article class="tool-row" aria-labelledby="sf50-takeoff-title">
+                <div class="tool-info">
+                  <span class="number">01 / Flaps 50%</span>
+                  <h3 id="sf50-takeoff-title">Takeoff</h3>
+                  <p>
+                    Ground run and distance over a 50 ft obstacle, each
+                    correction factor, the takeoff climb gradient, and margins
+                    against TORA and TODA.
+                  </p>
+                  <code>takeoff_performance</code>
+                </div>
+                <div class="tool-question">
+                  <span class="label">Example question</span>
+                  <blockquote id="question-sf50-takeoff">
+                    I’m flying a G2+ SF50 out of Oakland (KOAK) runway 28R in 18
+                    hours at 5,800 lb. What will my ground run and total takeoff
+                    distance be, and what correction factors apply?
+                  </blockquote>
+                  <button
+                    class="text-link"
+                    data-copy="question-sf50-takeoff"
+                    aria-label="Copy question: SF50 takeoff"
+                  >
+                    Copy question
+                    <svg class="icon" aria-hidden="true">
+                      <use href="#copy" />
+                    </svg>
+                  </button>
+                </div>
+              </article>
+              <article class="tool-row" aria-labelledby="sf50-landing-title">
+                <div class="tool-info">
+                  <span class="number">02 / Up, 50% or 100%, with ice</span>
+                  <h3 id="sf50-landing-title">Landing</h3>
+                  <p>
+                    Vref, landing run and distance from 50 ft on a dry, wet or
+                    contaminated runway, and whether the AFM go-around climb
+                    gradient is met.
+                  </p>
+                  <code>landing_performance</code>
+                </div>
+                <div class="tool-question">
+                  <span class="label">Example question</span>
+                  <blockquote id="question-sf50-landing">
+                    My G1 SF50 lands at Truckee (KTRK) runway 20 at 5,200 lb
+                    with a quarter inch of wet snow reported. What are my Vref
+                    and landing distance?
+                  </blockquote>
+                  <button
+                    class="text-link"
+                    data-copy="question-sf50-landing"
+                    aria-label="Copy question: SF50 landing"
+                  >
+                    Copy question
+                    <svg class="icon" aria-hidden="true">
+                      <use href="#copy" />
+                    </svg>
+                  </button>
+                </div>
+              </article>
+              <article class="tool-row" aria-labelledby="sf50-climb-title">
+                <div class="tool-info">
+                  <span class="number">03 / Five climb schedules</span>
+                  <h3 id="sf50-climb-title">Climb profile</h3>
+                  <p>
+                    Gradient and rate by altitude for the takeoff, enroute
+                    obstacle and enroute climbs, with and without ice
+                    protection, in the forecast winds aloft. Gives a gradient to
+                    compare with terrain.
+                  </p>
+                  <code>climb_profile</code>
+                </div>
+                <div class="tool-question">
+                  <span class="label">Example question</span>
+                  <blockquote id="question-sf50-climb">
+                    Will my G2+ SF50 at 5,900 lb out-climb the terrain taking
+                    off from Aspen (KASE) runway 15 right now?
+                  </blockquote>
+                  <button
+                    class="text-link"
+                    data-copy="question-sf50-climb"
+                    aria-label="Copy question: SF50 climb profile"
+                  >
+                    Copy question
+                    <svg class="icon" aria-hidden="true">
+                      <use href="#copy" />
+                    </svg>
+                  </button>
+                </div>
+              </article>
+              <article class="tool-row" aria-labelledby="sf50-limits-title">
+                <div class="tool-info">
+                  <span class="number">04 / Weight or temperature</span>
+                  <h3 id="sf50-limits-title">Takeoff limits</h3>
+                  <p>
+                    The maximum takeoff weight, or the hottest temperature at a
+                    weight, for one runway end or every end of an airport, and
+                    the constraint that sets it.
+                  </p>
+                  <code>takeoff_limits</code>
+                </div>
+                <div class="tool-question">
+                  <span class="label">Example question</span>
+                  <blockquote id="question-sf50-limits">
+                    What’s the hottest outside air temperature at which my G2
+                    SF50 can still take off from Telluride (KTEX) in either
+                    direction at maximum takeoff weight?
+                  </blockquote>
+                  <button
+                    class="text-link"
+                    data-copy="question-sf50-limits"
+                    aria-label="Copy question: SF50 takeoff limits"
+                  >
+                    Copy question
+                    <svg class="icon" aria-hidden="true">
+                      <use href="#copy" />
+                    </svg>
+                  </button>
+                </div>
+              </article>
+            </div>
+            <p class="setup-note alias-note">
+              <code>sf50_takeoff_performance</code>,
+              <code>sf50_landing_performance</code>,
+              <code>sf50_climb_profile</code> and
+              <code>sf50_takeoff_limits</code> are deprecated aliases that take
+              <code>aircraft_generation</code> instead of an aircraft object.
+              They will be removed.
+            </p>
+          </section>
+
+          <section class="tab-panel" id="sr22" aria-labelledby="sr22-title">
+            <h2 id="sr22-title">Cirrus <em>SR22</em></h2>
+            <div class="aircraft-config">
+              <div>
+                <span class="label">Aircraft object</span>
+                <code class="aircraft-object"
+                  >{"type": "sr22", "hartzell_propeller": false,
+                  "turbonormalized": true}</code
+                >
+              </div>
+              <dl>
+                <dt><code>hartzell_propeller</code></dt>
+                <dd>
+                  The Hartzell composite propeller (POH supplement 13772-129).
+                  Its enroute climb tables replace the POH’s.
+                </dd>
+                <dt><code>turbonormalized</code></dt>
+                <dd>
+                  The Tornado Alley turbonormalizing system (STC SA10588SC). It
+                  raises the ceiling to 25,000 ft and adds lean-of-peak climb
+                  figures. Takeoff stays limited to 10,000 ft.
+                </dd>
+              </dl>
+            </div>
+            <p class="setup-note">
+              Both options are required. The figures are for the pre-G3 wing POH
+              (13772-001), and results carry the supplements’ notes, including
+              that no document covers both supplements together.
+            </p>
+            <div class="coverage-note capability-note">
+              <div>
+                <span class="label">In the POH</span>
+                <p>
+                  Balked landing climb, time, fuel and distance to climb (lean
+                  of peak too when turbonormalized), the wet grass correction
+                  for takeoff and landing, and the air conditioner correction
+                  for takeoff.
+                </p>
+              </div>
+              <div>
+                <span class="label">Not in the POH</span>
+                <p>
+                  Vref, the go-around gradient check, contaminated-runway data
+                  other than wet grass, ice protection, and the enroute-obstacle
+                  climb. Results list these under
+                  <code>unavailable_outputs</code>, and contamination other than
+                  wet grass is refused.
+                </p>
+              </div>
+            </div>
+            <div class="tool-showcase">
+              <article class="tool-row" aria-labelledby="sr22-takeoff-title">
+                <div class="tool-info">
+                  <span class="number">01 / Flaps 50%</span>
+                  <h3 id="sr22-takeoff-title">Takeoff</h3>
+                  <p>
+                    Ground roll and distance over a 50 ft obstacle, with the
+                    slope, grass, wet grass and air conditioner corrections.
+                    Above 10,000 ft the POH does not authorize a takeoff.
+                  </p>
+                  <code>takeoff_performance</code>
+                </div>
+                <div class="tool-question">
+                  <span class="label">Example question</span>
+                  <blockquote id="question-sr22-takeoff">
+                    The grass at Boulder (KBDU) is wet after this morning’s
+                    rain. How much of runway 26G will my SR22 use taking off at
+                    3,300 lb?
+                  </blockquote>
+                  <button
+                    class="text-link"
+                    data-copy="question-sr22-takeoff"
+                    aria-label="Copy question: SR22 takeoff"
+                  >
+                    Copy question
+                    <svg class="icon" aria-hidden="true">
+                      <use href="#copy" />
+                    </svg>
+                  </button>
+                </div>
+              </article>
+              <article class="tool-row" aria-labelledby="sr22-landing-title">
+                <div class="tool-info">
+                  <span class="number">02 / Flaps 100%</span>
+                  <h3 id="sr22-landing-title">Landing</h3>
+                  <p>
+                    Landing roll and distance from 50 ft, with the wind, slope,
+                    grass and wet grass corrections, and the balked landing
+                    climb gradient and rate.
+                  </p>
+                  <code>landing_performance</code>
+                </div>
+                <div class="tool-question">
+                  <span class="label">Example question</span>
+                  <blockquote id="question-sr22-landing">
+                    I’m landing my turbonormalized SR22 with the Hartzell
+                    composite prop on Boulder’s (KBDU) wet grass runway 08G at
+                    3,300 lb. What’s my landing distance, and what can I expect
+                    from a balked landing climb?
+                  </blockquote>
+                  <button
+                    class="text-link"
+                    data-copy="question-sr22-landing"
+                    aria-label="Copy question: SR22 landing"
+                  >
+                    Copy question
+                    <svg class="icon" aria-hidden="true">
+                      <use href="#copy" />
+                    </svg>
+                  </button>
+                </div>
+              </article>
+              <article class="tool-row" aria-labelledby="sr22-climb-title">
+                <div class="tool-info">
+                  <span class="number">03 / Takeoff and enroute</span>
+                  <h3 id="sr22-climb-title">Climb profile</h3>
+                  <p>
+                    Gradient and rate by altitude in the forecast winds aloft,
+                    with the time, fuel and distance to climb. These leave out
+                    the POH’s start, taxi and takeoff fuel and its hot-day
+                    addition, and say so.
+                  </p>
+                  <code>climb_profile</code>
+                </div>
+                <div class="tool-question">
+                  <span class="label">Example question</span>
+                  <blockquote id="question-sr22-climb">
+                    How long will it take, and how much fuel, to climb my
+                    Hartzell-equipped SR22 from Reno (KRNO) runway 17R to 12,500
+                    ft at 3,400 lb?
+                  </blockquote>
+                  <button
+                    class="text-link"
+                    data-copy="question-sr22-climb"
+                    aria-label="Copy question: SR22 climb profile"
+                  >
+                    Copy question
+                    <svg class="icon" aria-hidden="true">
+                      <use href="#copy" />
+                    </svg>
+                  </button>
+                </div>
+              </article>
+              <article class="tool-row" aria-labelledby="sr22-limits-title">
+                <div class="tool-info">
+                  <span class="number">04 / Weight or temperature</span>
+                  <h3 id="sr22-limits-title">Takeoff limits</h3>
+                  <p>
+                    The maximum takeoff weight, or the hottest temperature at a
+                    weight, for one runway end or every end of an airport,
+                    including a wet grass strip.
+                  </p>
+                  <code>takeoff_limits</code>
+                </div>
+                <div class="tool-question">
+                  <span class="label">Example question</span>
+                  <blockquote id="question-sr22-limits">
+                    What’s the most my turbonormalized SR22 can weigh to take
+                    off from Leadville (KLXV) on a 25&nbsp;°C afternoon, and
+                    what limits it on each runway?
+                  </blockquote>
+                  <button
+                    class="text-link"
+                    data-copy="question-sr22-limits"
+                    aria-label="Copy question: SR22 takeoff limits"
+                  >
+                    Copy question
+                    <svg class="icon" aria-hidden="true">
+                      <use href="#copy" />
+                    </svg>
+                  </button>
+                </div>
+              </article>
+            </div>
+          </section>
+        </div>
+        <div class="coverage-note">
+          <p>
+            Figures come from digitized manual tables, or from regression
+            equations fitted to them that extrapolate with an uncertainty.
+            Anything the tables don’t cover is reported, not estimated.
+          </p>
+          <p class="operational-note">
+            For pre-flight planning only, not for cockpit use. These figures are
+            not approved by the FAA or by Cirrus Aircraft; verify them with the
+            aircraft’s flight manual.
+          </p>
+        </div>
+      </section>
+    </main>
+    <footer class="footer wrap">
+      <a class="brand" href="/">AVIATION / <strong>MCP</strong></a>
+      <div class="footer-info">
+        <p>Open-source aviation data and calculations.</p>
+        <nav aria-label="Legal and support">
+          <a href="/support/">Support</a><a href="/privacy/">Privacy</a
+          ><a href="/terms/">Terms</a>
+        </nav>
+      </div>
+      <a class="text-link" href="https://github.com/RISCfuture/Aviation-MCP"
+        >Open source on GitHub
+        <svg class="icon" aria-hidden="true"><use href="#arrow-up-right" /></svg
+      ></a>
+    </footer>
+    <p id="copy-status" class="sr-only" role="status" aria-live="polite"></p>
+  </body>
+</html>
