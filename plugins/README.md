@@ -115,14 +115,14 @@ Use <https://claude.ai/directory/manage> and choose **MCP connector**:
 - Privacy: <https://aviation-mcp.org/privacy>
 - Support: <https://aviation-mcp.org/support>
 - Icon: `aviation-mcp/assets/icon.svg`
-- One-liner: Query U.S. aviation data, worldwide terrain and Cirrus SF50 performance,
+- One-liner: Query U.S. aviation data, worldwide terrain and Cirrus SF50 and SR22 performance,
   with source cycles, provenance, and explicit coverage gaps.
 - Description: use the package's `longDescription`
 - Access: read-only queries and calculations; no account modification, flight-plan
   filing, transactions, or aircraft registration lookup
 - Data: our hosted normalized FAA database, read-only NOTAM queries, AWC and
-  Open-Meteo weather, public Copernicus terrain, and SF50 performance models built from
-  the AFM, which return computed figures only; no sponsored content
+  Open-Meteo weather, public Copernicus terrain, and SF50 and SR22 performance models built from
+  the AFM and POH, which return computed figures only; no sponsored content
 
 Supply the actual publisher and review-contact details in the portal. Exercise
 every exposed tool with MCP Inspector or a Claude custom connector before

@@ -1,18 +1,19 @@
 ---
 name: performance-weather-for-time
-description: Work out the weather a Cirrus SF50 performance calculation will use at a departure or arrival time, and build what-if overrides. Use when a takeoff, landing, climb or takeoff-limits question gives a time such as "now", "in 18 hours" or "tomorrow at 2pm"; when converting a local time to ISO 8601 with the airport's offset; when the forecast is a U.S. TAF, which has no temperature; when TEMPO, PROB, BECMG groups, gusts or variable winds could change the answer; when an ATIS or tower wind (magnetic) must be converted to true; or when the time is beyond the forecast range.
+description: Work out the weather a Cirrus SF50 or SR22 performance calculation will use at a departure or arrival time, and build what-if overrides. Use when a takeoff, landing, climb or takeoff-limits question gives a time such as "now", "in 18 hours" or "tomorrow at 2pm"; when converting a local time to ISO 8601 with the airport's offset; when the forecast is a U.S. TAF, which has no temperature; when TEMPO, PROB, BECMG groups, gusts or variable winds could change the answer; when an ATIS or tower wind (magnetic) must be converted to true; or when the time is beyond the forecast range.
 ---
 
 # Performance weather for a time
 
-The SF50 tools fetch weather themselves from the `time` argument. This skill makes sure
+The performance tools fetch weather themselves from the `time` argument. This skill makes sure
 that time is right, explains where each value came from, and adds worst-case runs for
 conditional forecast groups.
 
 ## Safety
 
-- Planning aid only. SF50 figures from these tools are not FAA- or Cirrus-approved and are
-  not for cockpit use; say so whenever you report them.
+- Planning aid only. Figures from these tools are not approved by the FAA, the aircraft
+  manufacturer or any supplement holder and are not for cockpit use; say so whenever you
+  report them.
 - Never invent, estimate or interpolate a figure the tools did not return. If something is
   missing, name it and the input that would supply it.
 - Pass through every non-`value` status (`uncertain`, `offscale_high`, `offscale_low`,
@@ -48,7 +49,7 @@ For each weather input the performance tools record an origin and time in `input
 - **U.S. TAFs carry no temperature and no altimeter.** The OAT and altimeter then come from
   the Open-Meteo model. Say so plainly; a modeled temperature is not a forecast from a
   forecaster and not an observation.
-- With no altimeter, the tools read the AFM at field elevation instead of pressure altitude
+- With no altimeter, the tools read the manual at field elevation instead of pressure altitude
   and add a note. Keep it.
 - Past the model's range, ask for hypothetical temperature, wind and altimeter, run with
   overrides, and label the result hypothetical.
