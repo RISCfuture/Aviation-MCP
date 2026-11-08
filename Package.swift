@@ -33,7 +33,7 @@ let package = Package(
     .package(
       url: "https://github.com/RISCfuture/SwiftGeographic.git",
       from: "1.1.0"),
-    .package(url: "https://github.com/SF50-TOLD/SF50-Performance.git", exact: "2.0.0"),
+    .package(url: "https://github.com/SF50-TOLD/SF50-Performance.git", exact: "2.0.1"),
     .package(url: "https://github.com/RISCfuture/MeasurementKit.git", from: "1.2.1"),
 
     .package(url: "https://github.com/vapor/vapor.git", from: "4.122.3"),
