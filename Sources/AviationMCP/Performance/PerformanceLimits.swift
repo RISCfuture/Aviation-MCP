@@ -4,22 +4,23 @@ import MCP
 import MeasurementKit
 
 extension PerformanceTools {
-  /// The lightest weight the AFM takeoff data covers, where the weight search starts by default.
-  private static let defaultMinimumWeightLb = 5_000.0
-
   /// The maximum takeoff weight, or the maximum temperature at a weight, for one runway end or
   /// every end of an airport.
-  func takeoffLimits(_ arguments: ToolArguments) async throws -> ToolResult {
+  func takeoffLimits(_ arguments: ToolArguments, through interface: PerformanceInterface)
+    async throws -> ToolResult
+  {
     let target = try LimitTarget(arguments)
-    let aircraft = try PerformanceAircraft(arguments, requiringWeight: target == .temperature)
+    let aircraft = try PerformanceAircraft(
+      arguments, through: interface, requiringWeight: target == .temperature)
     let obstacle = try arguments.obstacle()
+    let contamination = try PerformanceContamination.parse(arguments)
     let site = try await site(arguments)
     let (runways, omitted) = try Self.limitRunways(arguments, site: site, obstacle: obstacle)
     let weather = try await surfaceWeather(
       arguments, airport: site.airport, needsTemperature: target == .weight)
     let minimumWeightLb =
-      try arguments.number("minimum_weight_lb", range: 3_000...7_000)
-      ?? Self.defaultMinimumWeightLb
+      try arguments.number("minimum_weight_lb", range: aircraft.weightRangeLb)
+      ?? aircraft.lightestTakeoffWeight().converted(to: .pounds).value
     var figures = FigureEncoder(model: aircraft.model)
     let ignored = target == .weight ? ["weight_lb"] : ["temperature_c", "minimum_weight_lb"]
     let warnings =
@@ -28,19 +29,24 @@ extension PerformanceTools {
         "\($0) is ignored when solving for \(target.rawValue)."
       }
     let results = try runways.map { runway in
-      let input = runway.input()
+      let input = runway.input(contamination: contamination)
+      try PerformanceContamination.check(
+        contamination, aircraft: aircraft, runway: input, operation: .takeoff)
       let conditions = weather.resolved.conditions(runwayHeadingDeg: runway.headingTrueDeg.value)
       let search = TakeoffLimitSearch(
         target: target, aircraft: aircraft, conditions: conditions, obstacle: obstacle,
         minimumWeightLb: minimumWeightLb)
-      let inputs = try site.inputs(
+      var inputs = try site.inputs(
         runway: runway, weather: weather.resolved,
         pressureAltitude: conditions.pressureAltitude(elevation: input.elevation))
+      inputs["contamination"] = PerformanceContamination.json(contamination)
       var value: [String: MCP.Value] = [
-        "aircraft": aircraft.description().merging(["flaps": "50"]),
+        "aircraft": aircraft.description().merging([
+          "flaps": .string(PerformanceCalculator.takeoffFlapSetting.argument)
+        ]),
         "solve_for": .string(target.rawValue), "inputs": .object(inputs),
         "wind_components": PerformanceJSON.windComponents(input, conditions: conditions),
-        "disclaimers": [.string(FigureEncoder.disclaimer)]
+        "disclaimers": .array(aircraft.disclaimers.map(MCP.Value.string))
       ]
       value.merge(try search.limit(runway: input, figures: &figures)) { $1 }
       return MCP.Value.object(value)
@@ -160,7 +166,8 @@ struct TakeoffLimitSearch {
       conditions: conditions, weight: weight, runway: runway, obstacle: obstacle)
     if search.limit == nil {
       figures.warn(
-        "Runway \(runway.name): no temperature in the AFM range permits a takeoff at weight_lb.")
+        "Runway \(runway.name): no temperature in the AFM range permits a takeoff at weight_lb."
+      )
     }
     return Self.fields(search, key: "max_temperature_c", runway: runway, figures: &figures) {
       $0.converted(to: .celsius).value

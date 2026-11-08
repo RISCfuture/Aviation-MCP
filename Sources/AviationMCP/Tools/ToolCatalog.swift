@@ -69,7 +69,8 @@ struct ToolCatalog: Sendable {
         throw StorageError.invalidImport("The NOTAM database is not configured.")
       }
       return try await notams.search(arguments, area: NOTAMArea.resolve(arguments, store: store))
-    case .takeoffPerformance, .landingPerformance, .climbProfile, .takeoffLimits:
+    case .takeoffPerformance, .landingPerformance, .climbProfile, .takeoffLimits,
+      .sf50TakeoffPerformance, .sf50LandingPerformance, .sf50ClimbProfile, .sf50TakeoffLimits:
       return try await PerformanceTools(store: store, weather: weather).call(tool, arguments)
     case .findAirports, .getAirport, .findNavigation, .getAirway, .findRoutes, .queryAirspace,
       .findProcedures, .getProcedure, .queryObstacles, .getAircraft:

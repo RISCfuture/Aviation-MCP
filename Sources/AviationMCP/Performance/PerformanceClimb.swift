@@ -6,11 +6,13 @@ import MeasurementKit
 extension PerformanceTools {
   /// Climb gradient and rate by altitude for every climb schedule, from the field to a top
   /// altitude, in the forecast winds aloft.
-  func climbProfile(_ arguments: ToolArguments) async throws -> ToolResult {
-    let aircraft = try PerformanceAircraft(arguments)
+  func climbProfile(_ arguments: ToolArguments, through interface: PerformanceInterface)
+    async throws -> ToolResult
+  {
+    let aircraft = try PerformanceAircraft(arguments, through: interface)
     let weight = try aircraft.weight(
       within: aircraft.limitations.maxTakeoffWeight, operation: "takeoff")
-    let topFt = try arguments.number("top_altitude_ft", range: 0...31_000) ?? 0
+    let topFt = try aircraft.climbTopFt(arguments)
     let course = try arguments.number("course_true_deg", range: 0...360)
     let site = try await site(arguments)
     var fieldWarnings: [String] = []
@@ -20,43 +22,70 @@ extension PerformanceTools {
     }
     let overrides = try WeatherOverrides(arguments)
     let time = try arguments.instant("time", default: .now) ?? .now
-    var fields = ["pressure_levels"]
-    if overrides.temperatureC == nil { fields.append("temperature_c") }
-    if overrides.altimeterInHg == nil { fields.append("altimeter_inhg") }
-    let reported = try await report(fields, at: time, airport: site.airport, required: false)
+    let reported = try await report(
+      Self.climbWeatherFields(overrides), at: time, airport: site.airport, required: false)
     let atmosphere = ClimbAtmosphere(
       reported: reported, overrides: overrides, time: time, fieldElevationFt: field.value)
     let profile = try ClimbProfileGenerator.generate(
       windsAloft: atmosphere.observations, weightLb: weight.converted(to: .pounds).value,
-      aircraft: .sf50(aircraft.type),
-      seaLevelPressureInHg: atmosphere.altimeterInHg?.value ?? 29.92,
+      aircraft: aircraft.aircraft, seaLevelPressureInHg: atmosphere.altimeterInHg?.value ?? 29.92,
       useRegressionModel: aircraft.model == .regression)
     let climb = ClimbReport(
-      profile: profile, fieldFt: field.value, topFt: topFt, courseDeg: course,
+      profile: profile, schedules: ClimbReport.schedules(for: aircraft.aircraft),
+      fieldFt: field.value, topFt: topFt, courseDeg: course,
       windsApplied: !atmosphere.isCalm,
       terrainStart: try Self.terrainStart(arguments, site: site, field: field))
     var figures = FigureEncoder(model: aircraft.model)
-    var inputs = try atmosphere.inputs(time: time)
-    inputs["field_elevation_ft"] = try .encoded(field)
+    var inputs = try Self.climbInputs(
+      arguments, atmosphere: atmosphere, time: time, field: field, site: site)
     inputs["top_altitude_ft"] = .double(topFt)
-    inputs["airport"] = site.airport?.description
-    inputs["runway"] = try arguments.string("runway").map(MCP.Value.string)
-    inputs["course_true_deg"] = course.map(MCP.Value.double)
     let schedules = climb.schedules(figures: &figures)
     var value: [String: MCP.Value] = [
       "aircraft": aircraft.description(includingSafetyFactor: false), "inputs": .object(inputs),
       "levels": .array(climb.levels()), "schedules": .object(schedules),
-      "disclaimers": [.string(FigureEncoder.disclaimer)]
+      "disclaimers": .array(aircraft.disclaimers.map(MCP.Value.string))
     ]
+    value.merge(
+      try Self.timeFuelDistance(
+        aircraft, fromFt: field.value, toFt: topFt, altimeterInHg: atmosphere.altimeterInHg?.value,
+        figures: &figures)
+    ) { $1 }
+    value["unavailable_outputs"] = aircraft.unavailable(
+      ClimbReport.unavailableSchedules(for: aircraft.aircraft) + Self.timeFuelDistanceOutputs)
     value["query_terrain"] = climb.terrainComparison(schedules)
-    if topFt > atmosphere.highestLevelFt {
-      figures.warn(
-        "The atmosphere above \(Int(atmosphere.highestLevelFt)) ft is unknown; figures above it "
-          + "hold the conditions there.")
-    }
+    Self.warnAboveKnownAtmosphere(topFt, atmosphere: atmosphere, figures: &figures)
     return Self.result(
       [.object(value)], site: site, weather: reported, figures: figures,
       warnings: fieldWarnings + atmosphere.warnings)
+  }
+
+  private static func warnAboveKnownAtmosphere(
+    _ topFt: Double, atmosphere: ClimbAtmosphere, figures: inout FigureEncoder
+  ) {
+    guard topFt > atmosphere.highestLevelFt else { return }
+    figures.warn(
+      "The atmosphere above \(Int(atmosphere.highestLevelFt)) ft is unknown; figures above it "
+        + "hold the conditions there.")
+  }
+
+  /// Every input of a climb echoed with its origin.
+  private static func climbInputs(
+    _ arguments: ToolArguments, atmosphere: ClimbAtmosphere, time: Date, field: Sourced<Double>,
+    site: PerformanceSite
+  ) throws -> [String: MCP.Value] {
+    var inputs = try atmosphere.inputs(time: time)
+    inputs["field_elevation_ft"] = try .encoded(field)
+    inputs["airport"] = site.airport?.description
+    inputs["runway"] = try arguments.string("runway").map(MCP.Value.string)
+    inputs["course_true_deg"] = try arguments.number("course_true_deg", range: 0...360).map(
+      MCP.Value.double)
+    return inputs
+  }
+
+  /// The weather fields a climb reads that the caller did not override.
+  private static func climbWeatherFields(_ overrides: WeatherOverrides) -> [String] {
+    ["pressure_levels"] + (overrides.temperatureC == nil ? ["temperature_c"] : [])
+      + (overrides.altimeterInHg == nil ? ["altimeter_inhg"] : [])
   }
 
   private static func fieldElevation(
@@ -103,13 +132,21 @@ extension PerformanceTools {
 
 /// A climb profile read out between the field and the top altitude.
 struct ClimbReport {
-  /// Each climb schedule a profile carries, by the name results give it.
-  static let schedules: [(name: String, type: ClimbProfile.ProfileType)] = [
-    ("takeoff", .takeoff), ("enroute_obstacle", .enrouteObstacle(antiIce: false)),
-    ("enroute_obstacle_ice", .enrouteObstacle(antiIce: true)),
-    ("enroute", .enroute(antiIce: false)),
-    ("enroute_ice", .enroute(antiIce: true))
+  /// A climb schedule, by the name results give it.
+  typealias Schedule = (name: String, type: ClimbProfile.ProfileType)
+
+  /// Every climb schedule a profile can carry, with the capabilities an aircraft needs for it.
+  private static let allSchedules: [(schedule: Schedule, needs: Set<PerformanceCapability>)] = [
+    (("takeoff", .takeoff), []),
+    (("enroute_obstacle", .enrouteObstacle(antiIce: false)), [.enrouteObstacleClimb]),
+    (
+      ("enroute_obstacle_ice", .enrouteObstacle(antiIce: true)),
+      [.enrouteObstacleClimb, .iceProtection]
+    ),
+    (("enroute", .enroute(antiIce: false)), []),
+    (("enroute_ice", .enroute(antiIce: true)), [.iceProtection])
   ]
+
   private static let levelStepFt = 1_000.0
   private static let samplingStepFt = 100.0
 
@@ -121,6 +158,8 @@ struct ClimbReport {
   }
 
   let profile: ClimbProfile
+  /// The schedules the aircraft's manuals have figures for.
+  let schedules: [Schedule]
   let fieldFt: Double
   let topFt: Double
   let courseDeg: Double?
@@ -130,15 +169,32 @@ struct ClimbReport {
   let terrainStart: TerrainStart?
 
   init(
-    profile: ClimbProfile, fieldFt: Double, topFt: Double, courseDeg: Double?,
-    windsApplied: Bool = true, terrainStart: TerrainStart? = nil
+    profile: ClimbProfile, schedules: [Schedule], fieldFt: Double, topFt: Double,
+    courseDeg: Double?, windsApplied: Bool = true, terrainStart: TerrainStart? = nil
   ) {
     self.profile = profile
+    self.schedules = schedules
     self.fieldFt = fieldFt
     self.topFt = topFt
     self.courseDeg = courseDeg
     self.windsApplied = windsApplied
     self.terrainStart = terrainStart
+  }
+
+  /// The schedules the aircraft's manuals have figures for.
+  static func schedules(for aircraft: Aircraft) -> [Schedule] {
+    allSchedules.filter { $0.needs.isSubset(of: aircraft.capabilities) }.map(\.schedule)
+  }
+
+  /// Each schedule the aircraft's manuals have no figures for, with a capability it lacks.
+  static func unavailableSchedules(for aircraft: Aircraft) -> [(
+    output: String, capability: PerformanceCapability
+  )] {
+    allSchedules.compactMap { schedule, needs in
+      needs.subtracting(aircraft.capabilities).min { $0.rawValue < $1.rawValue }.map {
+        ("schedules.\(schedule.name)", $0)
+      }
+    }
   }
 
   /// The field, each whole thousand feet above it, and the top.
@@ -182,16 +238,16 @@ struct ClimbReport {
       level["wind_speed_kt"] = profile.windSpeed(at: altitude).map { .double($0.rounded()) }
       level["schedules"] = .object(
         Dictionary(
-          uniqueKeysWithValues: Self.schedules.map { ($0.name, figures(at: altitude, $0.type)) }))
+          uniqueKeysWithValues: schedules.map { ($0.name, figures(at: altitude, $0.type)) }))
       return .object(level)
     }
   }
 
-  /// Each schedule's minimum gradient over the climb, distance to the top and any bands the AFM
+  /// Each schedule's minimum gradient over the climb, distance to the top and any bands the manual
   /// data does not cover.
   func schedules(figures: inout FigureEncoder) -> [String: MCP.Value] {
     var schedules: [String: MCP.Value] = [:]
-    for (name, type) in Self.schedules {
+    for (name, type) in self.schedules {
       var summary: [String: MCP.Value] = [
         "minimum_gradient_ft_per_nm": figures.encode(
           minimum(type) { gradient(at: $0, type) }, "\(name) minimum_gradient_ft_per_nm"),

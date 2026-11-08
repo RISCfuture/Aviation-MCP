@@ -14,7 +14,7 @@ extension `Transactional publication` {
     try await withPerformanceCatalog { catalog in
       let result = try await catalog.call(
         .init(
-          name: "sf50_takeoff_performance",
+          name: "takeoff_performance",
           arguments: Self.performanceArguments([
             "obstacle_height_ft": 200, "obstacle_distance_ft": 3_000
           ])
@@ -37,7 +37,7 @@ extension `Transactional publication` {
 
       let overridden = try await catalog.call(
         .init(
-          name: "sf50_takeoff_performance",
+          name: "takeoff_performance",
           arguments: Self.performanceArguments(["temperature_c": 30, "slope_percent": -1])))
       let overriddenInputs = try #require(
         Self.results(overridden).first?.objectValue?["inputs"]?.objectValue)
@@ -46,9 +46,9 @@ extension `Transactional publication` {
 
       let airportFree = try await catalog.call(
         .init(
-          name: "sf50_takeoff_performance",
+          name: "takeoff_performance",
           arguments: [
-            "aircraft_generation": "g2_plus", "weight_lb": 5_800, "elevation_ft": 6,
+            "aircraft": Self.sf50G2Plus, "weight_lb": 5_800, "elevation_ft": 6,
             "runway_heading_true_deg": 295, "available_takeoff_run_ft": 9_000,
             "temperature_c": 20, "wind_direction_true_deg": 300, "wind_speed_kt": 5
           ]))
@@ -59,9 +59,42 @@ extension `Transactional publication` {
 
       let heavy = try await catalog.call(
         .init(
-          name: "sf50_takeoff_performance",
+          name: "takeoff_performance",
           arguments: Self.performanceArguments(["weight_lb": 6_500])))
       #expect(Self.errorCode(heavy) == "invalid_argument")
+    }
+  }
+
+  @Test
+  func `answers each deprecated sf50 alias with the tool's figures in the alias's own shape`()
+    async throws
+  {
+    try await withPerformanceCatalog { catalog in
+      let calls: [(tool: String, extra: [String: MCP.Value])] = [
+        ("takeoff_performance", [:]), ("landing_performance", ["weight_lb": 5_000]),
+        ("climb_profile", ["top_altitude_ft": 5_000]), ("takeoff_limits", ["solve_for": "weight"])
+      ]
+      for (tool, extra) in calls {
+        let alias = "sf50_\(tool)"
+        var arguments = Self.performanceArguments(extra)
+        if tool == "takeoff_limits" { arguments["weight_lb"] = nil }
+        var aliasArguments = arguments
+        aliasArguments["aircraft"] = nil
+        aliasArguments["aircraft_generation"] = "g2_plus"
+        let current = try #require(
+          Self.results(try await catalog.call(.init(name: tool, arguments: arguments))).first?
+            .objectValue)
+        let aliased = try #require(
+          Self.results(try await catalog.call(.init(name: alias, arguments: aliasArguments)))
+            .first?.objectValue)
+        let echo = try #require(aliased["aircraft"]?.objectValue)
+        #expect(echo["generation"] == "g2_plus" && echo["type"] == nil, "\(alias)")
+        #expect(echo["capabilities"] == nil && echo["documents"] == nil, "\(alias)")
+        #expect(
+          aliased.filter { $0.key != "aircraft" }
+            == current.filter { !["aircraft", "unavailable_outputs"].contains($0.key) },
+          "\(alias)")
+      }
     }
   }
 
@@ -72,7 +105,7 @@ extension `Transactional publication` {
         awc: { _ in throw WeatherFailure(provider: "awc", reason: "No report.") }, openMeteo: nil)
     ) { catalog in
       let unavailable = try await catalog.call(
-        .init(name: "sf50_takeoff_performance", arguments: Self.performanceArguments()))
+        .init(name: "takeoff_performance", arguments: Self.performanceArguments()))
       #expect(Self.errorCode(unavailable) == "weather_unavailable")
     }
     try await withPerformanceCatalog(
@@ -84,11 +117,11 @@ extension `Transactional publication` {
         }, openMeteo: nil)
     ) { catalog in
       let noTemperature = try await catalog.call(
-        .init(name: "sf50_takeoff_performance", arguments: Self.performanceArguments()))
+        .init(name: "takeoff_performance", arguments: Self.performanceArguments()))
       #expect(Self.errorCode(noTemperature) == "weather_unavailable")
       let overridden = try await catalog.call(
         .init(
-          name: "sf50_takeoff_performance",
+          name: "takeoff_performance",
           arguments: Self.performanceArguments(["temperature_c": 25])))
       #expect(Self.errorCode(overridden) == nil)
     }
@@ -99,7 +132,7 @@ extension `Transactional publication` {
     try await withPerformanceCatalog { catalog in
       let result = try await catalog.call(
         .init(
-          name: "sf50_landing_performance",
+          name: "landing_performance",
           arguments: Self.performanceArguments([
             "weight_lb": 5_000, "contamination": "water_or_slush",
             "contamination_depth_in": 0.25
@@ -114,7 +147,7 @@ extension `Transactional publication` {
         Self.results(
           try await catalog.call(
             .init(
-              name: "sf50_landing_performance",
+              name: "landing_performance",
               arguments: Self.performanceArguments(["weight_lb": 5_000])))
         ).first?.objectValue)
       for (field, value) in try PackageFigures.landing(weightLb: 5_000) {
@@ -125,14 +158,14 @@ extension `Transactional publication` {
           == 9_000)
       let missingDepth = try await catalog.call(
         .init(
-          name: "sf50_landing_performance",
+          name: "landing_performance",
           arguments: Self.performanceArguments([
             "weight_lb": 5_000, "contamination": "water_or_slush"
           ])))
       #expect(Self.errorCode(missingDepth) == "invalid_argument")
       let strayCode = try await catalog.call(
         .init(
-          name: "sf50_landing_performance",
+          name: "landing_performance",
           arguments: Self.performanceArguments([
             "weight_lb": 5_000, "contamination": "wet", "rwycc": 2
           ])))
@@ -147,10 +180,10 @@ extension `Transactional publication` {
     try await withPerformanceCatalog { catalog in
       let result = try await catalog.call(
         .init(
-          name: "sf50_climb_profile",
+          name: "climb_profile",
           arguments: [
-            "airport": "KOAK", "runway": "28R", "aircraft_generation": "g2_plus",
-            "weight_lb": 5_800, "top_altitude_ft": 5_000, "course_true_deg": 295,
+            "airport": "KOAK", "runway": "28R", "aircraft": Self.sf50G2Plus, "weight_lb": 5_800,
+            "top_altitude_ft": 5_000, "course_true_deg": 295,
             "time": .string(PerformanceFixtures.time.ISO8601Format())
           ]))
       let climb = try #require(Self.results(result).first?.objectValue)
@@ -174,10 +207,10 @@ extension `Transactional publication` {
       #expect(climb["aircraft"]?.objectValue?["safety_factor"] == nil)
       let hot = try await catalog.call(
         .init(
-          name: "sf50_climb_profile",
+          name: "climb_profile",
           arguments: [
-            "airport": "KOAK", "runway": "28R", "aircraft_generation": "g2_plus",
-            "weight_lb": 5_800, "top_altitude_ft": 5_000, "course_true_deg": 295,
+            "airport": "KOAK", "runway": "28R", "aircraft": Self.sf50G2Plus, "weight_lb": 5_800,
+            "top_altitude_ft": 5_000, "course_true_deg": 295,
             "temperature_c": 35, "time": .string(PerformanceFixtures.time.ISO8601Format())
           ]))
       let hotInputs = try #require(Self.results(hot).first?.objectValue?["inputs"]?.objectValue)
@@ -185,10 +218,9 @@ extension `Transactional publication` {
       #expect(hotInputs["temperature_c"]?.objectValue?["origin"] == "override")
       let below = try await catalog.call(
         .init(
-          name: "sf50_climb_profile",
+          name: "climb_profile",
           arguments: [
-            "airport": "KOAK", "aircraft_generation": "g2_plus", "weight_lb": 5_800,
-            "top_altitude_ft": 0
+            "airport": "KOAK", "aircraft": Self.sf50G2Plus, "weight_lb": 5_800, "top_altitude_ft": 0
           ]))
       #expect(Self.errorCode(below) == "invalid_argument")
     }
@@ -199,9 +231,9 @@ extension `Transactional publication` {
     try await withPerformanceCatalog { catalog in
       let result = try await catalog.call(
         .init(
-          name: "sf50_takeoff_limits",
+          name: "takeoff_limits",
           arguments: [
-            "airport": "KOAK", "aircraft_generation": "g1", "solve_for": "weight",
+            "airport": "KOAK", "aircraft": Self.sf50G1, "solve_for": "weight",
             "time": .string(PerformanceFixtures.time.ISO8601Format())
           ]))
       let ends = Self.results(result).compactMap(\.objectValue)
@@ -216,18 +248,18 @@ extension `Transactional publication` {
       #expect(ends.first?["max_takeoff_weight_lb"]?.number == published.limit)
       let oneEnd = try await catalog.call(
         .init(
-          name: "sf50_takeoff_limits",
+          name: "takeoff_limits",
           arguments: [
-            "airport": "KOAK", "aircraft_generation": "g1", "solve_for": "weight",
+            "airport": "KOAK", "aircraft": Self.sf50G1, "solve_for": "weight",
             "available_takeoff_run_ft": 5_000,
             "time": .string(PerformanceFixtures.time.ISO8601Format())
           ]))
       #expect(Self.errorCode(oneEnd) == "invalid_argument")
       let temperature = try await catalog.call(
         .init(
-          name: "sf50_takeoff_limits",
+          name: "takeoff_limits",
           arguments: [
-            "airport": "KOAK", "runway": "28R", "aircraft_generation": "g1",
+            "airport": "KOAK", "runway": "28R", "aircraft": Self.sf50G1,
             "solve_for": "temperature", "weight_lb": 5_500, "available_takeoff_run_ft": 3_000,
             "time": .string(PerformanceFixtures.time.ISO8601Format())
           ]))
@@ -240,6 +272,9 @@ extension `Transactional publication` {
       #expect(limit["inputs"]?.objectValue?["temperature_c"] == nil)
     }
   }
+
+  private static let sf50G2Plus: MCP.Value = ["type": "sf50", "generation": "g2_plus"]
+  private static let sf50G1: MCP.Value = ["type": "sf50", "generation": "g1"]
 
   private func withPerformanceCatalog(
     weather: WeatherService = PerformanceFixtures.weather(),
@@ -257,7 +292,7 @@ extension `Transactional publication` {
     .Value]
   {
     [
-      "airport": "KOAK", "runway": "28R", "aircraft_generation": "g2_plus", "weight_lb": 5_800,
+      "airport": "KOAK", "runway": "28R", "aircraft": Self.sf50G2Plus, "weight_lb": 5_800,
       "time": .string(PerformanceFixtures.time.ISO8601Format())
     ].merging(extra) { $1 }
   }
@@ -294,107 +329,5 @@ extension `Transactional publication` {
 
   private static func errorCode(_ result: CallTool.Result) -> MCP.Value? {
     result.structuredContent?.objectValue?["error"]?.objectValue?["code"]
-  }
-}
-
-/// The package's figures, rounded and keyed as results give them, for the fixtures' runway and
-/// weather built from their raw values, so a tool reading any of them wrongly disagrees.
-private enum PackageFigures {
-  /// The fixture METAR's wind and temperature with the model's altimeter setting.
-  private static let reportedConditions = Conditions(
-    windDirection: .init(value: 280, unit: .degrees), windSpeed: .init(value: 10, unit: .knots),
-    temperature: .init(value: 15, unit: .celsius),
-    seaLevelPressure: .init(value: 30.12, unit: .inchesOfMercury))
-
-  /// Runway 28R as the fixture airport publishes it. A shortened takeoff run also shortens the
-  /// takeoff distance, as the tools treat an `available_takeoff_run_ft` override.
-  static func runway28R(availableTakeoffRunFt: Double? = nil) -> RunwayInput {
-    let takeoffRunFt = availableTakeoffRunFt ?? 10_000
-    let takeoffDistanceFt = availableTakeoffRunFt ?? 10_500
-    return RunwayInput(
-      id: "28R", elevation: .init(value: 6, unit: .feet),
-      trueHeading: .init(value: 295, unit: .degrees), gradient: 0.001,
-      length: .init(value: max(takeoffDistanceFt, 9_000), unit: .feet),
-      takeoffRun: .init(value: takeoffRunFt, unit: .feet),
-      takeoffDistance: .init(value: takeoffDistanceFt, unit: .feet),
-      landingDistance: .init(value: 9_000, unit: .feet), notam: nil,
-      airportVariation: .init(value: 0, unit: .degrees))
-  }
-
-  /// A G2+ takeoff at 5,800 lb from 28R, and the ground run's correction multipliers.
-  static func takeoff() throws -> (figures: [String: Double], runMultipliers: [Double]) {
-    let report = try PerformanceCalculator(settings: .init(aircraft: .sf50(.g2Plus))).takeoff(
-      conditions: reportedConditions, weight: .init(value: 5_800, unit: .pounds),
-      runway: runway28R())
-    let results = report.results
-    return (
-      [
-        "takeoff_run_ft": try whole(results.takeoffRun.nominal, in: .feet),
-        "takeoff_distance_ft": try whole(results.takeoffDistance.nominal, in: .feet),
-        "takeoff_climb_gradient_ft_per_nm": try whole(
-          results.takeoffClimbGradient.nominal, in: .feetPerNauticalMile)
-      ],
-      report.groundRunBreakdown.adjustments.map { ($0.multiplier * 1000).rounded() / 1000 }
-    )
-  }
-
-  /// A dry G2+ flaps 100 landing on 28R.
-  static func landing(weightLb: Double) throws -> [String: Double] {
-    let results = try PerformanceCalculator(settings: .init(aircraft: .sf50(.g2Plus))).landing(
-      conditions: reportedConditions,
-      configuration: .init(weight: .init(value: weightLb, unit: .pounds), flapSetting: .flaps100),
-      runway: runway28R()
-    ).results
-    return [
-      "landing_run_ft": try whole(results.landingRun.nominal, in: .feet),
-      "landing_distance_ft": try whole(results.landingDistance.nominal, in: .feet),
-      "vref_kt": try whole(results.Vref.nominal, in: .knots)
-    ]
-  }
-
-  /// A G2+ climb profile at 5,800 lb from the field, at the METAR's temperature and the lowest
-  /// level's wind, through the fixture forecast's two pressure levels.
-  static func forecastClimb() throws -> ClimbProfile {
-    func feet(meters: Double) -> Double { meters / 0.304_8 }
-    return try ClimbProfileGenerator.generate(
-      windsAloft: [
-        .init(altitudeFt: 6, temperatureC: 15, windDirectionDeg: 290, windSpeedKts: 20),
-        .init(
-          altitudeFt: feet(meters: 780), temperatureC: 12, windDirectionDeg: 290,
-          windSpeedKts: 20),
-        .init(
-          altitudeFt: feet(meters: 3_100), temperatureC: -2, windDirectionDeg: 270,
-          windSpeedKts: 30)
-      ],
-      weightLb: 5_800, aircraft: .sf50(.g2Plus), seaLevelPressureInHg: 30.12,
-      useRegressionModel: false)
-  }
-
-  /// The G1 maximum takeoff weight from 5,000 lb up, and what binds it.
-  static func maxTakeoffWeight(runway: RunwayInput) throws -> (
-    limit: Double, constraint: BindingConstraint
-  ) {
-    let search = try PerformanceCalculator(settings: .init(aircraft: .sf50(.g1))).maxTakeoffWeight(
-      conditions: reportedConditions, runway: runway,
-      minimumWeight: .init(value: 5_000, unit: .pounds))
-    return (try whole(search.limit, in: .pounds), search.bindingConstraint)
-  }
-
-  /// The G1 maximum takeoff temperature from 28R at a weight, and what binds it.
-  static func maxTakeoffTemperature(weightLb: Double, availableTakeoffRunFt: Double) throws -> (
-    limit: Double, constraint: BindingConstraint
-  ) {
-    let search = try PerformanceCalculator(settings: .init(aircraft: .sf50(.g1)))
-      .maxTakeoffTemperature(
-        conditions: reportedConditions, weight: .init(value: weightLb, unit: .pounds),
-        runway: runway28R(availableTakeoffRunFt: availableTakeoffRunFt))
-    return (try whole(search.limit, in: .celsius), search.bindingConstraint)
-  }
-
-  /// A figure in whole units, failing the test where the package gives none.
-  private static func whole<UnitType: Dimension>(
-    _ measurement: Measurement<UnitType>?, in unit: UnitType
-  ) throws -> Double {
-    try #require(measurement).converted(to: unit).value.rounded()
   }
 }

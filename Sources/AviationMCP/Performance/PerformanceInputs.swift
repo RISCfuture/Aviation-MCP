@@ -24,95 +24,6 @@ struct Sourced<Content: Encodable & Sendable>: Encodable, Sendable {
   }
 }
 
-/// The aircraft a calculation is for: its generation, weight and the engine settings.
-struct PerformanceAircraft: Sendable {
-  static let generations = ["g1", "g2", "g2_updated_thrust", "g2_plus", "g3"]
-  static let landingFlaps = ["up", "up_ice", "50", "50_ice", "100"]
-
-  let generation: String
-  let type: SF50Variant
-  let weight: Measurement<UnitMass>?
-  let settings: PerformanceSettings
-
-  var model: PerformanceModelKind { settings.modelKind }
-  var limitations: AircraftLimitations { settings.limitations }
-
-  init(_ arguments: ToolArguments, requiringWeight: Bool = true) throws {
-    generation = try arguments.string("aircraft_generation", required: true) ?? ""
-    type = try Self.aircraftType(generation)
-    weight = try arguments.number("weight_lb", range: 3_000...7_000).map {
-      Measurement(value: $0, unit: .pounds)
-    }
-    if requiringWeight, weight == nil {
-      throw MCPError.invalidParams("weight_lb is required")
-    }
-    let model = try arguments.string("model") ?? PerformanceModelKind.tabular.rawValue
-    guard let kind = PerformanceModelKind(rawValue: model) else {
-      throw ToolInputError(reason: "model must be tabular or regression.")
-    }
-    let safetyFactor = try arguments.number("safety_factor", default: 1, range: 1...3) ?? 1
-    settings = PerformanceSettings(
-      aircraft: .sf50(type), modelKind: kind, safetyFactorDry: safetyFactor,
-      safetyFactorContaminated: safetyFactor,
-      VREFAdditive: Measurement(
-        value: try arguments.number("vref_additive_kt", default: 0, range: 0...20) ?? 0,
-        unit: .knots))
-  }
-
-  /// The weight, refused when it exceeds the structural maximum for the operation.
-  func weight(within maximum: Measurement<UnitMass>, operation: String) throws
-    -> Measurement<UnitMass>
-  {
-    guard let weight else { throw MCPError.invalidParams("weight_lb is required") }
-    guard weight <= maximum else {
-      throw ToolInputError(
-        reason: "weight_lb exceeds the \(generation) maximum \(operation) weight of "
-          + "\(Int(maximum.converted(to: .pounds).value)) lb; the AFM gives no data above it.")
-    }
-    return weight
-  }
-
-  /// The landing flap setting, 100% unless the caller names another.
-  static func landingFlapSetting(_ arguments: ToolArguments) throws -> FlapSetting {
-    switch try arguments.string("flaps") ?? "100" {
-    case "up": .flapsUp
-    case "up_ice": .flapsUpIce
-    case "50": .flaps50
-    case "50_ice": .flaps50Ice
-    case "100": .flaps100
-    default:
-      throw ToolInputError(
-        reason: "flaps must be one of \(landingFlaps.joined(separator: ", ")).")
-    }
-  }
-
-  private static func aircraftType(_ generation: String) throws -> SF50Variant {
-    switch generation {
-    case "g1": .g1
-    case "g2": .g2(updatedThrustSchedule: false)
-    case "g2_updated_thrust": .g2(updatedThrustSchedule: true)
-    case "g2_plus": .g2Plus
-    case "g3": .g3
-    default:
-      throw ToolInputError(
-        reason: "aircraft_generation must be one of \(generations.joined(separator: ", ")).")
-    }
-  }
-
-  /// The aircraft as results echo it.
-  ///
-  /// - Parameter includingSafetyFactor: Whether to echo the safety factor, which does not apply
-  ///   to a climb profile.
-  func description(includingSafetyFactor: Bool = true) -> MCP.Value {
-    var fields: [String: MCP.Value] = [
-      "generation": .string(generation), "model": .string(model.rawValue)
-    ]
-    if includingSafetyFactor { fields["safety_factor"] = .double(settings.safetyFactorDry) }
-    fields["weight_lb"] = weight.map { .double($0.converted(to: .pounds).value) }
-    return .object(fields)
-  }
-}
-
 /// Runway contamination given as tool arguments.
 enum PerformanceContamination {
   static let types = [
@@ -167,6 +78,59 @@ enum PerformanceContamination {
     }
   }
 
+  /// Refuses a contamination the aircraft's manuals have no figures for on this runway.
+  ///
+  /// An aircraft with contaminated-runway figures takes any contamination on landing. One with a
+  /// wet unpaved correction takes a wet turf runway, for takeoff and landing alike.
+  static func check(
+    _ contamination: Contamination?, aircraft: PerformanceAircraft, runway: RunwayInput,
+    operation: AircraftPerformance.Operation
+  ) throws {
+    guard let contamination else { return }
+    let capabilities = aircraft.aircraft.capabilities
+    if operation == .landing, capabilities.contains(.contamination) { return }
+    if contamination == .wetRunway, runway.surfaceType.isTurf,
+      capabilities.contains(.wetUnpavedCorrection)
+    {
+      return
+    }
+    throw ToolInputError(
+      reason: unsupported(contamination, aircraft: aircraft, operation: operation))
+  }
+
+  private static func unsupported(
+    _ contamination: Contamination, aircraft: PerformanceAircraft,
+    operation: AircraftPerformance.Operation
+  ) -> String {
+    let capabilities = aircraft.aircraft.capabilities
+    if capabilities.contains(.wetUnpavedCorrection) {
+      return "The \(aircraft.title) manuals correct only for a wet turf runway; contamination "
+        + "applies only as wet with surface turf."
+    }
+    if operation == .takeoff, capabilities.contains(.contamination) {
+      return "The \(aircraft.title) manuals give contaminated-runway figures only for landing."
+    }
+    return "The \(aircraft.title) manuals have no contaminated-runway figures."
+  }
+
+  /// A contamination as results echo it, or `nil` for a dry runway.
+  static func json(_ contamination: Contamination?) -> MCP.Value? {
+    guard let contamination else { return nil }
+    var fields: [String: MCP.Value] = ["origin": "override"]
+    switch contamination {
+    case .wetRunway: fields["type"] = "wet"
+    case .drySnow: fields["type"] = "dry_snow"
+    case .compactSnow: fields["type"] = "compact_snow"
+    case .waterOrSlush(let depth), .slushOrWetSnow(let depth):
+      fields["type"] = .string(
+        contamination.type == "waterOrSlush" ? "water_or_slush" : "slush_or_wet_snow")
+      fields["depth_in"] = .double(depth.converted(to: .inches).value)
+    case .rwyCC(let code):
+      fields["type"] = "rwycc"
+      fields["rwycc"] = .int(Int(code))
+    }
+    return .object(fields)
+  }
   /// A NOTAM snapshot carrying only a contamination, as the performance models read it.
   static func notam(_ contamination: Contamination?) -> NOTAMInput? {
     guard let contamination else { return nil }
