@@ -1,7 +1,7 @@
+import AircraftPerformance
 import Foundation
 import MCP
 import MeasurementKit
-import SF50Performance
 
 /// The SF50 performance tools: takeoff, landing, climb profile and takeoff limits.
 ///

@@ -1,7 +1,7 @@
 import MCP
 import SwiftACD
 
-enum AircraftPerformance {
+enum APDPerformance {
   static func normalize(_ performance: Performance) -> Value {
     Normalization.object([
       "source": "EUROCONTROL APD",

@@ -1,7 +1,7 @@
+import AircraftPerformance
 import Foundation
 import MCP
 import MeasurementKit
-import SF50Performance
 
 extension PerformanceTools {
   /// Climb gradient and rate by altitude for every climb schedule, from the field to a top
@@ -28,7 +28,8 @@ extension PerformanceTools {
       reported: reported, overrides: overrides, time: time, fieldElevationFt: field.value)
     let profile = try ClimbProfileGenerator.generate(
       windsAloft: atmosphere.observations, weightLb: weight.converted(to: .pounds).value,
-      aircraftType: aircraft.type, seaLevelPressureInHg: atmosphere.altimeterInHg?.value ?? 29.92,
+      aircraft: .sf50(aircraft.type),
+      seaLevelPressureInHg: atmosphere.altimeterInHg?.value ?? 29.92,
       useRegressionModel: aircraft.model == .regression)
     let climb = ClimbReport(
       profile: profile, fieldFt: field.value, topFt: topFt, courseDeg: course,
@@ -257,7 +258,7 @@ struct ClimbReport {
   /// it with any uncertainty kept, or the model's refusal at the nearest bracketing point that
   /// has none.
   private func gradient(at altitude: Double, _ type: ClimbProfile.ProfileType)
-    -> SF50Performance.Value<Double>
+    -> AircraftPerformance.Value<Double>
   {
     let points = profile.dataPoints
     guard let low = points.last(where: { $0.altitudeFt <= altitude }) ?? points.first,
@@ -281,7 +282,7 @@ struct ClimbReport {
   }
 
   private func groundGradient(at altitude: Double, _ type: ClimbProfile.ProfileType)
-    -> SF50Performance.Value<Double>
+    -> AircraftPerformance.Value<Double>
   {
     let air = gradient(at: altitude, type)
     guard let courseDeg, air.nominal != nil else { return air }
@@ -296,9 +297,9 @@ struct ClimbReport {
   /// The lowest figure over the climb, with its uncertainty, or the first refusal met on the way
   /// up.
   func minimum(
-    _ type: ClimbProfile.ProfileType, _ figure: (Double) -> SF50Performance.Value<Double>
-  ) -> SF50Performance.Value<Double> {
-    var lowest: SF50Performance.Value<Double>?
+    _ type: ClimbProfile.ProfileType, _ figure: (Double) -> AircraftPerformance.Value<Double>
+  ) -> AircraftPerformance.Value<Double> {
+    var lowest: AircraftPerformance.Value<Double>?
     for altitude in Array(stride(from: fieldFt, to: topFt, by: Self.samplingStepFt)) + [topFt] {
       let value = figure(altitude)
       guard let nominal = value.nominal else { return value }
@@ -323,7 +324,7 @@ struct ClimbReport {
   }
 }
 
-extension SF50Performance.Value where T == Double {
+extension AircraftPerformance.Value where T == Double {
   /// The uncertainty of a figure that carries one.
   fileprivate var uncertainty: Double? {
     if case .valueWithUncertainty(_, let uncertainty) = self { uncertainty } else { nil }

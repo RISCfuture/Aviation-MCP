@@ -14,7 +14,7 @@ readonly libraries=(
   RISCfuture/SwiftACD/SwiftACD
   RISCfuture/SwiftMETAR/SwiftMETAR
   RISCfuture/SwiftGeographic/SwiftGeographic
-  SF50-TOLD/SF50-Performance/SF50Performance
+  SF50-TOLD/SF50-Performance/AircraftPerformance
   RISCfuture/MeasurementKit/MeasurementKit
 )
 mkdir -p "$output"

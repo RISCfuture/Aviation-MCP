@@ -1,7 +1,7 @@
+import AircraftPerformance
 import Foundation
 import MCP
 import MeasurementKit
-import SF50Performance
 
 /// The atmosphere a climb passes through: the forecast winds aloft where they are available, and
 /// otherwise a calm column built on the surface temperature.

@@ -1,6 +1,6 @@
+import AircraftPerformance
 import Foundation
 import MCP
-import SF50Performance
 import Testing
 
 @testable import AviationMCP
@@ -98,7 +98,7 @@ struct `SF50 performance inputs and figures` {
 
   @Test
   func `reads climb figures with uncertainty, the first refusal and the ground distance`() throws {
-    func point(_ altitude: Double, _ gradient: SF50Performance.Value<Double>)
+    func point(_ altitude: Double, _ gradient: AircraftPerformance.Value<Double>)
       -> ClimbProfile.DataPoint
     {
       let data = ClimbProfile.ClimbData(
@@ -150,12 +150,12 @@ struct `SF50 performance inputs and figures` {
   func `maps model figures to JSON and suggests the regression model for tabular refusals`() {
     var tabular = FigureEncoder(model: .tabular)
     let clamped = tabular.encode(
-      SF50Performance.Value.offscaleHigh(
+      AircraftPerformance.Value.offscaleHigh(
         clamped: Measurement(value: 2_000.4, unit: UnitLength.feet)),
       "takeoff_run_ft", in: .feet)
     #expect(clamped == ["status": "offscale_high", "clamped_value": 2_000.0])
     let missing = tabular.encode(
-      SF50Performance.Value<Double>.notAvailable, "minimum_gradient_ft_per_nm")
+      AircraftPerformance.Value<Double>.notAvailable, "minimum_gradient_ft_per_nm")
     #expect(missing == ["status": "not_available"])
     #expect(tabular.isPartial)
     #expect(tabular.allWarnings.count == 3)
@@ -163,10 +163,10 @@ struct `SF50 performance inputs and figures` {
 
     var regression = FigureEncoder(model: .regression)
     let uncertain = regression.encode(
-      SF50Performance.Value.valueWithUncertainty(1_234.6, uncertainty: 40.2), "landing_run_ft")
+      AircraftPerformance.Value.valueWithUncertainty(1_234.6, uncertainty: 40.2), "landing_run_ft")
     #expect(uncertain == ["status": "uncertain", "value": 1_235.0, "uncertainty": 40.0])
     #expect(!regression.isPartial)
-    _ = regression.encode(SF50Performance.Value<Bool>.offscaleLow(clamped: nil), "go_around")
+    _ = regression.encode(AircraftPerformance.Value<Bool>.offscaleLow(clamped: nil), "go_around")
     #expect(regression.isPartial)
     #expect(regression.allWarnings.allSatisfy { !$0.contains("regression") })
   }

@@ -1,7 +1,7 @@
+import AircraftPerformance
 import Foundation
 import MCP
 import MeasurementKit
-import SF50Performance
 import Testing
 
 @testable import AviationMCP
@@ -323,7 +323,7 @@ private enum PackageFigures {
 
   /// A G2+ takeoff at 5,800 lb from 28R, and the ground run's correction multipliers.
   static func takeoff() throws -> (figures: [String: Double], runMultipliers: [Double]) {
-    let report = try PerformanceCalculator(settings: .init(aircraftType: .g2Plus)).takeoff(
+    let report = try PerformanceCalculator(settings: .init(aircraft: .sf50(.g2Plus))).takeoff(
       conditions: reportedConditions, weight: .init(value: 5_800, unit: .pounds),
       runway: runway28R())
     let results = report.results
@@ -340,7 +340,7 @@ private enum PackageFigures {
 
   /// A dry G2+ flaps 100 landing on 28R.
   static func landing(weightLb: Double) throws -> [String: Double] {
-    let results = try PerformanceCalculator(settings: .init(aircraftType: .g2Plus)).landing(
+    let results = try PerformanceCalculator(settings: .init(aircraft: .sf50(.g2Plus))).landing(
       conditions: reportedConditions,
       configuration: .init(weight: .init(value: weightLb, unit: .pounds), flapSetting: .flaps100),
       runway: runway28R()
@@ -366,7 +366,7 @@ private enum PackageFigures {
           altitudeFt: feet(meters: 3_100), temperatureC: -2, windDirectionDeg: 270,
           windSpeedKts: 30)
       ],
-      weightLb: 5_800, aircraftType: .g2Plus, seaLevelPressureInHg: 30.12,
+      weightLb: 5_800, aircraft: .sf50(.g2Plus), seaLevelPressureInHg: 30.12,
       useRegressionModel: false)
   }
 
@@ -374,7 +374,7 @@ private enum PackageFigures {
   static func maxTakeoffWeight(runway: RunwayInput) throws -> (
     limit: Double, constraint: BindingConstraint
   ) {
-    let search = try PerformanceCalculator(settings: .init(aircraftType: .g1)).maxTakeoffWeight(
+    let search = try PerformanceCalculator(settings: .init(aircraft: .sf50(.g1))).maxTakeoffWeight(
       conditions: reportedConditions, runway: runway,
       minimumWeight: .init(value: 5_000, unit: .pounds))
     return (try whole(search.limit, in: .pounds), search.bindingConstraint)
@@ -384,7 +384,7 @@ private enum PackageFigures {
   static func maxTakeoffTemperature(weightLb: Double, availableTakeoffRunFt: Double) throws -> (
     limit: Double, constraint: BindingConstraint
   ) {
-    let search = try PerformanceCalculator(settings: .init(aircraftType: .g1))
+    let search = try PerformanceCalculator(settings: .init(aircraft: .sf50(.g1)))
       .maxTakeoffTemperature(
         conditions: reportedConditions, weight: .init(value: weightLb, unit: .pounds),
         runway: runway28R(availableTakeoffRunFt: availableTakeoffRunFt))
