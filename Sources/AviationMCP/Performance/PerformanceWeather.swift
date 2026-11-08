@@ -1,7 +1,7 @@
+import AircraftPerformance
 import Foundation
 import MCP
 import MeasurementKit
-import SF50Performance
 
 /// One weather field as the weather service reported it.
 struct ReportedField: Sendable {
@@ -191,7 +191,7 @@ struct ResolvedWeather: Sendable {
       ?? (windSpeedKt.value > 0
         ? (runwayHeadingDeg + 180).truncatingRemainder(dividingBy: 360) : nil)
     let origins = [temperatureC?.origin, windSpeedKt.origin, altimeterInHg?.origin]
-    var providers = SF50Performance.WeatherProviders()
+    var providers = AircraftPerformance.WeatherProviders()
     if origins.contains(where: { $0 == .metar || $0 == .taf }) { providers.insert(.NWS) }
     if origins.contains(.openMeteo) { providers.insert(.openMeteo) }
     let source: Conditions.Source =

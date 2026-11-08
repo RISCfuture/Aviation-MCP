@@ -45,7 +45,7 @@ enum AircraftImporter {
     record.data["engine_count_code"] = profile.identity.engineCount.map { .string($0.ICAOCode) }
     record.data["dimensions"] = profile.dimensions.map(dimensions)
     record.data["weights"] = profile.weights.map(weights)
-    record.data["performance"] = profile.performance.map(AircraftPerformance.normalize)
+    record.data["performance"] = profile.performance.map(APDPerformance.normalize)
     record.data["variants"] = .array(variants(profile.variants, type: record.data))
     record.data["category_requires_variant_selection"] = .bool(
       Set(profile.variants.compactMap(\.categories.approach)).count > 1)

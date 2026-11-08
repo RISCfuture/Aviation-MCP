@@ -1,7 +1,7 @@
+import AircraftPerformance
 import Foundation
 import MCP
 import MeasurementKit
-import SF50Performance
 
 /// Where a performance input came from.
 enum InputOrigin: String, Codable, Sendable {
@@ -30,12 +30,12 @@ struct PerformanceAircraft: Sendable {
   static let landingFlaps = ["up", "up_ice", "50", "50_ice", "100"]
 
   let generation: String
-  let type: AircraftType
+  let type: SF50Variant
   let weight: Measurement<UnitMass>?
   let settings: PerformanceSettings
 
   var model: PerformanceModelKind { settings.modelKind }
-  var limitations: any Limitations.Type { settings.limitations }
+  var limitations: AircraftLimitations { settings.limitations }
 
   init(_ arguments: ToolArguments, requiringWeight: Bool = true) throws {
     generation = try arguments.string("aircraft_generation", required: true) ?? ""
@@ -52,7 +52,7 @@ struct PerformanceAircraft: Sendable {
     }
     let safetyFactor = try arguments.number("safety_factor", default: 1, range: 1...3) ?? 1
     settings = PerformanceSettings(
-      aircraftType: type, modelKind: kind, safetyFactorDry: safetyFactor,
+      aircraft: .sf50(type), modelKind: kind, safetyFactorDry: safetyFactor,
       safetyFactorContaminated: safetyFactor,
       VREFAdditive: Measurement(
         value: try arguments.number("vref_additive_kt", default: 0, range: 0...20) ?? 0,
@@ -86,7 +86,7 @@ struct PerformanceAircraft: Sendable {
     }
   }
 
-  private static func aircraftType(_ generation: String) throws -> AircraftType {
+  private static func aircraftType(_ generation: String) throws -> SF50Variant {
     switch generation {
     case "g1": .g1
     case "g2": .g2(updatedThrustSchedule: false)

@@ -1,7 +1,7 @@
+import AircraftPerformance
 import Foundation
 import MCP
 import MeasurementKit
-import SF50Performance
 
 /// An airport as the NASR airport record describes it, reduced to what performance needs.
 struct PerformanceAirport: Sendable {

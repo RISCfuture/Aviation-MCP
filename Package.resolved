@@ -1,5 +1,5 @@
 {
-  "originHash" : "e89643e9f8360a28727bc03e5d8c7b5e3d7feb994f79b289053cf7032281a5d8",
+  "originHash" : "088858f188530b957be7af3551d8fbc187eb47c43f2ca01cde2639c3afcf5f2a",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -141,8 +141,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/SF50-TOLD/SF50-Performance.git",
       "state" : {
-        "revision" : "49cdd9111fbc7dffbec6bbf8f9411b8c82aee679",
-        "version" : "1.0.0"
+        "revision" : "3bcfefc39f85796b575a270e3e2867e650e0e872",
+        "version" : "2.0.0"
       }
     },
     {

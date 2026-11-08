@@ -1,7 +1,7 @@
+import AircraftPerformance
 import Foundation
 import MCP
 import MeasurementKit
-import SF50Performance
 
 extension PerformanceTools {
   /// The lightest weight the AFM takeoff data covers, where the weight search starts by default.

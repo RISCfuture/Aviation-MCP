@@ -40,7 +40,7 @@ tools.
 The script lists each library as owner, repository and target, and takes a
 repository name to build only that library, such as
 `scripts/verify-linux-libraries.sh SF50-Performance`. It also builds
-`SF50-TOLD/SF50-Performance` (target `SF50Performance`) and
+`SF50-TOLD/SF50-Performance` (target `AircraftPerformance`) and
 `RISCfuture/MeasurementKit`.
 
 Upstream warnings included unsupported processing of string catalogs on Linux,

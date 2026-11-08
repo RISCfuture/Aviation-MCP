@@ -1,7 +1,7 @@
+import AircraftPerformance
 import Foundation
 import MCP
 import MeasurementKit
-import SF50Performance
 
 /// Turns the performance models' figures into JSON, collecting a warning for each figure the
 /// model could not stand behind.
@@ -41,18 +41,18 @@ struct FigureEncoder {
 
   /// A figure in whole units of `unit`.
   mutating func encode<UnitType: Dimension>(
-    _ figure: SF50Performance.Value<Measurement<UnitType>>, _ name: String, in unit: UnitType
+    _ figure: AircraftPerformance.Value<Measurement<UnitType>>, _ name: String, in unit: UnitType
   ) -> MCP.Value {
     encode(figure, name) { .double($0.converted(to: unit).value.rounded()) }
   }
 
   /// A figure already in its unit, rounded to whole units.
-  mutating func encode(_ figure: SF50Performance.Value<Double>, _ name: String) -> MCP.Value {
+  mutating func encode(_ figure: AircraftPerformance.Value<Double>, _ name: String) -> MCP.Value {
     encode(figure, name) { .double($0.rounded()) }
   }
 
   /// A yes-or-no figure.
-  mutating func encode(_ figure: SF50Performance.Value<Bool>, _ name: String) -> MCP.Value {
+  mutating func encode(_ figure: AircraftPerformance.Value<Bool>, _ name: String) -> MCP.Value {
     encode(figure, name, number: MCP.Value.bool)
   }
 
@@ -72,7 +72,7 @@ struct FigureEncoder {
   }
 
   private mutating func encode<T>(
-    _ figure: SF50Performance.Value<T>, _ name: String, number: (T) -> MCP.Value
+    _ figure: AircraftPerformance.Value<T>, _ name: String, number: (T) -> MCP.Value
   ) -> MCP.Value {
     switch figure {
     case .value, .valueWithUncertainty: break
@@ -98,7 +98,9 @@ struct FigureEncoder {
   }
 
   /// A figure's JSON, without recording a warning for it.
-  static func json<T>(_ figure: SF50Performance.Value<T>, number: (T) -> MCP.Value) -> MCP.Value {
+  static func json<T>(
+    _ figure: AircraftPerformance.Value<T>, number: (T) -> MCP.Value
+  ) -> MCP.Value {
     var fields: [String: MCP.Value]
     switch figure {
     case .value(let value):
@@ -116,7 +118,7 @@ struct FigureEncoder {
   }
 
   /// A figure in whole feet, without recording a warning for it.
-  static func feet(_ figure: SF50Performance.Value<Double>) -> MCP.Value {
+  static func feet(_ figure: AircraftPerformance.Value<Double>) -> MCP.Value {
     json(figure) { .double($0.rounded()) }
   }
 
@@ -166,7 +168,7 @@ enum PerformanceJSON {
   /// A required distance against the available one, marked when the required figure is the
   /// clamped value of an offscale one.
   static func margin(
-    required: SF50Performance.Value<Measurement<UnitLength>>, available: Measurement<UnitLength>
+    required: AircraftPerformance.Value<Measurement<UnitLength>>, available: Measurement<UnitLength>
   ) -> MCP.Value {
     let availableFt = available.converted(to: .feet).value.rounded()
     var fields: [String: MCP.Value] = ["available_ft": .double(availableFt)]
@@ -207,6 +209,8 @@ extension AdjustmentKind {
     case .uphillGradient: "uphill_slope"
     case .downhillGradient: "downhill_slope"
     case .unpavedSurface: "unpaved_surface"
+    case .wetUnpavedSurface: "wet_unpaved_surface"
+    case .airConditioner: "air_conditioner"
     case .contamination: "contamination"
     case .safetyMargin: "safety_factor"
     case .VREFAdditive: "vref_additive"
@@ -230,8 +234,10 @@ extension PerformanceNote {
     case .weightAboveMax: "weight_above_maximum"
     case .zeroFuelWeightExceeded: "zero_fuel_weight_above_maximum"
     case .fuelExceedsCapacity: "fuel_exceeds_capacity"
-    case .airportElevationOutsideLimits: "elevation_outside_limits"
-    case .temperatureOutsideLimits: "temperature_outside_limits"
+    case .airportElevationOutsideLimits, .airportElevationAboveLimit, .airportElevationBelowLimit:
+      "elevation_outside_limits"
+    case .temperatureOutsideLimits, .temperatureAboveLimit, .temperatureBelowLimit:
+      "temperature_outside_limits"
     case .takeoffDistanceExceedsAvailable: "takeoff_distance_exceeds_available"
     case .takeoffRunExceedsAvailable: "takeoff_run_exceeds_available"
     case .landingDistanceExceedsAvailable: "landing_distance_exceeds_available"
@@ -242,7 +248,7 @@ extension PerformanceNote {
   }
 }
 
-extension SF50Performance.Value {
+extension AircraftPerformance.Value {
   /// Whether the model held an input at the edge of its data, whether or not it substituted a
   /// figure.
   var isOffscale: Bool { isOffscaleHigh || isOffscaleLow }
