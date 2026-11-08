@@ -4,7 +4,10 @@ Swift 6.4/Vapor aviation server using the official MCP SDK's stateless Streamabl
 HTTP transport at **<https://aviation-mcp.org/mcp>**.
 
 The server exposes 21 tools for airports, navigation, airspace, procedures,
-obstacles, aircraft, weather, NOTAMs, geography, terrain and source status.
+obstacles, aircraft, weather, NOTAMs, geography, terrain, Cirrus SF50 and SR22
+performance planning and source status, plus four deprecated `sf50_*` aliases of
+the performance tools that keep their SF50-only arguments and results for older
+clients until those clients move.
 Recoverable parsing errors retain valid records and flag partial coverage.
 Complete source coverage and all five original acceptance cases have not yet
 been established.

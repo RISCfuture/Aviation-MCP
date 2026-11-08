@@ -98,8 +98,7 @@ extension ToolDefinition {
     case .queryNOTAMs: ["start", "end"]
     case .computeGeometry: ["operation"]
     case .queryTerrain: ["route", "half_width_nm"]
-    case .takeoffPerformance, .landingPerformance, .climbProfile, .takeoffLimits: sf50Required
-    default: []
+    default: aircraftRequired
     }
   }
 
@@ -123,7 +122,7 @@ extension ToolDefinition {
     case .computeGeometry: Geography.computation
     case .queryTerrain: Terrain.query
     case .getDataStatus: [:]
-    case .takeoffPerformance, .landingPerformance, .climbProfile, .takeoffLimits: sf50Parameters
+    default: aircraftParameters
     }
   }
 }

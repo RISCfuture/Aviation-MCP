@@ -23,10 +23,16 @@ enum ToolDefinition: String, CaseIterable, Sendable {
   case computeGeometry = "compute_geometry"
   case getDataStatus = "get_data_status"
   case queryTerrain = "query_terrain"
-  case takeoffPerformance = "sf50_takeoff_performance"
-  case landingPerformance = "sf50_landing_performance"
-  case climbProfile = "sf50_climb_profile"
-  case takeoffLimits = "sf50_takeoff_limits"
+  case takeoffPerformance = "takeoff_performance"
+  case landingPerformance = "landing_performance"
+  case climbProfile = "climb_profile"
+  case takeoffLimits = "takeoff_limits"
+  // Deprecated aliases of the four tools above, for clients built against the SF50-only names;
+  // to be removed once those clients have moved.
+  case sf50TakeoffPerformance = "sf50_takeoff_performance"
+  case sf50LandingPerformance = "sf50_landing_performance"
+  case sf50ClimbProfile = "sf50_climb_profile"
+  case sf50TakeoffLimits = "sf50_takeoff_limits"
 
   var group: DomainGroup {
     switch self {
@@ -41,7 +47,9 @@ enum ToolDefinition: String, CaseIterable, Sendable {
     case .convertCoordinates, .computeGeometry: .geography
     case .getDataStatus: .status
     case .queryTerrain: .terrain
-    case .takeoffPerformance, .landingPerformance, .climbProfile, .takeoffLimits: .performance
+    case .takeoffPerformance, .landingPerformance, .climbProfile, .takeoffLimits,
+      .sf50TakeoffPerformance, .sf50LandingPerformance, .sf50ClimbProfile, .sf50TakeoffLimits:
+      .performance
     }
   }
 
@@ -101,28 +109,55 @@ enum ToolDefinition: String, CaseIterable, Sendable {
       "Find native-cell terrain maxima within a coordinate route corridor, "
         + "with optional conservative supplied-gradient comparison in EGM2008."
     case .takeoffPerformance:
+      "Takeoff ground run and distance over a 50 ft screen for \(Self.aircraft), with the wind, "
+        + "slope, surface and wet-turf corrections the manual gives, takeoff climb gradient, "
+        + "margins against the runway, an optional obstacle and limitation notes. Runway data and "
+        + "weather are looked up and can be overridden. \(Self.planningOnly)"
+    case .landingPerformance:
+      "Landing ground run and distance from 50 ft for \(Self.aircraft), with corrections for "
+        + "wind, slope, surface and runway contamination where the manual gives them, Vref and "
+        + "the go-around climb gradient or the balked landing climb where it has them, margins "
+        + "against the runway and "
+        + "limitation notes. \(Self.planningOnly)"
+    case .climbProfile:
+      "Climb gradient and rate by altitude from the field to a top altitude for "
+        + "\(Self.aircraft), for each climb schedule the manual has (takeoff and enroute, and the "
+        + "SF50's enroute-obstacle and ice-protection schedules), using forecast winds aloft, "
+        + "with the SR22's time, fuel and distance to climb. "
+        + "Gives ground gradients along a course and a minimum gradient for query_terrain. "
+        + "\(Self.planningOnly)"
+    case .takeoffLimits:
+      "Maximum takeoff weight, or maximum outside air temperature at a weight, for "
+        + "\(Self.aircraft), for one runway end or every end of an airport, with the constraint "
+        + "that limits each. \(Self.planningOnly)"
+    case .sf50TakeoffPerformance:
       "Cirrus SF50 Vision Jet takeoff ground run and distance over a 50 ft screen, with the wind, "
         + "slope and surface corrections applied, takeoff climb gradient, margins against the "
-        + "runway, an optional obstacle and AFM limitation notes. Runway data and weather are "
-        + "looked up and can be overridden. \(Self.planningOnly)"
-    case .landingPerformance:
+        + "runway, an optional obstacle and AFM limitation notes. \(Self.deprecation(of: .takeoffPerformance))"
+    case .sf50LandingPerformance:
       "Cirrus SF50 Vision Jet landing Vref, ground run and distance from 50 ft, with corrections "
-        + "for wind, slope, surface and runway contamination, the AFM go-around climb gradient, "
-        + "margins against the runway and AFM limitation notes. \(Self.planningOnly)"
-    case .climbProfile:
+        + "for wind, slope, surface and runway contamination, the AFM go-around climb gradient and "
+        + "margins against the runway. \(Self.deprecation(of: .landingPerformance))"
+    case .sf50ClimbProfile:
       "Cirrus SF50 Vision Jet climb gradient and rate by altitude from the field to a top "
-        + "altitude, for the takeoff (91 KIAS), enroute-obstacle (120 KIAS) and enroute climb "
-        + "schedules with and without ice protection, using forecast winds aloft. Gives ground "
-        + "gradients along a course and a minimum gradient for query_terrain. \(Self.planningOnly)"
-    case .takeoffLimits:
+        + "altitude for every climb schedule, using forecast winds aloft. "
+        + "\(Self.deprecation(of: .climbProfile))"
+    case .sf50TakeoffLimits:
       "Cirrus SF50 Vision Jet maximum takeoff weight, or maximum outside air temperature at a "
-        + "weight, for one runway end or every end of an airport, with the constraint that "
-        + "limits each. \(Self.planningOnly)"
+        + "weight, with the constraint that limits each. \(Self.deprecation(of: .takeoffLimits))"
     }
   }
 
+  /// The notice every SF50 alias's description ends with.
+  private static func deprecation(of tool: Self) -> String {
+    "Deprecated alias of \(tool.rawValue), to be removed: it takes aircraft_generation where "
+      + "\(tool.rawValue) takes aircraft {\"type\": \"sf50\", \"generation\": …}. "
+      + planningOnly
+  }
+
   private static let planningOnly =
-    "For pre-flight planning only, not for cockpit use; not FAA- or Cirrus-approved."
+    "For pre-flight planning only, not for cockpit use; not FAA- or manufacturer-approved."
+  private static let aircraft = "the Cirrus SF50 Vision Jet or Cirrus SR22, chosen by aircraft"
 
   var title: String {
     switch self {
@@ -143,10 +178,14 @@ enum ToolDefinition: String, CaseIterable, Sendable {
     case .computeGeometry: "Compute distance and bearings"
     case .getDataStatus: "Get data availability and cycles"
     case .queryTerrain: "Query terrain elevations"
-    case .takeoffPerformance: "Calculate SF50 takeoff performance"
-    case .landingPerformance: "Calculate SF50 landing performance"
-    case .climbProfile: "Calculate SF50 climb profile"
-    case .takeoffLimits: "Calculate SF50 takeoff limits"
+    case .takeoffPerformance: "Calculate takeoff performance"
+    case .landingPerformance: "Calculate landing performance"
+    case .climbProfile: "Calculate climb profile"
+    case .takeoffLimits: "Calculate takeoff limits"
+    case .sf50TakeoffPerformance: "Calculate SF50 takeoff performance (deprecated)"
+    case .sf50LandingPerformance: "Calculate SF50 landing performance (deprecated)"
+    case .sf50ClimbProfile: "Calculate SF50 climb profile (deprecated)"
+    case .sf50TakeoffLimits: "Calculate SF50 takeoff limits (deprecated)"
     }
   }
 

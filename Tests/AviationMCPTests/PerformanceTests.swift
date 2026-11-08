@@ -6,7 +6,7 @@ import Testing
 @testable import AviationMCP
 
 @Suite
-struct `SF50 performance inputs and figures` {
+struct `Performance inputs and figures` {
   @Test
   func `resolves runway inputs from NASR, deriving what is unpublished, with overrides winning`()
     throws
@@ -110,8 +110,9 @@ struct `SF50 performance inputs and figures` {
     }
     func report(_ points: [ClimbProfile.DataPoint], top: Double) -> ClimbReport {
       ClimbReport(
-        profile: ClimbProfile(dataPoints: points, seaLevelPressureInHg: 29.92), fieldFt: 0,
-        topFt: top, courseDeg: 0)
+        profile: ClimbProfile(dataPoints: points, seaLevelPressureInHg: 29.92),
+        schedules: ClimbReport.schedules(for: .sf50(.g2Plus)), fieldFt: 0, topFt: top,
+        courseDeg: 0)
     }
     let uncertain = report(
       [
@@ -233,6 +234,23 @@ enum PerformanceFixtures {
             ]
           ])
       })
+  }
+
+  /// The aircraft an `aircraft` object names, without a weight.
+  static func aircraft(_ fields: [String: MCP.Value]) throws -> PerformanceAircraft {
+    try PerformanceAircraft(
+      ToolArguments(["aircraft": .object(fields)]), through: .current, requiringWeight: false)
+  }
+
+  /// A level 3,000 ft runway at sea level with the given surface.
+  static func runway(surface: SurfaceType) -> RunwayInput {
+    let length = Measurement(value: 3_000, unit: UnitLength.feet)
+    return RunwayInput(
+      id: "36", elevation: .init(value: 0, unit: .feet),
+      trueHeading: .init(value: 0, unit: .degrees),
+      gradient: 0, length: length, takeoffRun: length, takeoffDistance: length,
+      landingDistance: length, surfaceType: surface, notam: nil,
+      airportVariation: .init(value: 0, unit: .degrees))
   }
 
   static func sample(provider: String, product: String, values: [String: MCP.Value])

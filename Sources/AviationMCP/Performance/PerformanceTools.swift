@@ -3,7 +3,8 @@ import Foundation
 import MCP
 import MeasurementKit
 
-/// The SF50 performance tools: takeoff, landing, climb profile and takeoff limits.
+/// The performance tools: takeoff, landing, climb profile and takeoff limits, for each aircraft
+/// the performance models have data for.
 ///
 /// Each resolves its runway from the current NASR cycle and its weather from the weather
 /// service, lets the caller override any input, and echoes every input with its origin.
@@ -11,49 +12,62 @@ struct PerformanceTools: Sendable {
   let store: AviationStore
   let weather: WeatherService
 
-  /// Runs one of the performance tools.
+  /// Runs one of the performance tools, or one of their SF50 aliases.
   func call(_ tool: ToolDefinition, _ arguments: ToolArguments) async throws -> ToolResult {
     switch tool {
-    case .takeoffPerformance: try await takeoff(arguments)
-    case .landingPerformance: try await landing(arguments)
-    case .climbProfile: try await climbProfile(arguments)
-    case .takeoffLimits: try await takeoffLimits(arguments)
+    case .takeoffPerformance: try await takeoff(arguments, through: .current)
+    case .landingPerformance: try await landing(arguments, through: .current)
+    case .climbProfile: try await climbProfile(arguments, through: .current)
+    case .takeoffLimits: try await takeoffLimits(arguments, through: .current)
+    case .sf50TakeoffPerformance: try await takeoff(arguments, through: .sf50Alias)
+    case .sf50LandingPerformance: try await landing(arguments, through: .sf50Alias)
+    case .sf50ClimbProfile: try await climbProfile(arguments, through: .sf50Alias)
+    case .sf50TakeoffLimits: try await takeoffLimits(arguments, through: .sf50Alias)
     default: throw MCPError.invalidParams("\(tool.rawValue) is not a performance tool")
     }
   }
 
   /// Ground run, distance over a 50 ft screen, climb gradient and margins for a takeoff.
-  func takeoff(_ arguments: ToolArguments) async throws -> ToolResult {
-    let aircraft = try PerformanceAircraft(arguments)
+  func takeoff(_ arguments: ToolArguments, through interface: PerformanceInterface) async throws
+    -> ToolResult
+  {
+    let aircraft = try PerformanceAircraft(arguments, through: interface)
     let weight = try aircraft.weight(
       within: aircraft.limitations.maxTakeoffWeight, operation: "takeoff")
     let obstacle = try arguments.obstacle()
+    let contamination = try PerformanceContamination.parse(arguments)
     let site = try await site(arguments)
     let runway = try site.runway(arguments, requiring: "available_takeoff_run_ft") {
       $0.takeoffRunFt
     }
+    let input = runway.input(contamination: contamination)
+    try PerformanceContamination.check(
+      contamination, aircraft: aircraft, runway: input, operation: .takeoff)
     let weather = try await surfaceWeather(arguments, airport: site.airport, needsTemperature: true)
     let conditions = weather.resolved.conditions(runwayHeadingDeg: runway.headingTrueDeg.value)
-    let input = runway.input()
+    let airConditioner = try aircraft.airConditioner(arguments)
     let report = try PerformanceCalculator(settings: aircraft.settings).takeoff(
-      conditions: conditions, weight: weight, runway: input)
+      conditions: conditions, weight: weight, runway: input, airConditionerOn: airConditioner)
     let notes = PerformanceNotes.takeoffNotes(
       for: report,
       inputs: PerformanceNoteInputs(
         settings: aircraft.settings,
         configuration: Configuration(
-          weight: weight, flapSetting: PerformanceCalculator.takeoffFlapSetting),
+          weight: weight, flapSetting: PerformanceCalculator.takeoffFlapSetting,
+          airConditionerOn: airConditioner),
         runway: input, conditions: conditions, obstacle: obstacle))
     var figures = FigureEncoder(model: aircraft.model)
+    var inputs = try site.inputs(
+      runway: runway, weather: weather.resolved, pressureAltitude: report.pressureAltitude)
+    inputs["contamination"] = PerformanceContamination.json(contamination)
     var value = Self.takeoffFigures(report, runway: input, figures: &figures)
     value.merge([
-      "aircraft": aircraft.description().merging(["flaps": "50"]),
-      "inputs": .object(
-        try site.inputs(
-          runway: runway, weather: weather.resolved, pressureAltitude: report.pressureAltitude)),
+      "aircraft": aircraft.description().merging(
+        aircraft.takeoffEcho(airConditioner: airConditioner)),
+      "inputs": .object(inputs),
       "wind_components": PerformanceJSON.windComponents(input, conditions: conditions),
       "notes": PerformanceJSON.notes(notes),
-      "disclaimers": [.string(FigureEncoder.disclaimer)]
+      "disclaimers": .array(aircraft.disclaimers.map(MCP.Value.string))
     ]) { $1 }
     value["obstacle"] = obstacle.map { Self.obstacle($0, results: report.results, runway: input) }
     return Self.result(
@@ -62,21 +76,25 @@ struct PerformanceTools: Sendable {
   }
 
   /// Vref, landing run and distance from 50 ft, the go-around gradient and margins for a landing.
-  func landing(_ arguments: ToolArguments) async throws -> ToolResult {
-    let aircraft = try PerformanceAircraft(arguments)
+  func landing(_ arguments: ToolArguments, through interface: PerformanceInterface) async throws
+    -> ToolResult
+  {
+    let aircraft = try PerformanceAircraft(arguments, through: interface)
     let weight = try aircraft.weight(
       within: aircraft.limitations.maxLandingWeight, operation: "landing")
-    let flaps = try PerformanceAircraft.landingFlapSetting(arguments)
+    let flaps = try aircraft.landingFlapSetting(arguments)
     let contamination = try PerformanceContamination.parse(arguments)
     let site = try await site(arguments)
     let runway = try site.runway(arguments, requiring: "available_landing_distance_ft") {
       $0.landingDistanceFt
     }
+    let input = runway.input(contamination: contamination)
+    try PerformanceContamination.check(
+      contamination, aircraft: aircraft, runway: input, operation: .landing)
     let weather = try await surfaceWeather(arguments, airport: site.airport, needsTemperature: true)
     let conditions = weather.resolved.conditions(runwayHeadingDeg: runway.headingTrueDeg.value)
-    let input = runway.input(contamination: contamination)
     let configuration = Configuration(
-      weight: weight, flapSetting: flaps, iceProtection: [.flaps50Ice, .flapsUpIce].contains(flaps))
+      weight: weight, flapSetting: flaps, iceProtection: flaps.isIceProtected)
     let report = try PerformanceCalculator(settings: aircraft.settings).landing(
       conditions: conditions, configuration: configuration, runway: input)
     let notes = PerformanceNotes.landingNotes(
@@ -87,18 +105,27 @@ struct PerformanceTools: Sendable {
     var figures = FigureEncoder(model: aircraft.model)
     var inputs = try site.inputs(
       runway: runway, weather: weather.resolved, pressureAltitude: report.pressureAltitude)
-    inputs["contamination"] = Self.contamination(contamination)
-    var value = Self.landingFigures(report, runway: input, figures: &figures)
+    inputs["contamination"] = PerformanceContamination.json(contamination)
+    var echoed: [String: MCP.Value] = ["flaps": .string(flaps.argument)]
+    if aircraft.aircraft.capabilities.contains(.vref) {
+      echoed["vref_additive_kt"] = .double(aircraft.settings.VREFAdditiveKts)
+    }
+    var value = Self.landingFigures(
+      report, runway: input, capabilities: aircraft.aircraft.capabilities, figures: &figures)
+    if aircraft.aircraft.capabilities.contains(.balkedLandingClimb) {
+      let model = try PerformanceCalculator(settings: aircraft.settings).model(
+        conditions: conditions, configuration: configuration, runway: input)
+      value.merge(Self.balkedLandingFigures(model, figures: &figures)) { $1 }
+    }
     value.merge([
-      "aircraft": aircraft.description().merging([
-        "flaps": .string(try arguments.string("flaps") ?? "100"),
-        "vref_additive_kt": .double(aircraft.settings.VREFAdditiveKts)
-      ]),
+      "aircraft": aircraft.description().merging(echoed),
       "inputs": .object(inputs),
       "wind_components": PerformanceJSON.windComponents(input, conditions: conditions),
       "notes": PerformanceJSON.notes(notes),
-      "disclaimers": .array(Self.disclaimers(contamination).map(MCP.Value.string))
+      "disclaimers": .array(
+        Self.disclaimers(aircraft, contamination: contamination).map(MCP.Value.string))
     ]) { $1 }
+    value["unavailable_outputs"] = aircraft.unavailable(Self.landingOutputs)
     return Self.result(
       [.object(value)], site: site, weather: weather.reported, figures: figures,
       warnings: runway.warnings + weather.resolved.warnings)
@@ -128,32 +155,59 @@ struct PerformanceTools: Sendable {
     ]
   }
 
+  /// The landing outputs only some aircraft's manuals have figures for.
+  private static let landingOutputs: [(output: String, capability: PerformanceCapability)] = [
+    ("vref_kt", .vref), ("meets_go_around_climb_gradient", .goAroundClimbGradient),
+    ("balked_landing_climb_gradient_ft_per_nm", .balkedLandingClimb),
+    ("balked_landing_climb_rate_ft_per_min", .balkedLandingClimb)
+  ]
+
+  /// The balked landing climb at the landing's conditions and configuration.
+  private static func balkedLandingFigures(
+    _ model: any PerformanceModel, figures: inout FigureEncoder
+  ) -> [String: MCP.Value] {
+    [
+      "balked_landing_climb_gradient_ft_per_nm": figures.encode(
+        model.balkedLandingClimbGradientFtNM, "balked_landing_climb_gradient_ft_per_nm"),
+      "balked_landing_climb_rate_ft_per_min": figures.encode(
+        model.balkedLandingClimbRateFtMin, "balked_landing_climb_rate_ft_per_min")
+    ]
+  }
+
+  /// The landing figures, leaving out each one the aircraft's manuals have no figures for.
   private static func landingFigures(
-    _ report: LandingReport, runway: RunwayInput, figures: inout FigureEncoder
+    _ report: LandingReport, runway: RunwayInput, capabilities: Set<PerformanceCapability>,
+    figures: inout FigureEncoder
   ) -> [String: MCP.Value] {
     let results = report.results
-    return [
-      "vref_kt": figures.encode(results.Vref, "vref_kt", in: .knots),
+    var fields: [String: MCP.Value] = [
       "landing_run_ft": figures.encode(results.landingRun, "landing_run_ft", in: .feet),
       "landing_run_breakdown": PerformanceJSON.breakdown(report.groundRunBreakdown),
       "landing_distance_ft": figures.encode(
         results.landingDistance, "landing_distance_ft", in: .feet),
       "landing_distance_breakdown": PerformanceJSON.breakdown(report.distanceBreakdown),
-      "meets_go_around_climb_gradient": figures.encode(
-        results.meetsGoAroundClimbGradient, "meets_go_around_climb_gradient"),
       "runway_margins": .object([
         "landing_distance": PerformanceJSON.margin(
           required: results.landingDistance, available: runway.availableLandingDistance)
       ])
     ]
+    if capabilities.contains(.vref) {
+      fields["vref_kt"] = figures.encode(results.Vref, "vref_kt", in: .knots)
+    }
+    if capabilities.contains(.goAroundClimbGradient) {
+      fields["meets_go_around_climb_gradient"] = figures.encode(
+        results.meetsGoAroundClimbGradient, "meets_go_around_climb_gradient")
+    }
+    return fields
   }
 
-  /// The disclaimer, and the AFM's qualification of contaminated-runway data when it applies.
-  private static func disclaimers(_ contamination: Contamination?) -> [String] {
-    guard let contamination, contamination != .wetRunway else {
-      return [FigureEncoder.disclaimer]
-    }
-    return [FigureEncoder.disclaimer, FigureEncoder.contaminationDisclaimer]
+  /// The aircraft's disclaimers, and the manual's qualification of contaminated-runway data when
+  /// it applies.
+  private static func disclaimers(_ aircraft: PerformanceAircraft, contamination: Contamination?)
+    -> [String]
+  {
+    guard let contamination, contamination != .wetRunway else { return aircraft.disclaimers }
+    return aircraft.disclaimers + [FigureEncoder.contaminationDisclaimer]
   }
 
 }
@@ -307,76 +361,4 @@ extension PerformanceTools {
     return .object(fields)
   }
 
-  private static func contamination(_ contamination: Contamination?) -> MCP.Value? {
-    guard let contamination else { return nil }
-    var fields: [String: MCP.Value] = ["origin": "override"]
-    switch contamination {
-    case .wetRunway: fields["type"] = "wet"
-    case .drySnow: fields["type"] = "dry_snow"
-    case .compactSnow: fields["type"] = "compact_snow"
-    case .waterOrSlush(let depth), .slushOrWetSnow(let depth):
-      fields["type"] = .string(
-        contamination.type == "waterOrSlush" ? "water_or_slush" : "slush_or_wet_snow")
-      fields["depth_in"] = .double(depth.converted(to: .inches).value)
-    case .rwyCC(let code):
-      fields["type"] = "rwycc"
-      fields["rwycc"] = .int(Int(code))
-    }
-    return .object(fields)
-  }
-}
-
-/// The airport a calculation is for, if any, and the NASR cycle it came from.
-struct PerformanceSite: Sendable {
-  var airport: PerformanceAirport?
-  var sources: [SourceStamp] = []
-  var warnings: [String] = []
-
-  /// The runway end the arguments name, refusing a calculation that lacks a distance it needs.
-  ///
-  /// - Parameters:
-  ///   - distanceArgument: The argument that supplies the needed distance.
-  ///   - distance: Reads the needed distance from the resolved runway.
-  func runway(
-    _ arguments: ToolArguments, requiring distanceArgument: String,
-    distance: (ResolvedRunway) -> Sourced<Double>?
-  ) throws -> ResolvedRunway {
-    let runway = try runway(arguments, name: arguments.string("runway"))
-    guard distance(runway) != nil else {
-      throw ToolInputError(
-        reason: "The runway's available distance is unknown; supply \(distanceArgument).")
-    }
-    return runway
-  }
-
-  /// The runway end `name`, or the runway the overrides describe when there is no airport.
-  func runway(_ arguments: ToolArguments, name: String?) throws -> ResolvedRunway {
-    let overrides = try RunwayOverrides(arguments)
-    guard let airport else {
-      var runway = try ResolvedRunway.resolve(airport: nil, end: nil, overrides: overrides)
-      runway.name = name
-      return runway
-    }
-    guard let name else { throw ToolInputError(reason: "runway is required with airport.") }
-    return try ResolvedRunway.resolve(
-      airport: airport, end: airport.end(name), overrides: overrides)
-  }
-
-  /// Every input echoed with its origin.
-  func inputs(
-    runway: ResolvedRunway, weather: ResolvedWeather, pressureAltitude: Measurement<UnitLength>
-  ) throws -> [String: MCP.Value] {
-    var inputs = try runway.provenance().merging(
-      weather.provenance(pressureAltitude: pressureAltitude)
-    ) { $1 }
-    inputs["airport"] = airport?.description
-    return inputs
-  }
-}
-
-extension MCP.Value {
-  /// The object with `fields` added, replacing any of the same name.
-  func merging(_ fields: [String: Self]) -> Self {
-    .object((objectValue ?? [:]).merging(fields) { $1 })
-  }
 }
