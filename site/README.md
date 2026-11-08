@@ -5,6 +5,9 @@ examples using real airports, fixes, and routes. It uses self-hosted fonts, a ge
 illustration, and copy controls. The page explains MCP first, pairs each tool
 category with a question, then gives provider setup instructions. All eleven
 questions and the setup content are readable without JavaScript.
+`/performance/` documents the aircraft performance tools in a tab for each aircraft. It is
+reachable only by URL: no page links to it, the sitemap leaves it out, and it carries
+`noindex`. Vite builds it as a second entry beside the home page.
 The [hero image provenance and generation prompt](image-generation.md) describe
 the illustrative aviation overlays.
 

@@ -424,6 +424,98 @@ code {
   padding-left: 18px;
 }
 
+.performance h1 {
+  font-size: clamp(42px, 4.8vw, 74px);
+}
+
+.aircraft-tabs {
+  margin-top: 65px;
+}
+
+.tab-list {
+  display: flex;
+  gap: 40px;
+  border-bottom: 1px solid var(--rule);
+  font: 500 13px var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tab-list a {
+  padding-block: 0 18px;
+  margin-bottom: -1px;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+}
+
+.tab-list a[aria-selected="true"] {
+  color: var(--acid);
+  border-bottom-color: var(--acid);
+}
+
+.tab-panel {
+  padding-top: 60px;
+  scroll-margin-top: var(--nav-height);
+}
+
+.tab-panel:focus-visible {
+  outline-offset: 12px;
+}
+
+.tab-panel h2 {
+  font-size: clamp(36px, 3.6vw, 56px);
+}
+
+.aircraft-config {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 8%;
+  margin-block: 40px;
+}
+
+.aircraft-object {
+  display: block;
+  margin-top: 14px;
+  color: var(--acid);
+  font-size: 15px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+
+.aircraft-config dl {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.aircraft-config dt {
+  color: var(--paper);
+}
+
+.aircraft-config dd {
+  margin: 4px 0 18px;
+}
+
+.capability-note {
+  margin-block: 30px 0;
+}
+
+.capability-note p {
+  margin-top: 10px;
+}
+
+:is(.capability-note, .aircraft-config) .label {
+  font: 400 11px var(--mono);
+  color: var(--muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.alias-note {
+  padding-top: 30px;
+  border-top: 1px solid var(--rule);
+}
+
 .connect {
   background: #0b1713;
   border-block: 1px solid #21392d;
@@ -866,6 +958,29 @@ code {
     grid-template-columns: 1fr;
     gap: 18px;
     font-size: 14px;
+  }
+
+  .aircraft-tabs {
+    margin-top: 40px;
+  }
+
+  .tab-list {
+    gap: 24px;
+    font-size: 12px;
+  }
+
+  .tab-panel {
+    padding-top: 40px;
+  }
+
+  .aircraft-config {
+    grid-template-columns: 1fr;
+    gap: 24px;
+    margin-block: 28px;
+  }
+
+  .aircraft-object {
+    font-size: 13px;
   }
 
   .connect h2 {
