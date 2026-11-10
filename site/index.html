@@ -507,7 +507,8 @@
         <div class="wrap">
           <h2 id="connect-title">Connect the server</h2>
           <p class="section-deck">
-            Use the same endpoint in ChatGPT or Claude.
+            Install it from Claude’s directory, add the endpoint to ChatGPT, or
+            use it in any MCP client.
           </p>
           <div class="endpoint">
             <div>
@@ -582,20 +583,20 @@
               <ol class="steps">
                 <li>
                   <div>
-                    <h4>Open your connectors</h4>
+                    <h4>Browse the connectors</h4>
                     <p>
-                      Go to <strong>Customize → Connectors</strong>. Choose
-                      <strong>+ Add → Add custom connector</strong>.
+                      Go to <strong>Customize → Connectors</strong>, choose
+                      <strong>Browse connectors</strong>, and search for
+                      <strong>Aviation MCP</strong>.
                     </p>
                   </div>
                 </li>
                 <li>
                   <div>
-                    <h4>Add Aviation MCP</h4>
+                    <h4>Connect it</h4>
                     <p>
-                      Enter <strong>Aviation MCP</strong> and paste the endpoint
-                      above. Continue, choose <strong>No sign in</strong>, and
-                      finish adding the connector.
+                      Open the listing and select <strong>Connect</strong>. No
+                      sign-in is needed.
                     </p>
                   </div>
                 </li>
@@ -611,9 +612,10 @@
                 </li>
               </ol>
               <p class="setup-note">
-                For Team or Enterprise, an authorized owner first adds the
-                connector in organization settings. Availability and controls
-                depend on your account.
+                To add the server yourself, choose
+                <strong>+ Add → Add custom connector</strong> and paste the
+                endpoint above. For Team or Enterprise, an authorized owner
+                first adds the connector in organization settings.
               </p>
               <a
                 class="text-link"
@@ -622,6 +624,70 @@
                 <svg class="icon" aria-hidden="true">
                   <use href="#arrow-up-right" /></svg
               ></a>
+            </article>
+          </div>
+          <h3 class="agents-title" id="agents-title">Coding agents</h3>
+          <p class="connection-note">
+            The plugin also adds skills that guide the agent through Cirrus SF50
+            and SR22 performance planning, NOTAM and weather inputs, and airport
+            briefings.
+          </p>
+          <div class="installation-grid agents-grid">
+            <article aria-labelledby="claude-code-title">
+              <h3 id="claude-code-title">Claude Code</h3>
+              <ol class="steps">
+                <li>
+                  <div>
+                    <h4>Add the marketplace and plugin</h4>
+                    <p>Run these commands in Claude Code:</p>
+                  </div>
+                </li>
+              </ol>
+              <div class="command">
+                <pre><code id="claude-code-commands">/plugin marketplace add RISCfuture/Aviation-MCP
+/plugin install aviation-mcp@aviation-mcp</code></pre>
+                <button
+                  class="outline-button"
+                  data-copy="claude-code-commands"
+                  data-copy-status="Claude Code commands copied."
+                >
+                  Copy
+                  <svg class="icon" aria-hidden="true">
+                    <use href="#copy" />
+                  </svg>
+                </button>
+              </div>
+              <p class="setup-note">
+                Start a new session before asking a question.
+              </p>
+            </article>
+            <article aria-labelledby="codex-title">
+              <h3 id="codex-title">Codex</h3>
+              <ol class="steps">
+                <li>
+                  <div>
+                    <h4>Add the marketplace and plugin</h4>
+                    <p>Run these commands in a terminal:</p>
+                  </div>
+                </li>
+              </ol>
+              <div class="command">
+                <pre><code id="codex-commands">codex plugin marketplace add RISCfuture/Aviation-MCP
+codex plugin add aviation-mcp@aviation-mcp</code></pre>
+                <button
+                  class="outline-button"
+                  data-copy="codex-commands"
+                  data-copy-status="Codex commands copied."
+                >
+                  Copy
+                  <svg class="icon" aria-hidden="true">
+                    <use href="#copy" />
+                  </svg>
+                </button>
+              </div>
+              <p class="setup-note">
+                Start a new session before asking a question.
+              </p>
             </article>
           </div>
         </div>

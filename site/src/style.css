@@ -592,7 +592,7 @@ code {
 
 .installation-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-top: 64px;
   gap: 7%;
 }
@@ -659,6 +659,41 @@ code {
   font: 400 14px/1.8 var(--mono);
   color: var(--muted);
   margin-bottom: 18px;
+}
+
+.agents-title {
+  margin-top: 110px;
+  font-size: 48px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+}
+
+.agents-grid {
+  margin-top: 40px;
+}
+
+.steps code {
+  color: var(--paper);
+}
+
+.command {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 20px;
+  margin-bottom: 24px;
+  background: #13221b;
+  border-left: 2px solid var(--acid);
+}
+
+.command pre {
+  flex: 1 1 auto;
+  margin: 0;
+  min-width: 0;
+  overflow-x: auto;
+  color: var(--acid);
+  font: 400 14px/1.8 var(--mono);
 }
 
 .footer {
@@ -1006,7 +1041,7 @@ code {
   }
 
   .installation-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     margin-top: 44px;
     gap: 45px;
   }
@@ -1019,6 +1054,20 @@ code {
 
   .installation-grid h3 {
     font-size: 40px;
+  }
+
+  .agents-title {
+    margin-top: 70px;
+    font-size: 40px;
+  }
+
+  .command {
+    flex-wrap: wrap;
+    padding: 16px;
+  }
+
+  .command pre {
+    flex-basis: 100%;
   }
 
   .steps > :where(li) {

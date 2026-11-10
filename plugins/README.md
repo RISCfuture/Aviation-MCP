@@ -24,23 +24,21 @@ does not see the tools twice.
 
 ## Submission status
 
-As of October 29, 2026 UTC, [Claude's Aviation MCP submission](https://claude.ai/directory/manage/aviation-mcp)
-has been submitted for review under publisher Tim Morgan. The portal refreshed
-all 17 tools without annotation suggestions and confirmed receipt. Review updates
-go to the supplied publisher contact. It is not yet approved or published.
+As of November 9, 2026, [Claude's Aviation MCP connector](https://claude.ai/directory/manage/aviation-mcp)
+is published in Claude's directory under publisher Tim Morgan.
 
 [OpenAI's Aviation Data submission](https://platform.openai.com/plugins/manage/plugin_asdk_app_6ae2f4b563f88191a52bfbeed9663e5b)
-is **In review** for version 1.0.0. Identity and domain verification are complete,
-and MCP discovery succeeds. The display name follows the portal's instruction to
-omit “MCP”. The submission includes five positive and three negative client cases,
-the [recorded ChatGPT walkthrough](https://aviation-mcp.org/review/aviation-data-demo.mp4),
-and reviewer notes explaining the Productivity category and weather correction.
+is **In review** for version 1.1.0 and not yet published. Until it is, ChatGPT users
+add the endpoint as a custom MCP server, and Codex users install the plugin from this
+repository's marketplace:
 
-The production compatibility fix is deployed and ChatGPT's private connector
-works. All 17 production tools passed the MCP Inspector checks. The public
-privacy, terms, and support pages are deployed. Client findings are documented
-in [verification](verification.md). Claude conversation testing was unavailable
-due to the account's weekly usage limit. Neither listing is approved or published.
+```sh
+codex plugin marketplace add RISCfuture/Aviation-MCP
+codex plugin add aviation-mcp@aviation-mcp
+```
+
+Codex reads the repository's Claude marketplace and installs the MCP server and the
+skills.
 
 ## Before submitting 1.1.0
 
