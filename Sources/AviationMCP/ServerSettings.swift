@@ -1,5 +1,5 @@
 import Foundation
-import Vapor
+public import Vapor
 
 struct ServerSettings: Sendable {
   let terrainPython: String
@@ -31,7 +31,7 @@ struct ServerSettings: Sendable {
     terrainCacheBytes = Int(
       try Self.number(
         "TERRAIN_CACHE_BYTES", default: 536_870_912, range: 1_048_576...21_474_836_480))
-    role = Environment.get("APP_ROLE") ?? "serve"
+    role = Environment.appRole
     guard ["serve", "ingest"].contains(role) else { throw Self.invalid("APP_ROLE") }
     let databaseKey = role == "ingest" ? "INGEST_DATABASE_URL" : "DATABASE_URL"
     guard let url = Environment.get(databaseKey), !url.isEmpty else {
@@ -122,4 +122,9 @@ struct ServerSettings: Sendable {
   private static func invalid(_ key: String) -> StorageError {
     .invalidImport("Missing or invalid configuration: \(key).")
   }
+}
+
+extension Environment {
+  /// The process role from `APP_ROLE`; `serve` when unset.
+  public static var appRole: String { Self.get("APP_ROLE") ?? "serve" }
 }

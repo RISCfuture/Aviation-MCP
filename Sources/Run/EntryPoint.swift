@@ -32,9 +32,9 @@ struct EntryPoint {
 
   /// Flushes the reporter and exits on SIGTERM; the `serve` command already shuts down gracefully.
   private static func terminateOnSIGTERM(_ app: Application) -> (any DispatchSourceSignal)? {
-    guard Environment.get("APP_ROLE") != "serve" else { return nil }
+    guard Environment.appRole != "serve" else { return nil }
     signal(SIGTERM, SIG_IGN)
-    let source = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
+    let source = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .global())
     source.setEventHandler {
       app.errorReporter.close()
       exit(143)
