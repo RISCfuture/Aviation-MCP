@@ -13,9 +13,11 @@ case "$command_name" in
   migrate) cpus=1 memory_mb=2048 machine_timeout=1800 ;;
   purge) cpus=1 memory_mb=2048 machine_timeout=1200 ;;
   import-terrain) cpus=1 memory_mb=2048 machine_timeout=600 ;;
+  sentry-check) cpus=1 memory_mb=1024 machine_timeout=120 ;;
   *) exit 2 ;;
 esac
 poll_margin=300
+sentry_dsn=https://c928956930320ae25669a6a4e9a2d1ed@o4510156629475328.ingest.us.sentry.io/4512414920146944
 
 api=https://api.machines.dev/v1/apps/aviation-mcp-ingest/machines
 work_dir=$(mktemp -d)
@@ -64,9 +66,12 @@ finish() {
 
 jq -n --arg image "$AVIATION_INGEST_IMAGE" --arg command "$command_name" \
   --arg timeout "$machine_timeout" --argjson cpus "$cpus" --argjson memory "$memory_mb" \
+  --arg dsn "$sentry_dsn" \
   --args '{region:"sjc", config:{image:$image,
-    init:{exec:(["/usr/bin/timeout",$timeout,"/app/aviation-mcp",$command] + $ARGS.positional)},
-    env:{APP_ROLE:"ingest"}, restart:{policy:"no"}, auto_destroy:false,
+    init:{exec:(["/app/run-job","/usr/bin/timeout",$timeout,"/app/aviation-mcp",$command]
+      + $ARGS.positional)},
+    env:{APP_ROLE:"ingest", SENTRY_DSN:$dsn, SENTRY_ENVIRONMENT:"production"},
+    restart:{policy:"no"}, auto_destroy:false,
     guest:{cpu_kind:"shared",cpus:$cpus,memory_mb:$memory},
     metadata:{aviation_job:"source-ingestion"}}}' -- "$@" > "$work_dir/request.json"
 curl --fail-with-body --silent --show-error --max-time 120 --request POST \

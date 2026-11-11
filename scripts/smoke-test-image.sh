@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Checks that a deployment image links, migrates a fresh PostGIS database, serves under the
-# serving role, refuses a role that can modify aviation data, and can run the terrain worker's
-# Python stack.
+# serving role with and without an unreachable Sentry DSN, refuses a role that can modify aviation
+# data, and can run the terrain worker's Python stack.
 set -euo pipefail
 
 image=${1:?Supply the image to test}
@@ -9,7 +9,8 @@ postgis_image=${SMOKE_POSTGIS_IMAGE:-postgis/postgis:18-3.6}
 port=${SMOKE_PORT:-18080}
 privileges="$(dirname "$0")/database-privileges.sql"
 network="aviation-mcp-smoke-$$"
-database="$network-db" server="$network-serve" refused="$network-refused"
+database="$network-db" server="$network-serve" reporting="$network-reporting"
+refused="$network-refused"
 owner_url="postgres://postgres:smoke@$database:5432/aviation?sslmode=disable"
 serving_url="postgres://aviation_serve:smoke@$database:5432/aviation?sslmode=disable"
 # NOTAMs need their own database, so they are the one group left out.
@@ -17,7 +18,7 @@ groups=airports,navigation,airspace,procedures,obstacles,aircraft,weather,geogra
 
 # shellcheck disable=SC2329 # Invoked by the EXIT trap.
 cleanup() {
-  docker rm --force "$server" "$refused" "$database" >/dev/null 2>&1 || true
+  docker rm --force "$server" "$reporting" "$refused" "$database" >/dev/null 2>&1 || true
   docker network rm "$network" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -69,16 +70,21 @@ serve() {
     --env AVIATION_GROUPS="$groups" "$@" "$image" >/dev/null
 }
 
+# Serves from a container named by the first argument, passing the rest to docker run, and
+# removes the container once it is ready.
 check_serving_role() {
-  serve "$server" "$serving_url" --publish "127.0.0.1:$port:8080"
+  local name=$1
+  shift
+  serve "$name" "$serving_url" --publish "127.0.0.1:$port:8080" "$@"
   local request=(curl --fail --silent --show-error --max-time 5 --retry 15 --retry-delay 1
     --retry-all-errors)
   if ! "${request[@]}" "http://127.0.0.1:$port/health" | jq -e '.status == "ok"' >/dev/null \
     || ! "${request[@]}" "http://127.0.0.1:$port/ready" | jq -e '.status == "ready"' >/dev/null
   then
-    docker logs "$server" >&2
+    docker logs "$name" >&2
     return 1
   fi
+  docker rm --force "$name" >/dev/null
 }
 
 check_privileged_role_refused() {
@@ -98,6 +104,7 @@ check_terrain_runtime
 start_database
 check_migrations
 create_roles
-check_serving_role
+check_serving_role "$server"
+check_serving_role "$reporting" --env SENTRY_DSN=https://public@127.0.0.1:9/1
 check_privileged_role_refused
 printf 'Image %s passed smoke tests.\n' "$image"

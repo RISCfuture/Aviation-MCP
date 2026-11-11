@@ -9,3 +9,4 @@
 !terrain/
 !terrain/*.py
 !terrain/requirements.txt
+!scripts/run-job.sh

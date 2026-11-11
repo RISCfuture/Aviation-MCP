@@ -1,0 +1,5 @@
+module CSentry [system] {
+  header "shim.h"
+  link "sentry"
+  export *
+}

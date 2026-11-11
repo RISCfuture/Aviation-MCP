@@ -15,6 +15,7 @@ let package = Package(
   name: "AviationMCP",
   platforms: [.macOS(.v27)],
   products: [.executable(name: "aviation-mcp", targets: ["Run"])],
+  traits: [.trait(name: "Sentry", description: "Report defects through sentry-native on Linux.")],
   dependencies: [
     .package(
       url: "https://github.com/RISCfuture/SwiftNASR.git", from: "5.0.1"),
@@ -62,10 +63,12 @@ let package = Package(
         .product(name: "Fluent", package: "fluent"),
         .product(name: "FluentPostgresDriver", package: "fluent-postgres-driver"),
         .product(name: "PostgresKit", package: "postgres-kit"),
-        .product(name: "MCP", package: "swift-sdk")
+        .product(name: "MCP", package: "swift-sdk"),
+        .target(name: "CSentry", condition: .when(platforms: [.linux], traits: ["Sentry"]))
       ],
       swiftSettings: swiftSettings
     ),
+    .systemLibrary(name: "CSentry", path: "Sources/CSentry"),
     .executableTarget(
       name: "Run",
       dependencies: ["AviationMCP", .product(name: "Vapor", package: "vapor")],

@@ -7,7 +7,7 @@ import Vapor
 struct EntryPoint {
   static func main() async throws {
     let app = try await Application.make(.detect())
-    app.errorReporter = DisabledErrorReporter()
+    app.errorReporter = ErrorReporting.start(role: Environment.appRole, command: commandName)
     let termination = terminateOnSIGTERM(app)
     do {
       try configure(app)
@@ -28,6 +28,11 @@ struct EntryPoint {
     termination?.cancel()
     app.errorReporter.close()
     try await app.asyncShutdown()
+  }
+
+  /// The command named on the command line, or `nil` when the default command runs.
+  private static var commandName: String? {
+    CommandLine.arguments.dropFirst().first.flatMap { $0.hasPrefix("-") ? nil : $0 }
   }
 
   /// Flushes the reporter and exits on SIGTERM; the `serve` command already shuts down gracefully.

@@ -19,6 +19,9 @@ kill_timeout = "35s"
   DATABASE_WAIT_SECONDS = "15"
   TERRAIN_CACHE_DIRECTORY = "/data/terrain"
   TERRAIN_CACHE_BYTES = "536870912"
+  SENTRY_DSN = "https://c928956930320ae25669a6a4e9a2d1ed@o4510156629475328.ingest.us.sentry.io/4512414920146944"
+  SENTRY_ENVIRONMENT = "production"
+  SENTRY_DATABASE_PATH = "/data/sentry"
 
 [[mounts]]
   source = "terrain_cache"
