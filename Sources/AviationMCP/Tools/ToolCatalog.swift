@@ -43,20 +43,28 @@ struct ToolCatalog: Sendable {
     } catch let error as MCPError {
       throw error
     } catch {
-      return try Self.unexpectedFailure(error, tool: parameters.name, reporter: reporter)
+      return try Self.unexpectedFailure(
+        error, tool: parameters.name, arguments: parameters.arguments, reporter: reporter)
     }
   }
 
   /// Reports `error` when it is a defect and returns the generic failure shown to clients.
   static func unexpectedFailure(
-    _ error: any Error, tool: String, reporter: any ErrorReporter
+    _ error: any Error, tool: String, arguments: [String: Value]?, reporter: any ErrorReporter
   ) throws -> CallTool.Result {
     if DefectClassification.isDefect(error) {
-      reporter.report(
-        error, tags: ["tool": tool],
-        context: ToolCallContext.current?.flyRequestID.map { ["fly_request_id": $0] } ?? [:])
+      reporter.report(error, tags: ["tool": tool], context: reportContext(arguments: arguments))
     }
     return try failure("service_failure", message: "The request could not be completed.")
+  }
+
+  private static func reportContext(arguments: [String: Value]?) -> [String: String] {
+    let call = ToolCallContext.current
+    let fields = [
+      "fly_request_id": call?.flyRequestID, "jsonrpc_id": call?.jsonrpcID,
+      "arguments": ToolCallLog.encodedArguments(arguments)
+    ]
+    return fields.compactMapValues(\.self)
   }
 
   private static func failure(_ code: String, message: String) throws -> CallTool.Result {

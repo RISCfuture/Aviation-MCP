@@ -122,12 +122,15 @@ struct MCPGateway: Sendable {
       capabilities: .init(tools: .init())
     )
     let invocation = ToolInvocation(call: call)
+    let context = ToolCallContext.current?.handling(body)
     await server.withMethodHandler(ListTools.self) { _ in ListTools.Result(tools: tools) }
     await server.withMethodHandler(CallTool.self) { parameters in
       guard tools.contains(where: { $0.name == parameters.name }) else {
         throw MCPError.invalidParams("Unknown or disabled tool")
       }
-      return try await invocation.execute(parameters)
+      return try await ToolCallContext.$current.withValue(context) {
+        try await invocation.execute(parameters)
+      }
     }
     try await server.start(transport: transport)
     let message = MCP.HTTPRequest(

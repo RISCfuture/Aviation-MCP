@@ -39,25 +39,34 @@ import Vapor
 }
 
 final class RecordingErrorReporter: ErrorReporter {
-  private let recorded = Mutex<[(error: String, tags: [String: String])]>([])
+  struct Report {
+    let error: String
+    let tags: [String: String]
+    let context: [String: String]
+  }
 
-  var reports: [(error: String, tags: [String: String])] { recorded.withLock { $0 } }
+  private let recorded = Mutex<[Report]>([])
+
+  var reports: [Report] { recorded.withLock { $0 } }
 
   func report(_ error: any Error, tags: [String: String], context: [String: String]) {
-    recorded.withLock { $0.append((String(describing: error), tags)) }
+    recorded.withLock {
+      $0.append(Report(error: String(describing: error), tags: tags, context: context))
+    }
   }
   func flush(timeout: Duration) {}
   func close() {}
 }
 
 extension `Defect classification` {
-  @Test func `reports unexpected tool failures once with the tool tag`() throws {
+  @Test func `reports unexpected tool failures once with the tool and its arguments`() throws {
     let recorder = RecordingErrorReporter()
     let result = try ToolCatalog.unexpectedFailure(
       DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "x")),
-      tool: "get_airport", reporter: recorder)
+      tool: "get_airport", arguments: ["cursor": "secret", "ident": "KSFO"], reporter: recorder)
     #expect(recorder.reports.count == 1)
     #expect(recorder.reports.first?.tags["tool"] == "get_airport")
+    #expect(recorder.reports.first?.context["arguments"] == #"{"ident":"KSFO"}"#)
     #expect(result.isError == true)
     #expect(
       Self.text(of: result).hasPrefix("Error service_failure: The request could not be completed."))
@@ -66,7 +75,7 @@ extension `Defect classification` {
   @Test func `does not report expected tool failures`() throws {
     let recorder = RecordingErrorReporter()
     let result = try ToolCatalog.unexpectedFailure(
-      ChannelError.ioOnClosedChannel, tool: "get_airport", reporter: recorder)
+      ChannelError.ioOnClosedChannel, tool: "get_airport", arguments: nil, reporter: recorder)
     #expect(recorder.reports.isEmpty)
     #expect(result.isError == true)
   }
@@ -125,11 +134,14 @@ extension `Transactional publication` {
 
   @Test func `reads completeness and result count from a success`() throws {
     let result = try ToolResult(results: [.int(1), .int(2)], completeness: "partial").response()
-    let metadata = Self.metadata(result: result, requestID: "01TEST")
+    let context = ToolCallContext(
+      flyRequestID: "01TEST", jsonrpcID: "7", logger: Logger(label: "test"))
+    let metadata = Self.metadata(result: result, context: context)
     #expect(metadata["outcome"] == "ok")
     #expect(metadata["completeness"] == "partial")
     #expect(metadata["result_count"] == "2")
     #expect(metadata["fly_request_id"] == "01TEST")
+    #expect(metadata["jsonrpc_id"] == "7")
     #expect(metadata["tool"] == "find_airports")
   }
 
@@ -142,10 +154,10 @@ extension `Transactional publication` {
 
   private static func metadata(
     arguments: [String: Value]? = nil, result: CallTool.Result? = nil,
-    error: (any Error)? = nil, requestID: String? = nil
+    error: (any Error)? = nil, context: ToolCallContext? = nil
   ) -> Logger.Metadata {
     ToolCallLog.metadata(
       tool: "find_airports", arguments: arguments, result: result, error: error,
-      duration: .milliseconds(12), requestID: requestID)
+      duration: .milliseconds(12), context: context)
   }
 }

@@ -8,10 +8,10 @@ struct ToolCallLog {
   static let argumentLimit = 1024
 
   /// Metadata for one call: tool, outcome, completeness, duration_ms, result_count,
-  /// fly_request_id and arguments (without any cursor).
+  /// fly_request_id, jsonrpc_id and arguments (without any cursor).
   static func metadata(  // swiftlint:disable:this function_parameter_count
     tool: String, arguments: [String: Value]?, result: CallTool.Result?,
-    error: (any Error)?, duration: Duration, requestID: String?
+    error: (any Error)?, duration: Duration, context: ToolCallContext?
   ) -> Logger.Metadata {
     let content = result?.structuredContent?.objectValue
     let fields: [String: String?] = [
@@ -20,8 +20,9 @@ struct ToolCallLog {
       "completeness": content?["completeness"]?.stringValue,
       "duration_ms": String(Int(duration / .milliseconds(1))),
       "result_count": content?["results"]?.arrayValue.map { String($0.count) },
-      "fly_request_id": requestID,
-      "arguments": loggedArguments(arguments)
+      "fly_request_id": context?.flyRequestID,
+      "jsonrpc_id": context?.jsonrpcID,
+      "arguments": encodedArguments(arguments)
     ]
     return fields.compactMapValues { $0.map { .string($0) } }
   }
@@ -34,7 +35,8 @@ struct ToolCallLog {
     }
   }
 
-  private static func loggedArguments(_ arguments: [String: Value]?) -> String? {
+  /// `arguments` as JSON without any cursor, cut to ``argumentLimit`` bytes.
+  static func encodedArguments(_ arguments: [String: Value]?) -> String? {
     guard var arguments else { return nil }
     arguments.removeValue(forKey: "cursor")
     let encoder = JSONEncoder()

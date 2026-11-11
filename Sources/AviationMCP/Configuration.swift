@@ -74,7 +74,7 @@ private func registerMCP(_ app: Application, catalog: ToolCatalog, settings: Ser
         "tool call",
         metadata: ToolCallLog.metadata(
           tool: parameters.name, arguments: parameters.arguments, result: result, error: error,
-          duration: duration, requestID: ToolCallContext.current?.flyRequestID))
+          duration: duration, context: ToolCallContext.current))
     }
     do {
       let result = try await catalog.call(parameters)

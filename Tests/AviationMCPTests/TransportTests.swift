@@ -264,7 +264,7 @@ struct `Isolated HTTP requests` {
 
 extension `Isolated HTTP requests` {
   @Test
-  func `exposes the Fly request ID to tool calls`() async throws {
+  func `exposes the Fly request and JSON-RPC IDs to tool calls`() async throws {
     try await withApp { app in
       Self.requestIDGateway().register(on: app)
       try await app.testing().test(.POST, "/mcp") { request in
@@ -274,7 +274,7 @@ extension `Isolated HTTP requests` {
       } afterResponse: { response in
         let reply = try JSONDecoder().decode(
           RPCReply.self, from: Data(response.body.readableBytesView))
-        #expect(reply.result.content.first?.text == "01TEST")
+        #expect(reply.result.content.first?.text == "01TEST/1")
       }
       try await app.testing().test(.POST, "/mcp") { request in
         request.headers = Self.headers
@@ -284,7 +284,7 @@ extension `Isolated HTTP requests` {
       } afterResponse: { response in
         let replies = try JSONDecoder().decode(
           [RPCReply].self, from: Data(response.body.readableBytesView))
-        #expect(replies.map { $0.result.content.first?.text } == ["01TEST", "01TEST"])
+        #expect(replies.map { $0.result.content.first?.text } == ["01TEST/1", "01TEST/2"])
       }
     }
   }
@@ -299,10 +299,13 @@ extension `Isolated HTTP requests` {
       app.get("malformed") { _ -> String in
         throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "x"))
       }
-      try await app.testing().test(.GET, "fail") { #expect($0.status == .internalServerError) }
+      try await app.testing().test(.GET, "fail", headers: ["Fly-Request-Id": "01FAIL"]) {
+        #expect($0.status == .internalServerError)
+      }
       try await app.testing().test(.GET, "timeout") { #expect($0.status == .gatewayTimeout) }
       try await app.testing().test(.GET, "malformed") { #expect($0.status == .badRequest) }
       #expect(recorder.reports.count == 1)
+      #expect(recorder.reports.first?.context["fly_request_id"] == "01FAIL")
     }
   }
 
@@ -317,9 +320,10 @@ extension `Isolated HTTP requests` {
         Tool(name: "echo", description: "Echo an input", inputSchema: .object(["type": "object"]))
       ]
     ) { _ in
-      CallTool.Result(content: [
-        .text(
-          text: ToolCallContext.current?.flyRequestID ?? "missing", annotations: nil, _meta: nil)
+      let context = ToolCallContext.current
+      let ids = [context?.flyRequestID, context?.jsonrpcID].map { $0 ?? "missing" }
+      return CallTool.Result(content: [
+        .text(text: ids.joined(separator: "/"), annotations: nil, _meta: nil)
       ])
     }
   }

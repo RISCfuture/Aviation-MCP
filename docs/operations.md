@@ -255,9 +255,11 @@ cold-start check. These steps never block a deploy. They use the repository
 secret `SENTRY_AUTH_TOKEN`, an organization token with the `org:ci` scope.
 
 Each tool call logs one `info` line, `tool call`, with `tool`, `outcome`,
-`completeness`, `duration_ms`, `result_count`, `fly_request_id` and `arguments`.
-Arguments omit the cursor and are limited to 1024 bytes. HTTP rejections log at
-`notice` with `status`, `path` and `reason`. Find a call with:
+`completeness`, `duration_ms`, `result_count`, `fly_request_id`, `jsonrpc_id`
+and `arguments`. Arguments omit the cursor and are limited to 1024 bytes; a
+reported tool failure carries the same arguments and request IDs. HTTP
+rejections log `request rejected` at `notice` with `status`, `path` and
+`fly_request_id`; those raised as errors also carry `reason`. Find a call with:
 
 ```text
 fly logs -a aviation-mcp-server | grep <fly_request_id>
