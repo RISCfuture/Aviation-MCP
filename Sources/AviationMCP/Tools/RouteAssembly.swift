@@ -462,6 +462,12 @@ struct RouteAssembly: Sendable {
           + "inspect its sequence.")
       return
     }
+    guard record.data["geometry_scope"] != "unavailable_due_to_parse_errors" else {
+      try failAirway(
+        position,
+        reason: "\(name) has source parsing errors, so its route geometry is unavailable.")
+      return
+    }
     let reversed = starts[0] > ends[0]
     elements[index] = element(
       index, kind: "airway",
