@@ -7,6 +7,7 @@ struct ToolCatalog: Sendable {
   let weather: WeatherService
   let notams: NOTAMQueries?
   var terrain: TerrainService?
+  var reporter: any ErrorReporter = DisabledErrorReporter()
 
   var tools: [Tool] { ToolDefinition.allCases.filter { groups.contains($0.group) }.map(\.tool) }
 
@@ -42,8 +43,18 @@ struct ToolCatalog: Sendable {
     } catch let error as MCPError {
       throw error
     } catch {
-      return try Self.failure("service_failure", message: "The request could not be completed.")
+      return try Self.unexpectedFailure(error, tool: parameters.name, reporter: reporter)
     }
+  }
+
+  /// Reports `error` when it is a defect and returns the generic failure shown to clients.
+  static func unexpectedFailure(
+    _ error: any Error, tool: String, reporter: any ErrorReporter
+  ) throws -> CallTool.Result {
+    if DefectClassification.isDefect(error) {
+      reporter.report(error, tags: ["tool": tool], context: [:])
+    }
+    return try failure("service_failure", message: "The request could not be completed.")
   }
 
   private static func failure(_ code: String, message: String) throws -> CallTool.Result {

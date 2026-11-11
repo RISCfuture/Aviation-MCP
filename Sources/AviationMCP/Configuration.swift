@@ -46,7 +46,8 @@ public func configure(_ app: Application) throws {
         logger: app.logger))
     : nil
   let catalog = ToolCatalog(
-    store: store, groups: settings.groups, weather: weather, notams: notams, terrain: terrain)
+    store: store, groups: settings.groups, weather: weather, notams: notams, terrain: terrain,
+    reporter: app.errorReporter)
   registerMCP(app, catalog: catalog, settings: settings)
 }
 

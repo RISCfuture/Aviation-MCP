@@ -1,7 +1,9 @@
 import Foundation
+import MCP
 import NIOCore
 import PostgresKit
 import SQLKit
+import Synchronization
 import Testing
 import Vapor
 
@@ -23,6 +25,44 @@ import Vapor
       StorageError.invalidImport("Invalid ingestion plan."), Abort(.internalServerError),
       DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "x"))
     ] { #expect(DefectClassification.isDefect(error), "\(error)") }
+  }
+}
+
+final class RecordingErrorReporter: ErrorReporter {
+  private let recorded = Mutex<[(error: String, tags: [String: String])]>([])
+
+  var reports: [(error: String, tags: [String: String])] { recorded.withLock { $0 } }
+
+  func report(_ error: any Error, tags: [String: String], context: [String: String]) {
+    recorded.withLock { $0.append((String(describing: error), tags)) }
+  }
+  func flush(timeout: Duration) {}
+  func close() {}
+}
+
+extension `Defect classification` {
+  @Test func `reports unexpected tool failures once with the tool tag`() throws {
+    let recorder = RecordingErrorReporter()
+    let result = try ToolCatalog.unexpectedFailure(
+      DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "x")),
+      tool: "get_airport", reporter: recorder)
+    #expect(recorder.reports.count == 1)
+    #expect(recorder.reports.first?.tags["tool"] == "get_airport")
+    #expect(result.isError == true)
+    #expect(
+      Self.text(of: result).hasPrefix("Error service_failure: The request could not be completed."))
+  }
+
+  @Test func `does not report expected tool failures`() throws {
+    let recorder = RecordingErrorReporter()
+    let result = try ToolCatalog.unexpectedFailure(
+      ChannelError.ioOnClosedChannel, tool: "get_airport", reporter: recorder)
+    #expect(recorder.reports.isEmpty)
+    #expect(result.isError == true)
+  }
+
+  private static func text(of result: CallTool.Result) -> String {
+    result.content.compactMap { if case .text(let text, _, _) = $0 { text } else { nil } }.joined()
   }
 }
 
