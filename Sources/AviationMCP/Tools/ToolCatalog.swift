@@ -52,7 +52,9 @@ struct ToolCatalog: Sendable {
     _ error: any Error, tool: String, reporter: any ErrorReporter
   ) throws -> CallTool.Result {
     if DefectClassification.isDefect(error) {
-      reporter.report(error, tags: ["tool": tool], context: [:])
+      reporter.report(
+        error, tags: ["tool": tool],
+        context: ToolCallContext.current?.flyRequestID.map { ["fly_request_id": $0] } ?? [:])
     }
     return try failure("service_failure", message: "The request could not be completed.")
   }

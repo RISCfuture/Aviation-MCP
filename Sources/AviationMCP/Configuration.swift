@@ -63,13 +63,23 @@ private func registerMCP(_ app: Application, catalog: ToolCatalog, settings: Ser
     origins: settings.origins, timeout: .seconds(settings.timeout), tools: catalog.tools
   ) { parameters in
     let start = ContinuousClock.now
+    let logger = ToolCallContext.current?.logger ?? app.logger
+    func finish(_ result: CallTool.Result?, _ error: (any Error)?) async {
+      let duration = start.duration(to: .now)
+      await metrics.record(
+        tool: parameters.name, duration: duration, failed: error != nil || result?.isError == true)
+      logger.info(
+        "tool call",
+        metadata: ToolCallLog.metadata(
+          tool: parameters.name, arguments: parameters.arguments, result: result, error: error,
+          duration: duration, requestID: ToolCallContext.current?.flyRequestID))
+    }
     do {
       let result = try await catalog.call(parameters)
-      await metrics.record(
-        tool: parameters.name, duration: start.duration(to: .now), failed: result.isError == true)
+      await finish(result, nil)
       return result
     } catch {
-      await metrics.record(tool: parameters.name, duration: start.duration(to: .now), failed: true)
+      await finish(nil, error)
       throw error
     }
   }.register(on: app)

@@ -48,12 +48,13 @@ struct MCPGateway: Sendable {
     let envelope = Envelope(request)
     let deadline = ContinuousClock.now + timeout
     let body = request.body.data.map { Data($0.readableBytesView) }
-    let response =
+    let response = try await ToolCallContext.$current.withValue(ToolCallContext(request)) {
       if let body, let batch = try? JSONDecoder().decode([Value].self, from: body) {
         try await exchange(batch: batch, envelope: envelope, deadline: deadline)
       } else {
         try await exchange(body, envelope: envelope, deadline: deadline)
       }
+    }
     return Vapor.Response(
       status: .init(statusCode: response.statusCode),
       headers: HTTPHeaders(response.headers.map { ($0.key, $0.value) }),

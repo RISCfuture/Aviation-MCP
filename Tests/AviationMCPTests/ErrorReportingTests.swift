@@ -89,3 +89,53 @@ extension `Transactional publication` {
     return nil
   }
 }
+
+@Suite struct `Tool call log` {
+  @Test func `omits cursors from the logged arguments`() {
+    let metadata = Self.metadata(arguments: ["cursor": "secret", "ident": "KSFO"])
+    #expect(metadata["arguments"] == .string(#"{"ident":"KSFO"}"#))
+  }
+
+  @Test func `cuts long arguments on a character boundary`() throws {
+    let metadata = Self.metadata(arguments: ["note": .string(String(repeating: "é", count: 2000))])
+    guard case .string(let logged) = metadata["arguments"] else { throw LogFailure.missing }
+    #expect(logged.hasSuffix("…"))
+    #expect(logged.dropLast().utf8.count <= ToolCallLog.argumentLimit)
+    #expect(String(validatingUTF8: logged) != nil)
+  }
+
+  @Test func `reads the outcome of a failure from its error code`() throws {
+    let result = try ToolResult(
+      results: [], completeness: "unavailable", error: .object(["code": "service_failure"])
+    ).response()
+    let metadata = Self.metadata(result: result)
+    #expect(metadata["outcome"] == "service_failure")
+    #expect(metadata["completeness"] == "unavailable")
+  }
+
+  @Test func `reads completeness and result count from a success`() throws {
+    let result = try ToolResult(results: [.int(1), .int(2)], completeness: "partial").response()
+    let metadata = Self.metadata(result: result, requestID: "01TEST")
+    #expect(metadata["outcome"] == "ok")
+    #expect(metadata["completeness"] == "partial")
+    #expect(metadata["result_count"] == "2")
+    #expect(metadata["fly_request_id"] == "01TEST")
+    #expect(metadata["tool"] == "find_airports")
+  }
+
+  @Test func `names cancellation and protocol errors`() {
+    #expect(Self.metadata(error: CancellationError())["outcome"] == "cancelled")
+    #expect(Self.metadata(error: MCPError.invalidParams(nil))["outcome"] == "protocol_error")
+  }
+
+  private enum LogFailure: Error { case missing }
+
+  private static func metadata(
+    arguments: [String: Value]? = nil, result: CallTool.Result? = nil,
+    error: (any Error)? = nil, requestID: String? = nil
+  ) -> Logger.Metadata {
+    ToolCallLog.metadata(
+      tool: "find_airports", arguments: arguments, result: result, error: error,
+      duration: .milliseconds(12), requestID: requestID)
+  }
+}

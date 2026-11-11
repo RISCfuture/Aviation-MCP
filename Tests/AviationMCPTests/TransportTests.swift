@@ -262,6 +262,52 @@ struct `Isolated HTTP requests` {
   }
 }
 
+extension `Isolated HTTP requests` {
+  @Test
+  func `exposes the Fly request ID to tool calls`() async throws {
+    try await withApp { app in
+      Self.requestIDGateway().register(on: app)
+      try await app.testing().test(.POST, "/mcp") { request in
+        request.headers = Self.headers
+        request.headers.replaceOrAdd(name: "Fly-Request-Id", value: "01TEST")
+        request.body = ByteBuffer(string: Self.call(id: 1))
+      } afterResponse: { response in
+        let reply = try JSONDecoder().decode(
+          RPCReply.self, from: Data(response.body.readableBytesView))
+        #expect(reply.result.content.first?.text == "01TEST")
+      }
+      try await app.testing().test(.POST, "/mcp") { request in
+        request.headers = Self.headers
+        request.headers.replaceOrAdd(name: "MCP-Protocol-Version", value: "2025-03-26")
+        request.headers.replaceOrAdd(name: "Fly-Request-Id", value: "01TEST")
+        request.body = ByteBuffer(string: "[\(Self.call(id: 1)),\(Self.call(id: 2))]")
+      } afterResponse: { response in
+        let replies = try JSONDecoder().decode(
+          [RPCReply].self, from: Data(response.body.readableBytesView))
+        #expect(replies.map { $0.result.content.first?.text } == ["01TEST", "01TEST"])
+      }
+    }
+  }
+
+  static func call(id: Int) -> String {
+    #"{"jsonrpc":"2.0","id":\#(id),"method":"tools/call","params":{"name":"echo","arguments":{}}}"#
+  }
+
+  static func requestIDGateway() -> MCPGateway {
+    MCPGateway(
+      origins: ["https://aviation.example"], timeout: .seconds(2),
+      tools: [
+        Tool(name: "echo", description: "Echo an input", inputSchema: .object(["type": "object"]))
+      ]
+    ) { _ in
+      CallTool.Result(content: [
+        .text(
+          text: ToolCallContext.current?.flyRequestID ?? "missing", annotations: nil, _meta: nil)
+      ])
+    }
+  }
+}
+
 private struct RPCReply: Decodable {
   let id: Int
   let result: RPCResult
