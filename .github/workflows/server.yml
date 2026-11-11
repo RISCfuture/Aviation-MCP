@@ -130,18 +130,28 @@ jobs:
       - name: Install sentry-cli
         if: env.DEPLOYS == 'true'
         continue-on-error: true
-        run: curl -sL https://sentry.io/get-cli/ | SENTRY_CLI_VERSION=3.8.2 bash
-      - name: Create the Sentry release and upload symbols
+        run: curl -fsSL https://sentry.io/get-cli/ | SENTRY_CLI_VERSION=3.8.2 bash
+      - name: Create the Sentry release
         if: env.DEPLOYS == 'true'
         continue-on-error: true
-        env:
+        env: &sentry
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: timcodes
           SENTRY_PROJECT: aviation-mcp
+        run: sentry-cli releases new "$GITHUB_SHA"
+      - name: Associate the Sentry release with its commits
+        if: env.DEPLOYS == 'true'
+        continue-on-error: true
+        env: *sentry
+        run: sentry-cli releases set-commits "$GITHUB_SHA" --auto
+      # The debug file names sources by their paths in the image build's /workspace.
+      - name: Upload the debug symbols and sources to Sentry
+        if: env.DEPLOYS == 'true'
+        continue-on-error: true
+        env: *sentry
         run: |
-          sentry-cli releases new "$GITHUB_SHA"
-          sentry-cli releases set-commits "$GITHUB_SHA" --auto
-          sentry-cli debug-files upload --wait symbols
+          sudo ln -sfn "$GITHUB_WORKSPACE" /workspace
+          sentry-cli debug-files upload --include-sources --wait symbols
 
   deploy:
     needs: [test, image]
@@ -178,14 +188,11 @@ jobs:
       - name: Install sentry-cli
         if: env.DEPLOYS == 'true'
         continue-on-error: true
-        run: curl -sL https://sentry.io/get-cli/ | SENTRY_CLI_VERSION=3.8.2 bash
+        run: curl -fsSL https://sentry.io/get-cli/ | SENTRY_CLI_VERSION=3.8.2 bash
       - name: Finalize the Sentry release and record the deploy
         if: env.DEPLOYS == 'true'
         continue-on-error: true
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: timcodes
-          SENTRY_PROJECT: aviation-mcp
+        env: *sentry
         run: |
           sentry-cli releases finalize "$GITHUB_SHA"
           sentry-cli deploys new --release "$GITHUB_SHA" -e production
