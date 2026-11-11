@@ -7,12 +7,16 @@
   /// start to send.
   final class SentryReporter: ErrorReporter {
     private static let shutdownTimeout: Duration = .seconds(5)
+    private static let fallbackDatabasePath = "/tmp/aviation-sentry"
 
     private let closed = Mutex(false)
 
     /// Initializes sentry-native, returning `nil` if it fails to start.
+    ///
+    /// When the database at `SENTRY_DATABASE_PATH` can't be used, retries once with a database
+    /// in `/tmp`, so reporting still starts, though crashes stored there don't survive a restart.
     init?(dsn: String, role: String, command: String?) {
-      guard unsafe sentry_init(Self.options(dsn: dsn)) == 0 else { return nil }
+      guard Self.start(dsn: dsn) else { return nil }
       unsafe sentry_set_tag("app_role", role)
       if let command { unsafe sentry_set_tag("command", command) }
     }
@@ -40,7 +44,21 @@
       if !wasClosed { sentry_close() }
     }
 
-    private static func options(dsn: String) -> OpaquePointer? {
+    private static func start(dsn: String) -> Bool {
+      let configured = Environment.get("SENTRY_DATABASE_PATH") ?? fallbackDatabasePath
+      if start(dsn: dsn, databasePath: configured) { return true }
+      guard configured != fallbackDatabasePath else { return false }
+      Logger(label: "aviation-mcp.error-reporting").warning(
+        "Sentry could not use its database; storing it in \(fallbackDatabasePath) instead.",
+        metadata: ["path": "\(configured)"])
+      return start(dsn: dsn, databasePath: fallbackDatabasePath)
+    }
+
+    private static func start(dsn: String, databasePath: String) -> Bool {
+      unsafe sentry_init(options(dsn: dsn, databasePath: databasePath)) == 0
+    }
+
+    private static func options(dsn: String, databasePath: String) -> OpaquePointer? {
       let options = unsafe sentry_options_new()
       unsafe sentry_options_set_dsn(options, dsn)
       if let release = Environment.get("SENTRY_RELEASE"), !release.isEmpty {
@@ -48,8 +66,7 @@
       }
       unsafe sentry_options_set_environment(
         options, Environment.get("SENTRY_ENVIRONMENT") ?? "development")
-      unsafe sentry_options_set_database_path(
-        options, Environment.get("SENTRY_DATABASE_PATH") ?? "/tmp/aviation-sentry")
+      unsafe sentry_options_set_database_path(options, databasePath)
       unsafe sentry_options_set_shutdown_timeout(options, milliseconds(shutdownTimeout))
       return unsafe options
     }

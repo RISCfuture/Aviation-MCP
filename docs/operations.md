@@ -59,7 +59,7 @@ The dedicated `aviation_mcp_notams` role can read only `notams` and
 | `SENTRY_DSN` | None; error reporting is disabled when unset. Set in `fly.toml` and the ingestion machine config |
 | `SENTRY_ENVIRONMENT` | `development`; `production` on Fly |
 | `SENTRY_RELEASE` | The git SHA baked into the image |
-| `SENTRY_DATABASE_PATH` | `/tmp/aviation-sentry`; `/data/sentry` on the serving volume |
+| `SENTRY_DATABASE_PATH` | `/tmp/aviation-sentry`, also used when the configured path is unusable; `/data/terrain/sentry` on the serving volume |
 
 Domain groups are `airports`, `navigation`, `airspace`, `procedures`,
 `obstacles`, `aircraft`, `weather`, `notams`, `geography`, `status`, `terrain`,
