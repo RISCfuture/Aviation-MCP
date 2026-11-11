@@ -56,6 +56,10 @@ The dedicated `aviation_mcp_notams` role can read only `notams` and
 | `OPEN_METEO_HOUR_LIMIT` | `5000` |
 | `OPEN_METEO_DAY_LIMIT` | `10000` |
 | `OPEN_METEO_MONTH_LIMIT` | `300000` |
+| `SENTRY_DSN` | None; error reporting is disabled when unset. Set in `fly.toml` and the ingestion machine config |
+| `SENTRY_ENVIRONMENT` | `development`; `production` on Fly |
+| `SENTRY_RELEASE` | The git SHA baked into the image |
+| `SENTRY_DATABASE_PATH` | `/tmp/aviation-sentry`; `/data/sentry` on the serving volume |
 
 Domain groups are `airports`, `navigation`, `airspace`, `procedures`,
 `obstacles`, `aircraft`, `weather`, `notams`, `geography`, `status`, `terrain`,
@@ -221,6 +225,56 @@ AWC batches retain usable METARs and TAFs when neighboring reports are malformed
 Weather responses expose `parsing_gaps` and partial completeness. A batch with
 no usable reports remains unavailable. The workflow purges expired data even
 after ingestion failure.
+
+## Error reporting and logs
+
+Defects are reported to Sentry (organization `timcodes`, project `aviation-mcp`):
+unexpected tool failures, thrown errors that become HTTP 500 or above, fatal
+startup errors other than an incomplete release, and crashes from signals or
+traps. A reported tool failure still returns `service_failure` to the client.
+Expected outcomes are not reported: invalid input, unavailable or expired data,
+expired cursors, weather and terrain failures, cancellation, gateway timeouts and
+overload, an incomplete release, database connectivity failures, and source or
+download problems (`StorageError.sourceRejected`). Events never carry
+`EDGE_PROXY_SECRET`, client headers, database URLs, cursors or client addresses.
+A transaction whose idle connection died is retried on a fresh connection only
+when `BEGIN` fails, since nothing has run by then.
+
+Crash reporting uses sentry-native's `inproc` backend, built into the Docker
+image only through the `Sentry` package trait, so macOS and CI test builds do
+not need it. A crash stores an event of frames and modules, with no memory, and
+the next `sentry_init` sends it. Serving crashes are sent when Fly restarts the
+machine, from `SENTRY_DATABASE_PATH` on the volume. Ingestion crashes are sent
+by `/app/run-job`, which runs `aviation-mcp sentry-flush` (bounded to 15
+seconds) after an abnormal exit with status above 128.
+
+The Dockerfile's `symbols` stage exports the split debug file. The `Server`
+workflow creates the Sentry release, sets its commits, uploads the debug files,
+then finalizes the release and records the production deploy after the
+cold-start check. These steps never block a deploy. They use the repository
+secret `SENTRY_AUTH_TOKEN`, an organization token with the `org:ci` scope.
+
+Each tool call logs one `info` line, `tool call`, with `tool`, `outcome`,
+`completeness`, `duration_ms`, `result_count`, `fly_request_id` and `arguments`.
+Arguments omit the cursor and are limited to 1024 bytes. HTTP rejections log at
+`notice` with `status`, `path` and `reason`. Find a call with:
+
+```text
+fly logs -a aviation-mcp-server | grep <fly_request_id>
+```
+
+To verify reporting end to end, run the ingest-role checks against the deployed
+image:
+
+```bash
+export FLY_API_TOKEN=$(fly auth token)
+export AVIATION_INGEST_IMAGE=$(scripts/deployed-image.sh)
+scripts/run-ingestion-job.sh sentry-check          # handled event; exits 0
+scripts/run-ingestion-job.sh sentry-check --trap   # crash; exits nonzero
+```
+
+Sentry should show both events under the deployed release, and the crash's top
+`aviation-mcp` frames should name Swift functions.
 
 ## Verification and deployment files
 
