@@ -5,14 +5,16 @@ ARG SENTRY_NATIVE_VERSION=0.17.6
 RUN apt-get update \
     && apt-get install -y --no-install-recommends cmake make libcurl4-openssl-dev zlib1g-dev unzip \
     && rm -rf /var/lib/apt/lists/*
-ADD https://github.com/getsentry/sentry-native/releases/download/${SENTRY_NATIVE_VERSION}/sentry-native.zip /tmp/
+ADD --checksum=sha256:40b4b70cbada5bfae5b73f8267831dd023ec676d9676fb0d890878f31d2b5055 \
+    https://github.com/getsentry/sentry-native/releases/download/${SENTRY_NATIVE_VERSION}/sentry-native.zip /tmp/
 RUN unzip -q /tmp/sentry-native.zip -d /tmp/sentry-native \
     && cmake -S /tmp/sentry-native -B /tmp/sentry-native/build \
         -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_ASM_COMPILER=clang \
-        -DSENTRY_BACKEND=crashpad \
+        -DSENTRY_BACKEND=inproc \
         -DSENTRY_BUILD_TESTS=OFF -DSENTRY_BUILD_EXAMPLES=OFF -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     && cmake --build /tmp/sentry-native/build --parallel "$SWIFT_BUILD_JOBS" \
     && cmake --install /tmp/sentry-native/build --prefix /usr/local \
+    && strip --strip-debug /usr/local/lib/libsentry.so \
     && ldconfig \
     && rm -rf /tmp/sentry-native /tmp/sentry-native.zip
 WORKDIR /workspace
@@ -48,7 +50,6 @@ RUN python3 -m venv /opt/terrain \
 WORKDIR /app
 COPY --from=build /output/ ./
 COPY --from=build /usr/local/lib/libsentry.so /usr/local/lib/
-COPY --from=build /usr/local/bin/crashpad_handler /app/crashpad_handler
 COPY scripts/run-job.sh /app/run-job
 RUN ldconfig
 COPY terrain/ /app/terrain/

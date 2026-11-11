@@ -6,6 +6,7 @@ import Vapor
 @main
 struct EntryPoint {
   static func main() async throws {
+    if commandName == "sentry-flush" { return sendStoredCrashes() }
     let app = try await Application.make(.detect())
     app.errorReporter = ErrorReporting.start(role: Environment.appRole, command: commandName)
     let termination = terminateOnSIGTERM(app)
@@ -28,6 +29,11 @@ struct EntryPoint {
     termination?.cancel()
     app.errorReporter.close()
     try await app.asyncShutdown()
+  }
+
+  /// Starts and closes the reporter, which sends any crash an earlier run stored.
+  private static func sendStoredCrashes() {
+    ErrorReporting.start(role: Environment.appRole, command: commandName).close()
   }
 
   /// The command named on the command line, or `nil` when the default command runs.

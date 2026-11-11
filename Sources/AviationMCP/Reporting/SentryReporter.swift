@@ -3,9 +3,9 @@
   import Synchronization
   import Vapor
 
-  /// Reports defects through sentry-native, whose crashpad handler also uploads crashes.
+  /// Reports defects through sentry-native, whose in-process backend stores crashes for the next
+  /// start to send.
   final class SentryReporter: ErrorReporter {
-    private static let handlerPath = "/app/crashpad_handler"
     private static let shutdownTimeout: Duration = .seconds(5)
 
     private let closed = Mutex(false)
@@ -50,7 +50,6 @@
         options, Environment.get("SENTRY_ENVIRONMENT") ?? "development")
       unsafe sentry_options_set_database_path(
         options, Environment.get("SENTRY_DATABASE_PATH") ?? "/tmp/aviation-sentry")
-      unsafe sentry_options_set_handler_path(options, handlerPath)
       unsafe sentry_options_set_shutdown_timeout(options, milliseconds(shutdownTimeout))
       return unsafe options
     }
