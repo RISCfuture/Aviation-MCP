@@ -1,10 +1,13 @@
 import PostgresKit
 
 enum SQLConnectionAcquisition {
+  static let defaultRetryDelays: [Duration] = [.milliseconds(500), .seconds(1)]
+  /// Delays that outlast a database proxy restart, which refuses connections for about a second.
+  static let restartRetryDelays: [Duration] = [.milliseconds(500), .seconds(1), .seconds(2)]
   private static let retryWindow: Duration = .seconds(15)
 
   static func run<Value: Sendable>(
-    retryDelays: [Duration] = [.milliseconds(500), .seconds(1)],
+    retryDelays: [Duration] = defaultRetryDelays,
     _ acquire: @Sendable () async throws -> Result<Value, any Error>
   ) async throws -> Value {
     let deadline = ContinuousClock.now.advanced(by: retryWindow)

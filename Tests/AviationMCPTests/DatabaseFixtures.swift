@@ -169,6 +169,19 @@ extension `Transactional publication` {
     return try await resumed.value
   }
 
+  /// Terminates its connection's backend after the first statement of its first run.
+  static func terminatingFirstAttempt(
+    counting attempts: ConnectionAttempts
+  ) -> @Sendable (any Database) async throws -> Int32 {
+    { database in
+      let backend = try await backendID(database)
+      if await attempts.advance() == 1 {
+        try await terminate(backend, avoiding: database.eventLoop)
+      }
+      return try await backendID(database)
+    }
+  }
+
   private static func terminate(_ backend: Int32, avoiding loop: any EventLoop) async throws {
     let url = try #require(ProcessInfo.processInfo.environment["TEST_DATABASE_URL"])
     let other = try #require(

@@ -109,9 +109,9 @@ struct TerrainCatalog: Sendable {
 
   func request(_ query: TerrainQuery) async throws -> [String: Value] {
     let route = String(data: try JSONEncoder().encode(query.route), encoding: .utf8)
-    return try await database.withSQLTransaction { connection in
+    return try await database.withReadOnlySQLTransaction { connection in
       let sql = try connection.sqlDatabase()
-      try await sql.raw("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY").run()
+      try await sql.raw("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ").run()
       try await sql.raw("SET LOCAL statement_timeout = '8s'").run()
       let metadata = try await TerrainCatalog(database: connection).status()
       guard metadata.objectValue?["status"] == "available" else {

@@ -16,11 +16,33 @@ extension Database {
   func withSQLTransaction<Value: Sendable>(
     _ operation: @escaping @Sendable (any Database) async throws -> Value
   ) async throws -> Value {
-    try await SQLConnectionAcquisition.run {
+    try await runSQLTransaction(beginning: "BEGIN", replayingAfter: { _ in false }, operation)
+  }
+
+  /// Runs `operation` in a read-only transaction. Postgres rejects any write in it, so a
+  /// transaction that loses its connection at any point is replayed on a fresh connection.
+  /// `operation` must have no effects outside the transaction.
+  func withReadOnlySQLTransaction<Value: Sendable>(
+    _ operation: @escaping @Sendable (any Database) async throws -> Value
+  ) async throws -> Value {
+    try await runSQLTransaction(
+      beginning: "BEGIN READ ONLY", replayingAfter: SQLConnectionAcquisition.isTransient,
+      retryDelays: SQLConnectionAcquisition.restartRetryDelays, operation)
+  }
+
+  private func runSQLTransaction<Value: Sendable>(
+    beginning statement: SQLQueryString,
+    replayingAfter isReplayable: @escaping @Sendable (any Error) -> Bool,
+    retryDelays: [Duration] = SQLConnectionAcquisition.defaultRetryDelays,
+    _ operation: @escaping @Sendable (any Database) async throws -> Value
+  ) async throws -> Value {
+    try await SQLConnectionAcquisition.run(retryDelays: retryDelays) {
       try await withConnection { database -> Result<Value, any Error> in
-        let sql = try await database.beginSQLTransaction()
+        let sql = try await database.beginSQLTransaction(statement)
         do {
           return .success(try await database.completeSQLTransaction(operation, on: sql))
+        } catch  where isReplayable(error) {
+          throw error
         } catch {
           return .failure(error)
         }
@@ -28,10 +50,10 @@ extension Database {
     }
   }
 
-  private func beginSQLTransaction() async throws -> any SQLDatabase {
+  private func beginSQLTransaction(_ statement: SQLQueryString) async throws -> any SQLDatabase {
     let sql = try sqlDatabase()
     do {
-      try await sql.raw("BEGIN").run()
+      try await sql.raw(statement).run()
     } catch {
       await closeConnection()
       throw error

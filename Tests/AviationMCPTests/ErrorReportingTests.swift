@@ -145,12 +145,26 @@ extension `Transactional publication` {
     #expect(metadata["tool"] == "find_airports")
   }
 
+  @Test func `strips control characters from JSON-RPC IDs and bounds their length`() throws {
+    #expect(Self.jsonrpcID(#""7\nforged=line\u0007""#) == "7forged=line")
+    #expect(Self.jsonrpcID(#""\n\r""#) == nil)
+    let long = try #require(Self.jsonrpcID("\"\(String(repeating: "é", count: 1000))\""))
+    #expect(long.hasSuffix("…"))
+    #expect(long.dropLast().utf8.count <= ToolCallContext.jsonrpcIDLimit)
+  }
+
   @Test func `names cancellation and protocol errors`() {
     #expect(Self.metadata(error: CancellationError())["outcome"] == "cancelled")
     #expect(Self.metadata(error: MCPError.invalidParams(nil))["outcome"] == "protocol_error")
   }
 
   private enum LogFailure: Error { case missing }
+
+  private static func jsonrpcID(_ id: String) -> String? {
+    let body = #"{"jsonrpc":"2.0","id":\#(id),"method":"tools/call"}"#
+    return ToolCallContext(flyRequestID: nil, logger: Logger(label: "test"))
+      .handling(Data(body.utf8)).jsonrpcID
+  }
 
   private static func metadata(
     arguments: [String: Value]? = nil, result: CallTool.Result? = nil,

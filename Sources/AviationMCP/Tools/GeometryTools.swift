@@ -25,9 +25,8 @@ struct GeometryTools: Sendable {
   }
 
   func compute(_ arguments: ToolArguments) async throws -> ToolResult {
-    try await database.withSQLTransaction { transaction in
+    try await database.withReadOnlySQLTransaction { transaction in
       let sql = try transaction.sqlDatabase()
-      try await sql.raw("SET TRANSACTION READ ONLY").run()
       try await sql.raw("SET LOCAL statement_timeout = '10s'").run()
       let geometry = GeometryTools(database: transaction)
       switch try arguments.string("operation", required: true) {

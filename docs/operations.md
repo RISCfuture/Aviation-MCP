@@ -237,8 +237,9 @@ expired cursors, weather and terrain failures, cancellation, gateway timeouts an
 overload, an incomplete release, database connectivity failures, and source or
 download problems (`StorageError.sourceRejected`). Events never carry
 `EDGE_PROXY_SECRET`, client headers, database URLs, cursors or client addresses.
-A transaction whose idle connection died is retried on a fresh connection only
-when `BEGIN` fails, since nothing has run by then.
+A transaction whose connection died is retried on a fresh connection when
+`BEGIN` fails, since nothing has run by then. A read-only transaction, begun as
+`BEGIN READ ONLY`, is replayed after a connection loss at any point.
 
 Crash reporting uses sentry-native's `inproc` backend, built into the Docker
 image only through the `Sentry` package trait, so macOS and CI test builds do

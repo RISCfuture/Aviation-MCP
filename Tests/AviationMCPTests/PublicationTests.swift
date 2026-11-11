@@ -348,6 +348,27 @@ extension `Transactional publication` {
     }
   }
 
+  @Test(arguments: [true, false])
+  func `replays only a read-only transaction that loses its connection midway`(
+    readOnly: Bool
+  ) async throws {
+    try await withDatabase { store in
+      let attempts = ConnectionAttempts()
+      let operation = Self.terminatingFirstAttempt(counting: attempts)
+      do {
+        _ =
+          try await
+          (readOnly
+          ? store.database.withReadOnlySQLTransaction(operation)
+          : store.database.withSQLTransaction(operation))
+        #expect(readOnly)
+      } catch {
+        #expect(!readOnly && SQLConnectionAcquisition.isTransient(error))
+      }
+      #expect(await attempts.count == (readOnly ? 2 : 1))
+    }
+  }
+
   @Test
   func `returns the original failure when rollback loses its connection`() async throws {
     try await withDatabase { store async throws in

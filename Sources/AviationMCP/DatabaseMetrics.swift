@@ -6,9 +6,8 @@ struct DatabaseMetrics: Sendable {
   let database: any Database
 
   func render() async throws -> String {
-    try await database.withSQLTransaction { database in
+    try await database.withReadOnlySQLTransaction { database in
       let sql = try database.sqlDatabase()
-      try await sql.raw("SET TRANSACTION READ ONLY").run()
       try await sql.raw("SET LOCAL statement_timeout = '5s'").run()
       let runs = try await sql.raw(
         """

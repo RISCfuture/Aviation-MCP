@@ -164,7 +164,10 @@ struct ToolCatalog: Sendable {
       return .object(value)
     }
     if groups.contains(.terrain) {
-      values.append(try await TerrainCatalog(database: store.database).status())
+      values.append(
+        try await store.database.withReadOnlySQLTransaction {
+          try await TerrainCatalog(database: $0).status()
+        })
     }
     let warnings = (Array(snapshot.versions.values) + Array(snapshot.next.values))
       .flatMap(\.coverageWarnings)

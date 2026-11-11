@@ -44,16 +44,17 @@ struct ToolCallLog {
     guard let json = try? String(bytes: encoder.encode(arguments), encoding: .utf8) else {
       return nil
     }
-    return truncated(json)
+    return truncated(json, toBytes: argumentLimit)
   }
 
-  private static func truncated(_ text: String) -> String {
-    guard text.utf8.count > argumentLimit else { return text }
+  /// `text` cut on a character boundary to at most `limit` UTF-8 bytes, followed by "…" when cut.
+  static func truncated(_ text: String, toBytes limit: Int) -> String {
+    guard text.utf8.count > limit else { return text }
     var kept = ""
     var bytes = 0
     for character in text {
       bytes += String(character).utf8.count
-      guard bytes <= argumentLimit else { break }
+      guard bytes <= limit else { break }
       kept.append(character)
     }
     return kept + "…"

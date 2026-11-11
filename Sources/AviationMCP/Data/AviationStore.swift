@@ -27,9 +27,9 @@ struct AviationStore: Sendable {
   func withSnapshot<Result: Sendable>(
     _ operation: @escaping @Sendable (any SQLDatabase, SourceSnapshot) async throws -> Result
   ) async throws -> Result {
-    try await database.withSQLTransaction { database in
+    try await database.withReadOnlySQLTransaction { database in
       let sql = try database.sqlDatabase()
-      try await sql.raw("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY").run()
+      try await sql.raw("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ").run()
       try await sql.raw("SET LOCAL statement_timeout = '10s'").run()
       let instant = try await Self.instant(on: sql)
       let versions = try await Self.publishedVersions(on: sql)
