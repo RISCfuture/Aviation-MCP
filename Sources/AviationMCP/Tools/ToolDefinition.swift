@@ -11,6 +11,7 @@ enum ToolDefinition: String, CaseIterable, Sendable {
   case findNavigation = "find_navigation"
   case getAirway = "get_airway"
   case findRoutes = "find_routes"
+  case resolveRoute = "resolve_route"
   case queryAirspace = "query_airspace"
   case findProcedures = "find_procedures"
   case getProcedure = "get_procedure"
@@ -37,7 +38,7 @@ enum ToolDefinition: String, CaseIterable, Sendable {
   var group: DomainGroup {
     switch self {
     case .findAirports, .getAirport: .airports
-    case .findNavigation, .getAirway, .findRoutes: .navigation
+    case .findNavigation, .getAirway, .findRoutes, .resolveRoute: .navigation
     case .queryAirspace: .airspace
     case .findProcedures, .getProcedure: .procedures
     case .queryObstacles: .obstacles
@@ -70,6 +71,13 @@ enum ToolDefinition: String, CaseIterable, Sendable {
     case .findRoutes:
       "Find preferred IFR routes and coded departure routes by origin, destination or identifier; "
         + "airport matches either end."
+    case .resolveRoute:
+      "Resolve a U.S. route string of airports, fixes, navaids, airways, departures, arrivals "
+        + "and coordinates into ordered legs with distance and course, and [longitude, latitude] "
+        + "paths usable as the route of query_airspace, query_obstacles and query_terrain. "
+        + "Covers FAA data only, so foreign elements are unresolved; approaches are not "
+        + "included. Ambiguous identifiers return candidates and are never guessed; choose "
+        + "them with selections."
     case .queryAirspace:
       "Find airspace containing or near a position or route, optionally at an MSL altitude, "
         + "or by identifier or airport. Results give distance_nm and whether the reference is "
@@ -166,6 +174,7 @@ enum ToolDefinition: String, CaseIterable, Sendable {
     case .findNavigation: "Find navigation records"
     case .getAirway: "Get airway segments"
     case .findRoutes: "Find published routes"
+    case .resolveRoute: "Resolve a route string"
     case .queryAirspace: "Query airspace records"
     case .findProcedures: "Find instrument procedures"
     case .getProcedure: "Get procedure legs and restrictions"

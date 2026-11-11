@@ -62,6 +62,7 @@ struct ToolCatalog: Sendable {
     case .convertCoordinates: return try GeometryTools.convert(arguments)
     case .computeGeometry:
       return try await GeometryTools(database: store.database).compute(arguments)
+    case .resolveRoute: return try await RouteResolver(store: store).resolve(arguments)
     case .parseWeather: return try await WeatherParsing.parse(arguments)
     case .getWeather: return try await weather.weather(WeatherQuery(arguments: arguments))
     case .queryNOTAMs:
