@@ -26,6 +26,16 @@ import Vapor
       DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "x"))
     ] { #expect(DefectClassification.isDefect(error), "\(error)") }
   }
+
+  @Test func `treats download failures as rejected sources`() async {
+    let error = await #expect(throws: StorageError.self) {
+      try await StorageError.rejectingSource("The source download failed") {
+        throw URLError(.timedOut)
+      }
+    }
+    #expect(error.map(DefectClassification.isDefect) == false)
+    #expect(error?.failureReason?.hasPrefix("The source download failed: ") == true)
+  }
 }
 
 final class RecordingErrorReporter: ErrorReporter {

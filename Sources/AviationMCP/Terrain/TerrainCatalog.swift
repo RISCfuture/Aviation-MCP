@@ -200,11 +200,13 @@ struct ImportTerrainCommand: AsyncCommand {
   }
 
   private func download(_ resolution: String, app: Application) async throws -> String {
-    let response = try await app.client.get(
-      URI(string: "https://copernicus-dem-\(resolution).s3.amazonaws.com/tileList.txt"))
+    let catalog = URI(string: "https://copernicus-dem-\(resolution).s3.amazonaws.com/tileList.txt")
+    let response = try await StorageError.rejectingSource(
+      "Could not download a Copernicus catalog"
+    ) { try await app.client.get(catalog) }
     guard response.status == .ok, let body = response.body, body.readableBytes <= 8 * 1024 * 1024,
       let text = body.getString(at: body.readerIndex, length: body.readableBytes)
-    else { throw StorageError.invalidImport("Could not download a complete Copernicus catalog.") }
+    else { throw StorageError.sourceRejected("Could not download a complete Copernicus catalog.") }
     return text
   }
 }

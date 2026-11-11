@@ -23,3 +23,19 @@ enum StorageError: AviationStorageError, LocalizedError {
     }
   }
 }
+
+extension StorageError {
+  /// Runs `work`, rethrowing any failure other than cancellation as ``sourceRejected(_:)`` with
+  /// `reason` and the underlying error's description.
+  static func rejectingSource<T>(
+    _ reason: String, _ work: () async throws -> T
+  ) async throws -> T {
+    do {
+      return try await work()
+    } catch is CancellationError {
+      throw CancellationError()
+    } catch {
+      throw sourceRejected("\(reason): \(error.localizedDescription)")
+    }
+  }
+}

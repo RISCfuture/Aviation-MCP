@@ -105,7 +105,7 @@ enum RemoteIngestion {
         let endText = download.effectiveUntil,
         let end = ISO8601DateFormatter().date(from: endText)
       else { throw StorageError.sourceRejected("DOF release boundaries are invalid.") }
-      batch = try DOFImporter.parse(
+      batch = try await DOFImporter.parse(
         extract(archive, named: "DOF.DAT", to: directory),
         effectiveFrom: start, effectiveUntil: end)
     case "aircraft":
@@ -140,8 +140,9 @@ enum RemoteIngestion {
     guard let url = URL(string: download.url) else {
       throw StorageError.invalidImport("Invalid URL.")
     }
-    let (temporary, response) = try await URLSession.shared.download(
-      for: URLRequest(url: url, timeoutInterval: 240))
+    let (temporary, response) = try await StorageError.rejectingSource(
+      "The source download failed"
+    ) { try await URLSession.shared.download(for: URLRequest(url: url, timeoutInterval: 240)) }
     defer { try? FileManager.default.removeItem(at: temporary) }
     guard let response = response as? HTTPURLResponse, response.statusCode == 200 else {
       throw StorageError.sourceRejected("The source download failed; check it again.")
@@ -160,9 +161,11 @@ enum RemoteIngestion {
 
   private static func extract(
     _ archive: URL, named name: String, to directory: URL
-  ) throws -> Data {
+  ) async throws -> Data {
     let contents = directory.appendingPathComponent("extracted")
-    try FileManager.default.unzipItem(at: archive, to: contents)
+    try await StorageError.rejectingSource("The distribution could not be extracted") {
+      try FileManager.default.unzipItem(at: archive, to: contents)
+    }
     let files = FileManager.default.enumerator(at: contents, includingPropertiesForKeys: nil)
     let matches =
       files?.compactMap { $0 as? URL }.filter {
