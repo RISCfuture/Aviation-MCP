@@ -6,7 +6,7 @@ enum NASRCycle {
   static func read(_ archive: URL) async throws -> Cycle {
     let distribution = try ArchiveFileDistribution(location: archive, format: .csv)
     guard let path = try distribution.findFile(prefix: "APT_BASE.csv") else {
-      throw StorageError.invalidImport("NASR archive is missing APT_BASE.csv.")
+      throw StorageError.sourceRejected("NASR archive is missing APT_BASE.csv.")
     }
     return try await parse(distribution.readFileRaw(path: path, progress: nil))
   }
@@ -18,7 +18,7 @@ enum NASRCycle {
       let fields = row.stringFields
       guard let index = column else {
         guard let index = fields.firstIndex(of: "EFF_DATE") else {
-          throw StorageError.invalidImport("NASR airport data has no EFF_DATE column.")
+          throw StorageError.sourceRejected("NASR airport data has no EFF_DATE column.")
         }
         column = index
         continue
@@ -26,7 +26,7 @@ enum NASRCycle {
       guard fields.indices.contains(index), !fields[index].isEmpty,
         effectiveDate == nil || effectiveDate == fields[index]
       else {
-        throw StorageError.invalidImport(
+        throw StorageError.sourceRejected(
           "NASR airport rows have missing or inconsistent effective dates.")
       }
       effectiveDate = fields[index]
@@ -36,7 +36,7 @@ enum NASRCycle {
       let instant = cycle.effectiveDate, String(instant.ISO8601Format().prefix(10)) == cycle.id,
       Cycle.effectiveCycle(for: instant) == cycle
     else {
-      throw StorageError.invalidImport("NASR effective date is not a valid cycle boundary.")
+      throw StorageError.sourceRejected("NASR effective date is not a valid cycle boundary.")
     }
     return cycle
   }

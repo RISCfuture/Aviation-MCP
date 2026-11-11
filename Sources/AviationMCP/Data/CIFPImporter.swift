@@ -8,7 +8,7 @@ enum CIFPImporter {
   static func parse(_ bytes: Data) async throws -> StagedImport {
     var diagnostics = CIFPDiagnostics()
     guard let text = String(data: bytes, encoding: .utf8) else {
-      throw StorageError.invalidImport("CIFP contains invalid text encoding.")
+      throw StorageError.sourceRejected("CIFP contains invalid text encoding.")
     }
     let lines = text.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
     let cifp = try CIFP(
@@ -20,7 +20,7 @@ enum CIFPImporter {
     guard let start = cifp.cycle.effectiveDate?.addingTimeInterval(SourceDiscovery.changeover),
       let end = cifp.cycle.expirationDate?.addingTimeInterval(SourceDiscovery.changeover)
     else {
-      throw StorageError.invalidImport(
+      throw StorageError.sourceRejected(
         "CIFP has invalid cycle dates.")
     }
     var version = SourceVersion(
@@ -34,7 +34,7 @@ enum CIFPImporter {
     }
     records += CIFPAirspace.records(cifp, versionID: version.id)
     guard !records.isEmpty else {
-      throw StorageError.invalidImport("CIFP contains no usable records.")
+      throw StorageError.sourceRejected("CIFP contains no usable records.")
     }
     version.validation = diagnostics.errors.validation
     return StagedImport(versions: [version], records: diagnostics.applying(to: records))

@@ -16,7 +16,7 @@ enum NASRImporter {
     guard let start = cycle.effectiveDate?.addingTimeInterval(SourceDiscovery.changeover),
       let end = cycle.expirationDate?.addingTimeInterval(SourceDiscovery.changeover)
     else {
-      throw StorageError.invalidImport("NASR has invalid cycle dates.")
+      throw StorageError.sourceRejected("NASR has invalid cycle dates.")
     }
     var version = SourceVersion(
       id: UUID(), source: .nasr, cycle: String(start.ISO8601Format().prefix(10)),
@@ -26,7 +26,7 @@ enum NASRImporter {
     let records = await normalize(
       data, version: version, frequencies: frequencies, diagnostics: &diagnostics)
     guard !records.isEmpty else {
-      throw StorageError.invalidImport("NASR contains no usable records.")
+      throw StorageError.sourceRejected("NASR contains no usable records.")
     }
     version.validation = diagnostics.validation
     return StagedImport(versions: [version], records: diagnostics.applying(to: records))

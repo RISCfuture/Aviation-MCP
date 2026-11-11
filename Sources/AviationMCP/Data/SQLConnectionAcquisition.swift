@@ -27,7 +27,7 @@ enum SQLConnectionAcquisition {
     }
   }
 
-  private static func isTransient(_ error: any Error) -> Bool {
+  static func isTransient(_ error: any Error) -> Bool {
     if let error = error as? ChannelError { return error == .ioOnClosedChannel }
     guard let error = error as? PSQLError else { return false }
     switch error.code {

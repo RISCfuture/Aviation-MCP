@@ -13,7 +13,7 @@ struct NASRFrequencies: Sendable {
   static func read(_ archive: URL) async throws -> Self {
     let distribution = try ArchiveFileDistribution(location: archive, format: .csv)
     guard let path = try distribution.findFile(prefix: file) else {
-      throw StorageError.invalidImport("NASR archive is missing \(file).")
+      throw StorageError.sourceRejected("NASR archive is missing \(file).")
     }
     return try await parse(distribution.readFileRaw(path: path, progress: nil))
   }

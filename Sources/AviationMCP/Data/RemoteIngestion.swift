@@ -76,7 +76,7 @@ enum RemoteIngestion {
         ISO8601DateFormatter().date(from: download.effectiveFrom) != nil,
         download.effectiveUntil.map({ $0 > Date.now.ISO8601Format() }) != false,
         download.source == "aircraft" || download.effectiveUntil != nil
-      else { throw StorageError.invalidImport("Invalid or expired source download metadata.") }
+      else { throw StorageError.sourceRejected("Invalid or expired source download metadata.") }
     }
   }
 
@@ -104,13 +104,13 @@ enum RemoteIngestion {
       guard let start = ISO8601DateFormatter().date(from: download.effectiveFrom),
         let endText = download.effectiveUntil,
         let end = ISO8601DateFormatter().date(from: endText)
-      else { throw StorageError.invalidImport("DOF release boundaries are invalid.") }
+      else { throw StorageError.sourceRejected("DOF release boundaries are invalid.") }
       batch = try DOFImporter.parse(
         extract(archive, named: "DOF.DAT", to: directory),
         effectiveFrom: start, effectiveUntil: end)
     case "aircraft":
       guard let start = ISO8601DateFormatter().date(from: download.effectiveFrom) else {
-        throw StorageError.invalidImport("Aircraft snapshot date is invalid.")
+        throw StorageError.sourceRejected("Aircraft snapshot date is invalid.")
       }
       batch = try await AircraftImporter.parse(
         directory: directory, release: download.cycle, publishedAt: start)
@@ -120,7 +120,7 @@ enum RemoteIngestion {
       guard version.effectiveFrom.ISO8601Format() == download.effectiveFrom,
         version.effectiveUntil?.ISO8601Format() == download.effectiveUntil
       else {
-        throw StorageError.invalidImport("Parsed source dates disagree with the checked release.")
+        throw StorageError.sourceRejected("Parsed source dates disagree with the checked release.")
       }
       var version = version
       version.validation = (version.validation ?? [:]).merging(
@@ -144,13 +144,13 @@ enum RemoteIngestion {
       for: URLRequest(url: url, timeoutInterval: 240))
     defer { try? FileManager.default.removeItem(at: temporary) }
     guard let response = response as? HTTPURLResponse, response.statusCode == 200 else {
-      throw StorageError.invalidImport("The source download failed; check it again.")
+      throw StorageError.sourceRejected("The source download failed; check it again.")
     }
     var received = download
     received.etag = response.value(forHTTPHeaderField: "ETag")
     received.lastModified = response.value(forHTTPHeaderField: "Last-Modified")
     guard download.source != "aircraft" || received.lastModified == download.lastModified else {
-      throw StorageError.invalidImport("The aircraft snapshot changed; check it again.")
+      throw StorageError.sourceRejected("The aircraft snapshot changed; check it again.")
     }
     let destination = directory.appendingPathComponent(
       download.source == "aircraft" ? "FAA.xlsx" : "source.zip")
@@ -169,7 +169,7 @@ enum RemoteIngestion {
         $0.lastPathComponent.uppercased() == name
       } ?? []
     guard matches.count == 1, let file = matches.first else {
-      throw StorageError.invalidImport("Distribution must contain exactly one \(name) file.")
+      throw StorageError.sourceRejected("Distribution must contain exactly one \(name) file.")
     }
     return try Data(contentsOf: file)
   }

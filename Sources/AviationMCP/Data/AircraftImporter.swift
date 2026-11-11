@@ -14,7 +14,7 @@ enum AircraftImporter {
       _ = errors.withLock { $0.record(error, kind: "aircraft") }
     }
     guard !profiles.isEmpty else {
-      throw StorageError.invalidImport(
+      throw StorageError.sourceRejected(
         "Aircraft distribution contains no usable records.")
     }
     var version = SourceVersion(

@@ -18,7 +18,7 @@ enum DOFImporter {
       let currency = dof.cycle.currencyDate,
       effectiveFrom == dof.cycle.releaseDate, effectiveUntil == dof.cycle.expirationDate
     else {
-      throw StorageError.invalidImport(
+      throw StorageError.sourceRejected(
         "DOF import is empty or has invalid dates.")
     }
     var version = SourceVersion(
