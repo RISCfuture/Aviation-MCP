@@ -28,6 +28,7 @@ public func configure(_ app: Application) throws {
     app.asyncCommands.use(PublishCommand(), as: "publish-bundle")
     app.asyncCommands.use(PurgeCommand(), as: "purge")
     app.asyncCommands.use(ImportTerrainCommand(), as: "import-terrain")
+    app.asyncCommands.use(SentryCheckCommand(), as: "sentry-check")
     return
   }
   app.http.server.configuration.hostname = "0.0.0.0"
@@ -53,6 +54,7 @@ public func configure(_ app: Application) throws {
 
 private func registerMCP(_ app: Application, catalog: ToolCatalog, settings: ServerSettings) {
   let metrics = ServerMetrics()
+  app.middleware.use(ErrorReportingMiddleware(reporter: app.errorReporter))
   registerEdgeGate(app, settings: settings, metrics: metrics)
   app.middleware.use(
     AdmissionMiddleware(

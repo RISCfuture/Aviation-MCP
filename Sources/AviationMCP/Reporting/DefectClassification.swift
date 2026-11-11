@@ -5,12 +5,12 @@ import Vapor
 
 /// Separates errors that indicate a bug in this server from expected outcomes such as bad input,
 /// unavailable data, an unreachable database, or a cancelled request.
-enum DefectClassification {
+public enum DefectClassification {
   private static let expectedSQLStateClasses: Set<Substring> = ["08", "53", "57"]
   private static let expectedSQLStates: Set<String> = ["40001", "40P01"]
 
   /// Whether `error` is a defect worth reporting rather than an expected outcome.
-  static func isDefect(_ error: any Error) -> Bool { !isExpected(error) }
+  public static func isDefect(_ error: any Error) -> Bool { !isExpected(error) }
 
   private static func isExpected(_ error: any Error) -> Bool {
     switch error {

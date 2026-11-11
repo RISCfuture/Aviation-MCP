@@ -289,6 +289,23 @@ extension `Isolated HTTP requests` {
     }
   }
 
+  @Test
+  func `reports 5xx errors but not deliberate timeouts or client errors`() async throws {
+    try await withApp { app in
+      let recorder = RecordingErrorReporter()
+      app.middleware.use(ErrorReportingMiddleware(reporter: recorder))
+      app.get("fail") { _ -> String in throw Abort(.internalServerError) }
+      app.get("timeout") { _ -> String in throw Abort(.gatewayTimeout) }
+      app.get("malformed") { _ -> String in
+        throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "x"))
+      }
+      try await app.testing().test(.GET, "fail") { #expect($0.status == .internalServerError) }
+      try await app.testing().test(.GET, "timeout") { #expect($0.status == .gatewayTimeout) }
+      try await app.testing().test(.GET, "malformed") { #expect($0.status == .badRequest) }
+      #expect(recorder.reports.count == 1)
+    }
+  }
+
   static func call(id: Int) -> String {
     #"{"jsonrpc":"2.0","id":\#(id),"method":"tools/call","params":{"name":"echo","arguments":{}}}"#
   }
