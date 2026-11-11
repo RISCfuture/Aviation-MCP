@@ -95,9 +95,22 @@ jobs:
           context: .
           load: true
           tags: aviation-mcp:${{ github.sha }}
-          build-args: SWIFT_BUILD_JOBS=4
+          build-args: |
+            SWIFT_BUILD_JOBS=4
+            SENTRY_RELEASE=${{ github.sha }}
           cache-from: type=gha,scope=server-image
           cache-to: type=gha,scope=server-image,mode=max
+      - name: Extract the debug symbols
+        if: env.DEPLOYS == 'true'
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          target: symbols
+          outputs: type=local,dest=symbols
+          build-args: |
+            SWIFT_BUILD_JOBS=4
+            SENTRY_RELEASE=${{ github.sha }}
+          cache-from: type=gha,scope=server-image
       - name: Smoke-test the image
         run: scripts/smoke-test-image.sh "aviation-mcp:$GITHUB_SHA"
       - if: env.DEPLOYS == 'true'
@@ -114,6 +127,21 @@ jobs:
           docker push --quiet "$REPOSITORY:$GITHUB_SHA"
           reference=$(docker image inspect --format '{{index .RepoDigests 0}}' "$REPOSITORY:$GITHUB_SHA")
           echo "reference=$reference" >> "$GITHUB_OUTPUT"
+      - name: Install sentry-cli
+        if: env.DEPLOYS == 'true'
+        continue-on-error: true
+        run: curl -sL https://sentry.io/get-cli/ | SENTRY_CLI_VERSION=3.8.2 bash
+      - name: Create the Sentry release and upload symbols
+        if: env.DEPLOYS == 'true'
+        continue-on-error: true
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: timcodes
+          SENTRY_PROJECT: aviation-mcp
+        run: |
+          sentry-cli releases new "$GITHUB_SHA"
+          sentry-cli releases set-commits "$GITHUB_SHA" --auto
+          sentry-cli debug-files upload --wait symbols
 
   deploy:
     needs: [test, image]
@@ -147,6 +175,20 @@ jobs:
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_SERVER_API_TOKEN }}
         run: scripts/smoke-test-deployment.sh "$IMAGE"
+      - name: Install sentry-cli
+        if: env.DEPLOYS == 'true'
+        continue-on-error: true
+        run: curl -sL https://sentry.io/get-cli/ | SENTRY_CLI_VERSION=3.8.2 bash
+      - name: Finalize the Sentry release and record the deploy
+        if: env.DEPLOYS == 'true'
+        continue-on-error: true
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: timcodes
+          SENTRY_PROJECT: aviation-mcp
+        run: |
+          sentry-cli releases finalize "$GITHUB_SHA"
+          sentry-cli deploys new --release "$GITHUB_SHA" -e production
       - name: Roll back to the previous image
         if: failure() && (steps.deploy.outcome == 'failure' || steps.smoke.outcome == 'failure')
         env:
