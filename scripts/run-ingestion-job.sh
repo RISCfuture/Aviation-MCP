@@ -19,6 +19,10 @@ esac
 poll_margin=300
 sentry_dsn=https://c928956930320ae25669a6a4e9a2d1ed@o4510156629475328.ingest.us.sentry.io/4512414920146944
 
+# Runs the job through /app/run-job, or directly in an image without it.
+# shellcheck disable=SC2016 # Expanded by the machine's shell.
+launcher='[ -x /app/run-job ] && exec /app/run-job "$@"; exec "$@"'
+
 api=https://api.machines.dev/v1/apps/aviation-mcp-ingest/machines
 work_dir=$(mktemp -d)
 machine_id=
@@ -66,10 +70,10 @@ finish() {
 
 jq -n --arg image "$AVIATION_INGEST_IMAGE" --arg command "$command_name" \
   --arg timeout "$machine_timeout" --argjson cpus "$cpus" --argjson memory "$memory_mb" \
-  --arg dsn "$sentry_dsn" \
+  --arg dsn "$sentry_dsn" --arg launcher "$launcher" \
   --args '{region:"sjc", config:{image:$image,
-    init:{exec:(["/app/run-job","/usr/bin/timeout",$timeout,"/app/aviation-mcp",$command]
-      + $ARGS.positional)},
+    init:{exec:(["/bin/sh","-c",$launcher,"job","/usr/bin/timeout",$timeout,
+      "/app/aviation-mcp",$command] + $ARGS.positional)},
     env:{APP_ROLE:"ingest", SENTRY_DSN:$dsn, SENTRY_ENVIRONMENT:"production"},
     restart:{policy:"no"}, auto_destroy:false,
     guest:{cpu_kind:"shared",cpus:$cpus,memory_mb:$memory},
