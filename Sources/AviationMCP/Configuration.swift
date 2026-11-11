@@ -131,9 +131,7 @@ private func configureNOTAMs(_ app: Application, settings: ServerSettings) throw
   }
   let id = DatabaseID(string: "notams")
   app.databases.use(
-    try .postgres(
-      url: url, maxConnectionsPerEventLoop: 1,
-      connectionPoolTimeout: .seconds(5)), as: id)
+    try settings.postgres(url: url, connectionsPerEventLoop: 1, poolTimeout: .seconds(5)), as: id)
   let notams = NOTAMQueries(database: app.db(id))
   app.lifecycle.use(NOTAMRoleCheck(queries: notams))
   return notams
@@ -234,9 +232,17 @@ extension DatabaseID {
 
 extension ServerSettings {
   fileprivate func postgres(connectionsPerEventLoop: Int) throws -> DatabaseConfigurationFactory {
+    try postgres(
+      url: databaseURL, connectionsPerEventLoop: connectionsPerEventLoop,
+      poolTimeout: .seconds(Int64(databaseWaitSeconds)))
+  }
+
+  fileprivate func postgres(
+    url: String, connectionsPerEventLoop: Int, poolTimeout: TimeAmount
+  ) throws -> DatabaseConfigurationFactory {
     try .postgres(
-      url: databaseURL, maxConnectionsPerEventLoop: connectionsPerEventLoop,
-      connectionPoolTimeout: .seconds(Int64(databaseWaitSeconds)),
+      url: url, maxConnectionsPerEventLoop: connectionsPerEventLoop,
+      connectionPoolTimeout: poolTimeout,
       pruneInterval: role == "serve" ? .seconds(30) : nil,
       maxIdleTimeBeforePruning: .seconds(60))
   }

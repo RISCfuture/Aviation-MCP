@@ -10,23 +10,38 @@ extension Database {
     return ConnectedSQLDatabase(database: postgres)
   }
 
+  /// Runs `operation` in a transaction. A leased connection that cannot begin one, such as a
+  /// pooled connection the server closed while it sat idle, is retried like a failed acquisition,
+  /// since nothing has run on it yet.
   func withSQLTransaction<Value: Sendable>(
     _ operation: @escaping @Sendable (any Database) async throws -> Value
   ) async throws -> Value {
     try await SQLConnectionAcquisition.run {
       try await withConnection { database -> Result<Value, any Error> in
-        do { return .success(try await database.performSQLTransaction(operation)) } catch {
+        let sql = try await database.beginSQLTransaction()
+        do {
+          return .success(try await database.completeSQLTransaction(operation, on: sql))
+        } catch {
           return .failure(error)
         }
       }
     }
   }
 
-  private func performSQLTransaction<Value: Sendable>(
-    _ operation: @Sendable (any Database) async throws -> Value
-  ) async throws -> Value {
+  private func beginSQLTransaction() async throws -> any SQLDatabase {
     let sql = try sqlDatabase()
-    try await sql.raw("BEGIN").run()
+    do {
+      try await sql.raw("BEGIN").run()
+    } catch {
+      await closeConnection()
+      throw error
+    }
+    return sql
+  }
+
+  private func completeSQLTransaction<Value: Sendable>(
+    _ operation: @Sendable (any Database) async throws -> Value, on sql: any SQLDatabase
+  ) async throws -> Value {
     do {
       let result = try await operation(self)
       try await sql.raw("COMMIT").run()
@@ -36,12 +51,15 @@ extension Database {
         try await sql.raw("ROLLBACK").run()
       } catch {
         logger.warning("Transaction rollback failed; closing its connection")
-        if let postgres = self as? any PostgresDatabase {
-          try? await postgres.withConnection { $0.close() }.get()
-        }
+        await closeConnection()
       }
       throw error
     }
+  }
+
+  private func closeConnection() async {
+    guard let postgres = self as? any PostgresDatabase else { return }
+    try? await postgres.withConnection { $0.close() }.get()
   }
 }
 

@@ -17,6 +17,20 @@ actor ConnectionAttempts {
   }
 }
 
+/// Runs a task's jobs on an event loop, so the task leases that loop's pooled connections in place.
+final class EventLoopTaskExecutor: TaskExecutor {
+  let loop: any EventLoop
+
+  init(_ loop: any EventLoop) {
+    self.loop = loop
+  }
+
+  func enqueue(_ job: consuming ExecutorJob) {
+    let job = UnownedJob(job)
+    loop.execute { job.runSynchronously(on: self.asUnownedTaskExecutor()) }
+  }
+}
+
 extension AviationRecord {
   static func fixture(_ version: SourceVersion) -> Self {
     Self(
@@ -120,6 +134,47 @@ extension `Transactional publication` {
       database.name.lowercased().contains("test"),
       "TEST_DATABASE_URL names \(database.name); its schema is reset only when the name contains “test”."
     )
+  }
+
+  private static let terminationTimeoutMilliseconds = 5000
+
+  static func backendID(_ database: any Database) async throws -> Int32 {
+    try #require(
+      try await database.sqlDatabase().raw("SELECT pg_backend_pid() AS pid")
+        .first(decodingColumn: "pid", as: Int32.self))
+  }
+
+  /// Holds `loop` while the server terminates `backend`, then runs `operation` on the loop before it
+  /// reads the termination, as a process resuming from suspend finds a connection the server closed
+  /// while it slept.
+  static func resuming<Value: Sendable>(
+    _ loop: any EventLoop, afterTerminating backend: Int32,
+    _ operation: @escaping @Sendable () async throws -> Value
+  ) async throws -> Value {
+    let release = DispatchSemaphore(value: 0)
+    await withCheckedContinuation { held in
+      loop.execute {
+        held.resume()
+        release.wait()
+      }
+    }
+    try await terminate(backend, avoiding: loop)
+    let resumed = Task(executorPreference: EventLoopTaskExecutor(loop), operation: operation)
+    release.signal()
+    return try await resumed.value
+  }
+
+  private static func terminate(_ backend: Int32, avoiding loop: any EventLoop) async throws {
+    let url = try #require(ProcessInfo.processInfo.environment["TEST_DATABASE_URL"])
+    let other = try #require(
+      MultiThreadedEventLoopGroup.singleton.makeIterator().first { $0 !== loop })
+    let connection = try await PostgresConnection.connect(
+      on: other, configuration: try SQLPostgresConfiguration(url: url).coreConfiguration, id: 0,
+      logger: Logger(label: "terminate"))
+    _ = try await connection.query(
+      "SELECT pg_terminate_backend(\(backend), \(terminationTimeoutMilliseconds))",
+      logger: connection.logger)
+    try await connection.close()
   }
 
   static func version(_ source: SourceName) -> SourceVersion {

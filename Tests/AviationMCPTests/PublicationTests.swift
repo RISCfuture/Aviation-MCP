@@ -52,52 +52,6 @@ struct `Transactional publication` {
     }
   }
 
-  @Test(arguments: [
-    (true, 2, 2, 3), (false, 2, 2, 1), (true, 100, 2, 3), (true, 4, 4, 5), (false, 4, 4, 1)
-  ])
-  func `retries acquisition within its policy without replaying queries`(
-    beforeQuery: Bool, failures: Int, retries: Int, expectedAttempts: Int
-  ) async throws {
-    let attempts = ConnectionAttempts()
-    var value: Int?
-    do {
-      value = try await SQLConnectionAcquisition.run(
-        retryDelays: Array(repeating: .zero, count: retries)
-      ) {
-        let attempt = await attempts.advance()
-        guard attempt <= failures else { return .success(42) }
-        if beforeQuery { throw ChannelError.ioOnClosedChannel }
-        return .failure(ChannelError.ioOnClosedChannel)
-      }
-    } catch {
-      #expect(error is ChannelError)
-    }
-    #expect(await attempts.count == expectedAttempts)
-    #expect(value == (beforeQuery && failures < expectedAttempts ? 42 : nil))
-  }
-
-  @Test
-  func `returns the original failure when rollback loses its connection`() async throws {
-    try await withDatabase { store async throws in
-      do {
-        try await store.database.withSQLTransaction { database in
-          let postgres = try #require(database as? any PostgresDatabase)
-          try await postgres.withConnection { $0.close() }.get()
-          let sql = try database.sqlDatabase()
-          await #expect(throws: ChannelError.self) {
-            try await sql.raw("SELECT 1").run()
-          }
-          throw CancellationError()
-        }
-        Issue.record("A failed transaction returned successfully")
-      } catch {
-        #expect(error is CancellationError)
-      }
-      let snapshot = try await store.snapshot()
-      #expect(snapshot.versions.isEmpty)
-    }
-  }
-
   @Test
   func `publishes complete source pairs and rolls back invalid batches`() async throws {
     try await withDatabase { store in
@@ -356,4 +310,63 @@ extension `Transactional publication` {
     }
   }
 
+}
+
+extension `Transactional publication` {
+  @Test(arguments: [
+    (true, 2, 2, 3), (false, 2, 2, 1), (true, 100, 2, 3), (true, 4, 4, 5), (false, 4, 4, 1)
+  ])
+  func `retries acquisition within its policy without replaying queries`(
+    beforeQuery: Bool, failures: Int, retries: Int, expectedAttempts: Int
+  ) async throws {
+    let attempts = ConnectionAttempts()
+    var value: Int?
+    do {
+      value = try await SQLConnectionAcquisition.run(
+        retryDelays: Array(repeating: .zero, count: retries)
+      ) {
+        let attempt = await attempts.advance()
+        guard attempt <= failures else { return .success(42) }
+        if beforeQuery { throw ChannelError.ioOnClosedChannel }
+        return .failure(ChannelError.ioOnClosedChannel)
+      }
+    } catch {
+      #expect(error is ChannelError)
+    }
+    #expect(await attempts.count == expectedAttempts)
+    #expect(value == (beforeQuery && failures < expectedAttempts ? 42 : nil))
+  }
+
+  @Test
+  func `retries a transaction whose idle connection died`() async throws {
+    try await withDatabase { store in
+      let idle = try await Self.backendID(store.database)
+      let resumed = try await Self.resuming(store.database.eventLoop, afterTerminating: idle) {
+        try await store.database.withSQLTransaction { try await Self.backendID($0) }
+      }
+      #expect(resumed != idle)
+    }
+  }
+
+  @Test
+  func `returns the original failure when rollback loses its connection`() async throws {
+    try await withDatabase { store async throws in
+      do {
+        try await store.database.withSQLTransaction { database in
+          let postgres = try #require(database as? any PostgresDatabase)
+          try await postgres.withConnection { $0.close() }.get()
+          let sql = try database.sqlDatabase()
+          await #expect(throws: ChannelError.self) {
+            try await sql.raw("SELECT 1").run()
+          }
+          throw CancellationError()
+        }
+        Issue.record("A failed transaction returned successfully")
+      } catch {
+        #expect(error is CancellationError)
+      }
+      let snapshot = try await store.snapshot()
+      #expect(snapshot.versions.isEmpty)
+    }
+  }
 }
