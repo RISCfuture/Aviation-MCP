@@ -158,7 +158,12 @@ extension `Transactional publication` {
         release.wait()
       }
     }
-    try await terminate(backend, avoiding: loop)
+    do {
+      try await terminate(backend, avoiding: loop)
+    } catch {
+      release.signal()
+      throw error
+    }
     let resumed = Task(executorPreference: EventLoopTaskExecutor(loop), operation: operation)
     release.signal()
     return try await resumed.value
@@ -171,10 +176,18 @@ extension `Transactional publication` {
     let connection = try await PostgresConnection.connect(
       on: other, configuration: try SQLPostgresConfiguration(url: url).coreConfiguration, id: 0,
       logger: Logger(label: "terminate"))
-    _ = try await connection.query(
-      "SELECT pg_terminate_backend(\(backend), \(terminationTimeoutMilliseconds))",
-      logger: connection.logger)
+    let terminated: Bool?
+    do {
+      terminated = try await connection.query(
+        "SELECT pg_terminate_backend(\(backend), \(terminationTimeoutMilliseconds))",
+        logger: connection.logger
+      ).collect().first?.decode(Bool.self)
+    } catch {
+      try? await connection.close()
+      throw error
+    }
     try await connection.close()
+    try #require(terminated == true, "The server did not terminate backend \(backend).")
   }
 
   static func version(_ source: SourceName) -> SourceVersion {
