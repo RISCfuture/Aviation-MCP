@@ -110,6 +110,13 @@ fix elsewhere is not ambiguous here.
   when exactly one exists. With none or several, the element is unresolved.
 - A segment flagged `airway_gap`, or lacking a position, breaks the path there.
   `mea_unusable` segments stay in the path and raise a warning.
+- The point where the route joins an airway must be the same point the route
+  has already reached. When a previous airway or procedure places a fix of that
+  name somewhere else, the two share only an identifier, and the airway is
+  unresolved.
+- An airway whose geometry the importer withheld because of parse errors is
+  unresolved. Its surviving points are not joined, since a point between them
+  may be missing.
 
 Each airway leg carries the published segment distance, the magnetic course
 for the direction flown, and the segment's whole `altitudes` object (MEA, MOCA,
@@ -142,9 +149,22 @@ common route, then en route transition; for an arrival, the reverse.
 - The leg into an arrival's first fix is a direct leg; every later leg is the
   arrival's. Every leg of a departure, including the one from the airport, is
   the departure's.
-- Only legs with a published fix position contribute points. Legs defined by a
-  heading, course or altitude (for example `VA`, `CA`, `VM`) break the path,
-  and are listed in `geometry_gaps` with their sequence and path terminator.
+- Only an initial fix (`IF`) and a track to a fix (`TF`) are drawn, the same
+  standard as the published procedure geometry. Every other leg splits the
+  path and is listed in `geometry_gaps` with its sequence, path terminator and
+  reason:
+  - a leg with no fix position (`VA`, `VI`, `CA`, `VM`) contributes no point;
+  - a leg that ends at its fix along an arc or a course (`RF`, `AF`, `CF`,
+    `DF`), or after a hold (`HA`, `HF`), splits the path before the fix;
+  - a leg that starts at its fix and ends somewhere unpublished (`FM`, `FA`,
+    `FC`, `FD`, `HM`, `PI`) splits the path after the fix, so an arrival ending
+    on such a leg is not joined to the destination airport;
+  - any other leg with a fix is cut off on both sides.
+
+  A leg at the fix the path has already reached, such as a hold there, adds
+  nothing and splits nothing.
+- A procedure whose geometry the importer withheld because of parse errors is
+  unresolved, and the elements beside it resolve on their own.
 - Approaches are out of scope. The path ends at the last arrival fix or the
   destination airport's reference point.
 

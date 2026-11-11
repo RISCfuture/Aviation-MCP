@@ -178,6 +178,7 @@ extension `Transactional publication` {
           fixes.enumerated().map { sequence, fix in
             .object([
               "sequence": .int(sequence), "fix": .string(fix.0),
+              "path_terminator": sequence == 0 ? "IF" : "TF",
               "position": Normalization.point(latitude: fix.1, longitude: fix.2)
             ])
           })

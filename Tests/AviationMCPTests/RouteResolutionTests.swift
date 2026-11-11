@@ -23,8 +23,9 @@ private let routeExpectations: [String: RouteExpectation] = [
     .init(completeness: "complete", paths: [7], totalNM: 450.91),
   // A departure and an arrival with their transitions, and Q176 entered twice. No runway is
   // given and RNLDI4 has three runway transitions, so the path starts at its common route.
+  // BRDJE5 ends on a course flown until ATC ends it (an FM leg), so nothing joins it to KDFW.
   "KIAD RNLDI4.OTTTO Q176 STEVY Q176 BICKS PXV FSM KOMMA RRNET.BRDJE5 KDFW":
-    .init(completeness: "partial", paths: [1, 23], totalNM: 1056.52),
+    .init(completeness: "partial", paths: [1, 22, 1], totalNM: 1037.34),
   // An arrival whose runway transition ends on a heading, which splits off the airport.
   "KHSV SQS.DODJE6 KRBD":
     .init(completeness: "partial", paths: [9, 1], totalNM: 531.27),

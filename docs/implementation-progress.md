@@ -26,6 +26,14 @@
   completeness, unresolved elements, path sizes and distances. All 101 tests
   pass on macOS against PostGIS 3.6; Linux and CI have not yet run this
   branch.
+- Review of the pull request found four ways the tool could join points across
+  something unknown and still call the distance complete; all are fixed.
+  Airways and procedures with geometry withheld for parse errors are now
+  unresolved. An airway is joined only at the point the route has already
+  reached, not at another fix of the same name. Procedure legs follow the
+  published geometry's standard: only `IF` and `TF` legs are drawn, so arcs,
+  courses to a fix and legs that leave a fix on a course (1,816 `FM` legs in
+  the 2026-10-29 cycle) split the path.
 - Still to do after deployment: refresh the eval mock tool list, add the tool
   to the verification logs, and use it from the departure-climb skill.
 

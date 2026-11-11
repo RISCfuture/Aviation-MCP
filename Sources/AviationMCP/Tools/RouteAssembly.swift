@@ -35,8 +35,15 @@ struct RouteRecord: Sendable {
 
   /// The positions in `segments` of an airway point with this identifier.
   func segmentIndices(of identifier: String) -> [Int] {
-    segments.indices.filter { segments[$0]["identifier"]?.stringValue?.uppercased() == identifier }
+    let segments = segments
+    return segments.indices.filter {
+      segments[$0]["identifier"]?.stringValue?.uppercased() == identifier
+    }
   }
+
+  /// Whether the importer withheld this record's geometry because a parse error may have
+  /// dropped one of its points or legs, so what remains cannot be joined up.
+  var hasWithheldGeometry: Bool { data["geometry_scope"] == "unavailable_due_to_parse_errors" }
 
   /// The record as a candidate to choose with `selections`.
   var candidate: [String: Value] {
@@ -65,6 +72,27 @@ struct RoutePoint: Sendable {
   var viaKind = "direct"
   /// What the source publishes for the arriving leg, such as an airway segment's altitudes.
   var published: [String: Value] = [:]
+}
+
+/// How a procedure leg relates to its fix. As in the published procedure geometry, only an
+/// initial fix and a track to a fix are drawn; every other leg splits the path.
+private enum LegShape {
+  /// `IF` and `TF`: the path runs straight to the fix.
+  case track
+  /// The leg ends at its fix but reaches it along an arc, a course or a holding pattern.
+  case endsAtFix
+  /// The leg starts at its fix and ends somewhere unpublished, such as `FM`.
+  case leavesFix
+  case undetermined
+
+  init(terminator: String?) {
+    switch terminator {
+    case "IF", "TF": self = .track
+    case "AF", "CF", "DF", "RF", "HA", "HF": self = .endsAtFix
+    case "FA", "FC", "FD", "FM", "HM", "PI": self = .leavesFix
+    default: self = .undetermined
+    }
+  }
 }
 
 /// Resolves a route's elements against the records that could match them and assembles the
@@ -106,6 +134,8 @@ struct RouteAssembly: Sendable {
   private var handled: Set<Int> = []
   /// The point at which the previous airway joins the next one.
   private var junction: String?
+  /// Where the previous airway places that point.
+  private var junctionPosition: GeoPoint?
   private var flownDepartureRunway: String?
   private var flownArrivalRunway: String?
 
@@ -415,7 +445,14 @@ struct RouteAssembly: Sendable {
     let index = significant[position]
     let followsAirway = isAirway(position - 1)
     let entry = followsAirway ? junction : self.name(at: position - 1)
+    // Where the route already places the entry point: the previous airway's junction, or the
+    // element before this airway when something else resolved it.
+    let known =
+      followsAirway
+      ? junctionPosition
+      : elements[significant[position - 1]]["position"].flatMap(GeoPoint.init(geoJSON:))
     junction = nil
+    junctionPosition = nil
     let (records, selected) = try choose(airways(name), at: index)
     let joinsAirway = isAirway(position + 1)
     var exit = self.name(at: position + 1)
@@ -462,10 +499,20 @@ struct RouteAssembly: Sendable {
           + "inspect its sequence.")
       return
     }
-    guard record.data["geometry_scope"] != "unavailable_due_to_parse_errors" else {
+    guard !record.hasWithheldGeometry else {
       try failAirway(
         position,
         reason: "\(name) has source parsing errors, so its route geometry is unavailable.")
+      return
+    }
+    let segments = record.segments
+    if let known, let joined = segments[starts[0]]["position"].flatMap(GeoPoint.init(geoJSON:)),
+      Geodesy.sphericalDistanceNM(from: known, to: joined) >= Self.coincidenceNM
+    {
+      try failAirway(
+        position,
+        reason: "\(entry) on \(name) is a different point from the \(entry) the route reaches "
+          + "before it; they share only the identifier.")
       return
     }
     let reversed = starts[0] > ends[0]
@@ -476,13 +523,13 @@ struct RouteAssembly: Sendable {
         "resolution": selected ? "selected" : "unique", "entry": .string(entry),
         "exit": .string(exit), "reversed": .bool(reversed)
       ])
-    let segments = record.segments
     if !followsAirway {
       anchor(significant[position - 1], to: name, segment: segments[starts[0]])
     }
     traverse(segments, from: starts[0], to: ends[0], airway: name, element: index)
     if joinsAirway {
       junction = exit
+      junctionPosition = segments[ends[0]]["position"].flatMap(GeoPoint.init(geoJSON:))
     } else {
       let following = significant[position + 1]
       anchor(following, to: name, segment: segments[ends[0]])
@@ -575,6 +622,10 @@ struct RouteAssembly: Sendable {
     let enroute = departures.filter { $0.transition != nil && !$0.isRunwayTransition }
     let next = self.name(at: position + 1)
     let exits = enroute.filter { $0.transition?.uppercased() == next }
+    guard !departures.contains(where: \.hasWithheldGeometry) else {
+      unresolve(index, reason: Self.withheldReason(name))
+      return
+    }
     guard common.count <= 1, exits.count <= 1 else {
       unresolve(index, reason: Self.variantsReason(name))
       return
@@ -612,22 +663,25 @@ struct RouteAssembly: Sendable {
     let enroute = arrivals.filter { $0.transition != nil && !$0.isRunwayTransition }
     let previous = self.name(at: position - 1)
     let entries = enroute.filter { $0.transition?.uppercased() == previous }
+    let isWithheld = arrivals.contains(where: \.hasWithheldGeometry)
     let hasVariants = common.count > 1 || entries.count > 1
     let runway =
-      hasVariants
+      hasVariants || isWithheld
       ? (record: RouteRecord?.none, skipped: false)
       : runwayTransition(
         arrivals.filter(\.isRunwayTransition), requested: flownArrivalRunway,
         argument: "arrival_runway", procedure: name)
     // An arrival with no common route is flown on its runway transition alone.
     let parts = [entries.first, common.first, runway.record].compactMap(\.self)
-    if hasVariants || parts.isEmpty {
+    if isWithheld || hasVariants || parts.isEmpty {
       if elements[previousIndex].isEmpty { try point(position - 1) }
       unresolve(
         index,
-        reason: hasVariants
-          ? Self.variantsReason(name)
-          : Self.transitionReason(name, enroute, placement: "precede"))
+        reason: isWithheld
+          ? Self.withheldReason(name)
+          : hasVariants
+            ? Self.variantsReason(name)
+            : Self.transitionReason(name, enroute, placement: "precede"))
       return
     }
     usedProcedures = true
@@ -679,13 +733,15 @@ struct RouteAssembly: Sendable {
     var isFirst = joinedDirect
     for part in parts {
       for leg in part.legs {
-        guard let location = leg["position"].flatMap(GeoPoint.init(geoJSON:)) else {
-          gap([
+        func gap(_ reason: String) {
+          self.gap([
             "element": .int(element), "via": .string(procedure),
             "transition": part.transition.map(Value.string), "sequence": leg["sequence"],
-            "path_terminator": leg["path_terminator"],
-            "reason": "The leg has no published fix position."
+            "path_terminator": leg["path_terminator"], "reason": .string(reason)
           ])
+        }
+        guard let location = leg["position"].flatMap(GeoPoint.init(geoJSON:)) else {
+          gap("The leg has no published fix position.")
           continue
         }
         var point = RoutePoint(
@@ -696,7 +752,24 @@ struct RouteAssembly: Sendable {
           point.viaKind = kind
         }
         isFirst = false
+        let shape = LegShape(terminator: leg["path_terminator"]?.stringValue)
+        // A leg that only passes over the point the path has already reached adds nothing.
+        let repeatsLast =
+          !breakPending
+          && runs.last?.last.map {
+            $0.identifier == point.identifier
+              && Geodesy.sphericalDistanceNM(from: $0.position, to: location) < Self.coincidenceNM
+          } == true
+        if shape != .track, shape != .leavesFix, !repeatsLast {
+          gap(
+            shape == .endsAtFix
+              ? "The leg reaches its fix along an arc or a course, not a straight track."
+              : "The leg's path cannot be determined from its fix.")
+        }
         emit(point)
+        if shape == .leavesFix || shape == .undetermined {
+          gap("The leg leaves its fix on a course or heading with no published end point.")
+        }
       }
     }
   }
@@ -728,6 +801,11 @@ struct RouteAssembly: Sendable {
 
   private static func names(_ transitions: [RouteRecord]) -> String {
     transitions.compactMap(\.transition).sorted().joined(separator: ", ")
+  }
+
+  private static func withheldReason(_ name: String) -> String {
+    "\(name) has source parsing errors, so its legs may be incomplete and its path is "
+      + "unavailable."
   }
 
   private static func variantsReason(_ name: String) -> String {

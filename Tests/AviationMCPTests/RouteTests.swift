@@ -299,6 +299,127 @@ struct `Route assembly` {
 }
 
 extension `Route assembly` {
+  @Test
+  func `leaves an airway or procedure with withheld geometry unresolved`() throws {
+    var withheld = Self.v25
+    withheld = RouteRecord(
+      id: withheld.id, kind: withheld.kind, identifier: withheld.identifier, name: withheld.name,
+      data: withheld.data.merging(["geometry_scope": "unavailable_due_to_parse_errors"]) { $1 },
+      position: nil)
+    let navigation = [
+      Self.point("SNS", 36.66, -121.6, kind: "navaid"), Self.point("PRB", 35.67, -120.63),
+      withheld
+    ]
+    let airway = try Self.assemble("SNS V25 PRB", navigation)
+    #expect(airway.elements.map { $0["kind"] } == ["navaid", "unresolved", "fix"])
+    #expect(airway.elements[1]["reason"]?.stringValue?.contains("parsing errors") == true)
+    // Its surviving points are not joined: MID never appears and the path is split.
+    #expect(airway.runs.map { $0.map(\.identifier) } == [["SNS"], ["PRB"]])
+    #expect(airway.isBroken)
+
+    let airport = Self.point("KDST", 35, -118, kind: "airport")
+    var entry = Self.procedure(
+      "entry", "arrival", transition: "ENTR", [("ENTR", 36.0, -120.0), ("LAST", 35.2, -118.4)])
+    entry = RouteRecord(
+      id: entry.id, kind: entry.kind, identifier: entry.identifier, name: entry.name,
+      data: entry.data.merging(["geometry_scope": "unavailable_due_to_parse_errors"]) { $1 },
+      position: nil)
+    let arrival = try Self.assemble(
+      "AAA ENTR STAR1 KDST",
+      [airport, Self.point("AAA", 37, -122), Self.point("ENTR", 36, -120)], arrivals: [entry])
+    #expect(arrival.elements.map { $0["kind"] } == ["fix", "fix", "unresolved", "airport"])
+    #expect(arrival.runs.map { $0.map(\.identifier) } == [["AAA", "ENTR"], ["KDST"]])
+    #expect(!arrival.usedProcedures)
+    let departure = try Self.assemble(
+      "KDST STAR1 ENTR AAA", [airport, Self.point("AAA", 37, -122), Self.point("ENTR", 36, -120)],
+      departures: [entry])
+    #expect(departure.elements[1]["kind"] == "unresolved")
+    #expect(departure.runs.map { $0.map(\.identifier) } == [["KDST"], ["ENTR", "AAA"]])
+  }
+
+  @Test
+  func `does not join airways at two different points that share an identifier`() throws {
+    // V27 has its own DUPE, 60 NM from the DUPE that ends V25.
+    let first = Self.airway(
+      "V25",
+      [
+        Self.segment("SNS", 10, 36.66, -121.6, distance: 30, course: 128, opposite: 308),
+        Self.segment("DUPE", 20, 36.2, -121.1)
+      ])
+    let second = Self.airway(
+      "V27", [Self.segment("DUPE", 10, 35.2, -121.1), Self.segment("END", 20, 35.0, -120)])
+    let implicit = try Self.assemble("SNS V25 V27 END", [first, second])
+    #expect(implicit.elements[1]["kind"] == "airway")
+    #expect(implicit.elements[2]["kind"] == "unresolved")
+    #expect(implicit.elements[2]["reason"]?.stringValue?.contains("different point") == true)
+    #expect(implicit.runs.map { $0.map(\.identifier) }.first == ["SNS", "DUPE"])
+    #expect(!implicit.runs.contains { $0.map(\.identifier).contains("END") && $0.count > 1 })
+    #expect(implicit.isBroken)
+
+    let explicit = try Self.assemble("SNS V25 DUPE V27 END", [first, second])
+    #expect(
+      explicit.elements.map { $0["kind"] } == [
+        "airway_point", "airway", "airway_point", "unresolved", "unresolved"
+      ])
+    #expect(explicit.isBroken)
+  }
+
+  @Test
+  func `draws only tracks to fixes and splits the path at every other leg`() throws {
+    let navigation = [
+      Self.point("KDST", 35, -118, kind: "airport"), Self.point("AAA", 37, -122)
+    ]
+    func arrival(_ terminators: [Int: String]) throws -> RouteAssembly {
+      try Self.assemble(
+        "AAA STAR1 KDST", navigation,
+        arrivals: [
+          Self.procedure(
+            "common", "arrival", transition: nil,
+            [("ONE", 36.0, -120.0), ("TWO", 35.6, -119.2), ("LAST", 35.2, -118.4)],
+            terminators: terminators)
+        ])
+    }
+    let tracks = try arrival([0: "IF"])
+    #expect(tracks.runs.map { $0.map(\.identifier) } == [["AAA", "ONE", "TWO", "LAST", "KDST"]])
+    #expect(tracks.gaps.isEmpty && !tracks.isBroken)
+
+    // FM: from LAST on a course until told otherwise, so nothing joins LAST to the airport.
+    let manual = try Self.assemble(
+      "AAA STAR1 KDST", navigation,
+      arrivals: [
+        Self.procedure(
+          "common", "arrival", transition: nil,
+          [("ONE", 36.0, -120.0), ("LAST", 35.2, -118.4), ("LAST", 35.2, -118.4)],
+          terminators: [2: "FM"])
+      ])
+    #expect(manual.runs.map { $0.map(\.identifier) } == [["AAA", "ONE", "LAST"], ["KDST"]])
+    #expect(manual.gaps.count == 1)
+    #expect(manual.gaps.first?.objectValue?["path_terminator"] == "FM")
+    #expect(manual.isBroken)
+
+    // An arc or a course to a fix ends there, but the way to it is not a straight track.
+    for terminator in ["RF", "AF", "CF", "DF"] {
+      let curved = try arrival([1: terminator])
+      #expect(curved.runs.map { $0.map(\.identifier) } == [["AAA", "ONE"], ["TWO", "LAST", "KDST"]])
+      #expect(curved.gaps.first?.objectValue?["path_terminator"] == .string(terminator))
+    }
+    // A leg of a kind the tool does not know is cut off on both sides.
+    let unknown = try arrival([1: "ZZ"])
+    #expect(
+      unknown.runs.map { $0.map(\.identifier) } == [["AAA", "ONE"], ["TWO"], ["LAST", "KDST"]])
+    // A hold at the fix the path has already reached changes nothing.
+    let hold = try Self.assemble(
+      "AAA STAR1 KDST", navigation,
+      arrivals: [
+        Self.procedure(
+          "common", "arrival", transition: nil,
+          [("ONE", 36.0, -120.0), ("ONE", 36.0, -120.0), ("LAST", 35.2, -118.4)],
+          terminators: [1: "HF"])
+      ])
+    #expect(hold.runs.map { $0.map(\.identifier) } == [["AAA", "ONE", "LAST", "KDST"]])
+    #expect(hold.gaps.isEmpty)
+  }
+
   static let v25Segments: [[String: Value]] = [
     segment("SNS", 10, 36.66, -121.6, distance: 30, course: 128, opposite: 308),
     segment("MID", 20, 36.2, -121.1, distance: 25, course: 130, opposite: 310),
@@ -349,17 +470,19 @@ extension `Route assembly` {
       data: ["segments": .array(segments.map(Value.object))], position: nil)
   }
 
-  /// A procedure part whose legs are fixes with positions, or `nil` for a heading leg.
+  /// A procedure part whose legs are fixes with positions, or `nil` for a heading leg. Each
+  /// leg is a track to its fix unless `terminators` names another path terminator for it.
   static func procedure(
     _ id: String, _ type: String, transition: String?,
-    _ fixes: [(String, Double, Double)?]
+    _ fixes: [(String, Double, Double)?], terminators: [Int: String] = [:]
   ) -> RouteRecord {
     let legs: [Value] = fixes.enumerated().map { sequence, fix in
       guard let fix else {
         return .object(["sequence": .int(sequence), "path_terminator": "VA"])
       }
       return .object([
-        "sequence": .int(sequence), "fix": .string(fix.0), "path_terminator": "TF",
+        "sequence": .int(sequence), "fix": .string(fix.0),
+        "path_terminator": .string(terminators[sequence] ?? "TF"),
         "position": Normalization.point(latitude: fix.1, longitude: fix.2)
       ])
     }
