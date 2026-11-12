@@ -81,6 +81,20 @@ enum Geodesy {
     return normalizedCourse(degrees(course))
   }
 
+  /// The great-circle distance between two points in nautical miles, measured on a sphere of
+  /// the Earth's mean radius; within about 0.5% of the geodesic distance.
+  static func sphericalDistanceNM(from start: GeoPoint, to end: GeoPoint) -> Double {
+    let meanRadiusMeters = 6_371_008.8
+    let startLatitude = radians(start.latitude)
+    let endLatitude = radians(end.latitude)
+    let latitudeDelta = endLatitude - startLatitude
+    let longitudeDelta = radians(end.longitude - start.longitude)
+    let haversine =
+      sin(latitudeDelta / 2) * sin(latitudeDelta / 2)
+      + cos(startLatitude) * cos(endLatitude) * sin(longitudeDelta / 2) * sin(longitudeDelta / 2)
+    return 2 * meanRadiusMeters * asin(min(1, haversine.squareRoot())) / metersPerNauticalMile
+  }
+
   /// A course expressed in degrees from 0 up to 360.
   static func normalizedCourse(_ course: Double) -> Double {
     let remainder = course.truncatingRemainder(dividingBy: 360)
