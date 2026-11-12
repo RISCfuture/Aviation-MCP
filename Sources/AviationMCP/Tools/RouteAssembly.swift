@@ -690,6 +690,18 @@ struct RouteAssembly: Sendable {
             : Self.transitionReason(name, enroute, placement: "precede"))
       return
     }
+    if let previous, let first = parts.first?.legs.first,
+      first["fix"]?.stringValue?.uppercased() == previous,
+      let known = elements[previousIndex]["position"].flatMap(GeoPoint.init(geoJSON:)),
+      let joined = first["position"].flatMap(GeoPoint.init(geoJSON:)),
+      Geodesy.sphericalDistanceNM(from: known, to: joined) >= Self.coincidenceNM
+    {
+      unresolve(
+        index,
+        reason: "\(previous) on \(name) is a different point from the \(previous) the route "
+          + "reaches before it; they share only the identifier.")
+      return
+    }
     usedProcedures = true
     emit(parts, procedure: name, kind: "arrival", element: index, joinedDirect: true)
     if runway.skipped { interrupt() }
