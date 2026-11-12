@@ -150,7 +150,8 @@ struct RouteAssembly: Sendable {
     self.arrivalRunway = arrivalRunway
     elements = Array(repeating: [:], count: words.count)
     significant = words.indices.filter { words[$0].token != .speedLevel }
-    guard significant.count >= 2 else {
+    // A direct marker joins elements without being one, so `KOAK DCT` is still a single element.
+    guard significant.count(where: { words[$0].token != .direct }) >= 2 else {
       throw ToolInputError(reason: "route_string needs at least two route elements.")
     }
     for index in selections.keys where !words.indices.contains(index) {
@@ -313,11 +314,16 @@ struct RouteAssembly: Sendable {
   }
 
   /// Whether the next element will resolve this one: an airway it lies on, or an arrival whose
-  /// transition it names.
+  /// transition it names or whose common route starts at it.
   private func isDeferred(_ position: Int, _ name: String) -> Bool {
     let next = position + 1
     if isArrival(next) {
-      return arrivals.contains { !$0.isRunwayTransition && $0.transition?.uppercased() == name }
+      return arrivals.contains { arrival in
+        if arrival.isRunwayTransition { return false }
+        guard arrival.transition == nil else { return arrival.transition?.uppercased() == name }
+        let first = arrival.legs.first
+        return first?["fix"]?.stringValue?.uppercased() == name && first?["position"] != nil
+      }
     }
     guard isAirway(next), let airway = self.name(at: next) else { return false }
     return airways(airway).contains { !$0.segmentIndices(of: name).isEmpty }

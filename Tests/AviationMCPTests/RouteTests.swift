@@ -124,6 +124,8 @@ struct `Route assembly` {
     #expect(endpoint.elements.map { $0["kind"] } == ["airport", "direct", "fix"])
     #expect(endpoint.runs.map { $0.map(\.identifier) } == [["KMID", "BBB"]])
     #expect(throws: ToolInputError.self) { try Self.assemble("AAA N0450F350", navigation) }
+    #expect(throws: ToolInputError.self) { try Self.assemble("AAA DCT", navigation) }
+    #expect(throws: ToolInputError.self) { try Self.assemble("DCT DCT", navigation) }
   }
 
   @Test
@@ -291,6 +293,21 @@ struct `Route assembly` {
     #expect(runwayOnly.warnings.contains { $0.contains("not one of its transitions (ENTR)") })
     let nothing = try Self.assemble("AAA STAR1 KDST", navigation, arrivals: [arrivals[0]])
     #expect(nothing.elements[1]["kind"] == "unresolved")
+
+    // The fix the common route starts at is the arrival's own, however many records share its
+    // name.
+    let merge = [
+      Self.point("MERGE", 35.5, -119, id: "near"), Self.point("MERGE", 10, 10, id: "far")
+    ]
+    let joined = try Self.assemble(
+      "AAA MERGE STAR1 KDST", navigation + merge, arrivals: [arrivals[1], arrivals[2]])
+    #expect(joined.elements[1]["resolution"] == "anchored")
+    #expect(joined.elements[1]["anchor"] == "STAR1")
+    #expect(joined.runs.map { $0.map(\.identifier) } == [["AAA", "MERGE", "LAST"], ["KDST"]])
+    #expect(joined.runs[0].map(\.viaKind) == ["direct", "direct", "arrival"])
+    #expect(joined.warnings.isEmpty)
+    let unjoined = try Self.assemble("AAA MERGE KDST", navigation + merge)
+    #expect(unjoined.elements[1]["kind"] == "unresolved")
 
     // Without the arrival to anchor it, the duplicated transition fix stays ambiguous.
     let unanchored = try Self.assemble("AAA ENTR KDST", navigation)

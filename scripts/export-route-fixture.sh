@@ -17,9 +17,10 @@ else
   psql=(psql "${DATABASE_URL:?Set DATABASE_URL or PSQL}")
 fi
 
-# Every element of every route, split as the tool splits them and without speed suffixes.
+# Every element of every route, split as the tool splits them and without speed suffixes. A
+# bearing-distance point such as SNS090020 names its navaid.
 names=$(tr -s ' .\t\r' '\n' < "$routes" | tr '[:lower:]' '[:upper:]' | sed 's|/.*||' \
-  | grep -E '^[A-Z0-9]{1,8}$' | sort -u | paste -sd, -)
+  | sed -E 's/^([A-Z]{2,5})[0-9]{6}$/\1/' | grep -E '^[A-Z0-9]{1,8}$' | sort -u | paste -sd, -)
 
 "${psql[@]}" -v ON_ERROR_STOP=1 -v names="$names" --no-psqlrc --quiet --tuples-only --no-align \
   > "$output" <<'SQL'

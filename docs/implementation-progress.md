@@ -34,6 +34,11 @@
   published geometry's standard: only `IF` and `TF` legs are drawn, so arcs,
   courses to a fix and legs that leave a fix on a course (1,816 `FM` legs in
   the 2026-10-29 cycle) split the path.
+- A second review pass found three smaller faults, also fixed. A route of one
+  element and a `DCT` is now rejected instead of resolving to nothing. The
+  fix an arrival's common route starts at is anchored by the arrival, as a
+  transition fix already was. The fixture export script now exports the
+  navaid of a bearing-distance point.
 - Still to do after deployment: refresh the eval mock tool list, add the tool
   to the verification logs, and use it from the departure-climb skill.
 

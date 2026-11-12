@@ -76,7 +76,7 @@ Elements are case-insensitive and are classified in this order.
 | Element | Example | Rule |
 | --- | --- | --- |
 | Speed and level group | `N0450F350` | Recognised by pattern, reported, and otherwise ignored. Also accepted as a `/N0450F350` suffix on a fix. |
-| Direct | `DCT` | Joins its neighbours with a geodesic leg. Two adjacent points with no `DCT` between them are joined the same way. |
+| Direct | `DCT` | Joins its neighbours with a geodesic leg. Two adjacent points with no `DCT` between them are joined the same way. It does not count toward the two elements a route needs. |
 | Coordinate | `3730N12200W`, `37N122W` | ICAO degrees or degrees and minutes. |
 | Place, bearing, distance | `SNS090020` | A navaid, a three-digit magnetic bearing and a three-digit distance in NM. Navaids only; see [Place, bearing, distance](#place-bearing-distance). |
 | Airport | `KOAK`, `OAK` | Only as the first or last element. Matched by FAA location identifier or ICAO code. |
@@ -134,6 +134,10 @@ common route, then en route transition; for an arrival, the reverse.
   element. If none matches, the procedure is joined at the end of its common
   route with a direct leg. When the procedure does publish en route
   transitions, a warning names them.
+- The element before an arrival is the arrival's own fix when it names an en
+  route transition or the fix the common route starts at. It takes the
+  arrival's position and needs no selection, even when several fixes share
+  the name.
 - The runway transition is chosen with `departure_runway` or `arrival_runway`,
   using `RunwayName.matches`. A procedure with a single runway transition uses
   it. With several and no runway, or a runway that matches none, no runway
