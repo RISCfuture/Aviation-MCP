@@ -13,14 +13,31 @@ enum WeatherParsing {
     let value: Value
     switch type.lowercased() {
     case "metar":
-      value = metar(try await METAR.from(string: text, on: reference, lenientRemarks: true))
-    case "taf": value = taf(try await TAF.from(string: text, on: reference))
-    case "winds_aloft": value = winds(try await WindsAloft.from(string: text, on: reference))
+      value = metar(
+        try await decoding {
+          try await METAR.from(string: text, on: reference, lenientRemarks: true)
+        })
+    case "taf": value = taf(try await decoding { try await TAF.from(string: text, on: reference) })
+    case "winds_aloft":
+      value = winds(try await decoding { try await WindsAloft.from(string: text, on: reference) })
     default: throw MCPError.invalidParams("Supported report types: metar, taf, winds_aloft")
     }
     return ToolResult(
       results: [value],
       warnings: ["Parsed from client-supplied text; not retrieved from a live provider."])
+  }
+
+  /// Runs `parse`, rethrowing a report the parser rejects as invalid tool input.
+  private static func decoding<Report>(
+    _ parse: () async throws -> Report
+  ) async throws -> Report {
+    do {
+      return try await parse()
+    } catch let error as SwiftMETAR.Error {
+      throw ToolInputError(
+        reason: [error.errorDescription, error.failureReason].compactMap(\.self).joined(
+          separator: " "))
+    }
   }
 
   static func fields(_ report: METAR) -> [String: Value] {

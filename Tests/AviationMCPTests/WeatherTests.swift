@@ -113,6 +113,14 @@ struct `Weather selection and provenance` {
   }
 
   @Test
+  func `rejects unparseable reports as invalid input`() async throws {
+    let error = await #expect(throws: ToolInputError.self) {
+      try await WeatherParsing.parse(ToolArguments(["type": "metar", "report": "flights to Rome"]))
+    }
+    #expect(error?.reason.contains("‘to’") == true)
+  }
+
+  @Test
   func `bounds combined TAF fields at the next transition`() async throws {
     let reference = Date(timeIntervalSince1970: 1_793_188_800)
     let taf = try await TAF.from(
