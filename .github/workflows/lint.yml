@@ -15,8 +15,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  route:
+    uses: RISCfuture/ci-workflows/.github/workflows/minerva-route.yml@1.1.0
+    permissions:
+      contents: read
+
   lint:
-    runs-on: macos-latest
+    needs: route
+    runs-on: ${{ fromJSON(needs.route.outputs.macos-latest) }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7.0.1
