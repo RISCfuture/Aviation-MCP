@@ -28,10 +28,9 @@ As of November 9, 2026, [Claude's Aviation MCP connector](https://claude.ai/dire
 is published in Claude's directory under publisher Tim Morgan.
 
 [OpenAI's Aviation Data plugin](https://platform.openai.com/plugins/manage/plugin_asdk_app_6ae2f4b563f88191a52bfbeed9663e5b)
-version 1.1.0 is published in ChatGPT's plugin directory as of November 19, 2026. That
-release calls the SF50-only `sf50_*` tools, which the server keeps as deprecated aliases.
-Version 1.2.0 moves the skills and review cases to the aircraft-neutral tools and adds the
-SR22.
+version 1.2.0 is published in ChatGPT's plugin directory as of November 20, 2026. It
+replaced 1.1.0, which called the SF50-only `sf50_*` tools the server keeps as deprecated
+aliases. Codex lists it as `aviation-mcp@openai-curated-remote`.
 
 Codex users can also install the plugin from this repository's marketplace:
 

@@ -70,7 +70,7 @@ used to check the displayed questions.
 
 ## Copy and source references
 
-Setup instructions were checked on November 19, 2026 against the
+Setup instructions were checked on November 20, 2026 against the
 [OpenAI plugins guide](https://help.openai.com/en/articles/20001256-plugins-in-chatgpt),
 [OpenAI custom MCP server guide](https://help.openai.com/en/articles/12584461-connecting-custom-mcp-servers-in-chatgpt),
 and [Claude remote connector guide](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp).
