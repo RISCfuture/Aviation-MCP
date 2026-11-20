@@ -95,6 +95,7 @@ extension ToolDefinition {
     switch self {
     case .getAirport, .getAirway, .getProcedure, .getAircraft: ["identifier"]
     case .parseWeather: ["type", "report"]
+    case .resolveRoute: ["route_string"]
     case .queryNOTAMs: ["start", "end"]
     case .computeGeometry: ["operation"]
     case .queryTerrain: ["route", "half_width_nm"]
@@ -109,6 +110,7 @@ extension ToolDefinition {
     case .findNavigation: Navigation.search
     case .getAirway: Navigation.airway
     case .findRoutes: Navigation.routes
+    case .resolveRoute: Navigation.resolution
     case .queryAirspace: Airspace.search
     case .findProcedures: Procedures.search
     case .getProcedure: Procedures.detail
@@ -234,6 +236,36 @@ private enum Navigation {
       "Arrival airport, as an FAA location identifier or ICAO code."),
     "kinds": Common.kinds(.findRoutes)
   ]) { $1 }
+}
+
+extension Navigation {
+  static let resolution: [String: Value] = [
+    "route_string": ToolSchemas.described(
+      ["type": "string", "minLength": 3, "maxLength": .int(RouteResolver.routeLengthLimit)],
+      "Route elements separated by spaces or dots, such as KOAK SNS V25 PRB KSBP: airports "
+        + "(first and last only), fixes, navaids, airways, a departure after the origin, an "
+        + "arrival before the destination, DCT, ICAO coordinates such as 3730N12200W, and a "
+        + "navaid with magnetic bearing and distance such as SNS090020. At most "
+        + "\(RouteGrammar.maximumElements) elements."),
+    "departure_runway": ToolSchemas.text(
+      "Departure runway, such as 28R, to include the departure's runway transition."),
+    "arrival_runway": ToolSchemas.text(
+      "Arrival runway, such as 28R, to include the arrival's runway transition."),
+    "selections": ToolSchemas.described(
+      [
+        "type": "array", "maxItems": .int(RouteGrammar.maximumElements),
+        "items": .object([
+          "type": "object", "required": ["index", "record_id"], "additionalProperties": false,
+          "properties": .object([
+            "index": .object(["type": "integer", "minimum": 0]),
+            "record_id": .object(["type": "string", "minLength": 1])
+          ])
+        ])
+      ],
+      "Choices for ambiguous elements: index is the element's zero-based index and record_id "
+        + "is the id of one of its candidates from an earlier result."),
+    "include_geometry": Common.geometry
+  ]
 }
 
 private enum Airspace {

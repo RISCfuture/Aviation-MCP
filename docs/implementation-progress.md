@@ -1,5 +1,47 @@
 # Hosted Aviation MCP implementation
 
+## Route string resolution (2026-11-11)
+
+- Added `resolve_route` to the navigation group, the 22nd tool. It resolves a
+  U.S. route string of airports, fixes, navaids, airways, departures, arrivals,
+  runways, coordinates and navaid bearing-distance points into ordered legs
+  and `[longitude, latitude]` paths that `query_airspace`, `query_obstacles`
+  and `query_terrain` accept. [The specification](resolve-route.md) records
+  the grammar, rules and output. Not yet deployed.
+- It never chooses among several matches. An ambiguous identifier returns its
+  candidates and the caller selects one; an element anchored by an adjacent
+  airway or procedure needs no selection. Unresolved elements, airway gaps and
+  procedure legs without a fix position split the path instead of being
+  bridged. Approaches and non-U.S. data are out of scope.
+- A locally ingested 2026-10-29 NASR and CIFP cycle (226,668 records) showed
+  three things synthetic fixtures had not: three-letter identifiers at route
+  ends usually name both an airport and a navaid, VOR test facilities appear
+  as navaids, and many procedures publish transitions with no common route.
+  VOTs are now excluded, and a procedure without a common route is flown on
+  its runway transition alone. Only 71 fix or navaid identifiers are
+  duplicated in that cycle.
+- `RouteResolutionTests.swift` runs every route in
+  `Tests/AviationMCPTestData/RouteResolutionTests.txt` against 76 real records
+  exported from that cycle by `scripts/export-route-fixture.sh`, with pinned
+  completeness, unresolved elements, path sizes and distances. All 101 tests
+  pass on macOS against PostGIS 3.6; Linux and CI have not yet run this
+  branch.
+- Review of the pull request found four ways the tool could join points across
+  something unknown and still call the distance complete; all are fixed.
+  Airways and procedures with geometry withheld for parse errors are now
+  unresolved. An airway is joined only at the point the route has already
+  reached, not at another fix of the same name. Procedure legs follow the
+  published geometry's standard: only `IF` and `TF` legs are drawn, so arcs,
+  courses to a fix and legs that leave a fix on a course (1,816 `FM` legs in
+  the 2026-10-29 cycle) split the path.
+- A second review pass found three smaller faults, also fixed. A route of one
+  element and a `DCT` is now rejected instead of resolving to nothing. The
+  fix an arrival's common route starts at is anchored by the arrival, as a
+  transition fix already was. The fixture export script now exports the
+  navaid of a bearing-distance point.
+- Still to do after deployment: refresh the eval mock tool list, add the tool
+  to the verification logs, and use it from the departure-climb skill.
+
 ## Public deployment and cold-start verification (2026-10-28)
 
 - Signed commit 6ae4909 is pushed. The first remote build lost Depot connectivity;
