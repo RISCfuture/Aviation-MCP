@@ -44,6 +44,21 @@ responses. Detailed example outcomes and procedure-path limits are in
 values change; successful queries do not certify flight safety or completeness
 of upstream data.
 
+## Performance tools
+
+On November 20, 2026 UTC, direct calls to the production endpoint exercised the four
+aircraft-neutral performance tools for both aircraft. Each returned structured results
+with input origins, the manuals used, and the planning-only disclaimer. These are
+tool-level checks; they do not establish how a client selects tools.
+
+| Tool | Inputs | Result |
+| --- | --- | --- |
+| `takeoff_performance` | SF50 G2+, 5,800 lb, KOAK 28R, forecast time | Ground run and distance with wind and slope breakdowns; NASR, TAF and Open-Meteo origins |
+| `takeoff_performance` | SR22, 3,600 lb, KOAK 28R | `invalid_argument`: above the 3,400 lb maximum takeoff weight |
+| `climb_profile` | SF50 G2+, 5,900 lb, KASE 15, course 150° true, to 14,000 ft | Gradients for all five schedules; takeoff schedule offscale above 10,030 ft, reported as such |
+| `landing_performance` | SR22, Hartzell propeller, turbonormalized, 3,400 lb, KASE 15 | Landing distance with balked-landing climb; Vref and go-around gradient listed as unavailable |
+| `takeoff_limits` | SF50 G2+, 6,000 lb, KTEX, solve for temperature | Maximum OAT for runways 09 and 27, each limited by field length |
+
 ## ChatGPT client review
 
 On October 29, 2026 UTC, the private **Aviation Data Review** connector exercised

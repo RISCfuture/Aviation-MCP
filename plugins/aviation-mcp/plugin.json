@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "aviation-mcp",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Query U.S. aviation data, worldwide terrain and Cirrus SF50 and SR22 performance with source cycles, provenance, and explicit coverage gaps.",
   "author": {
     "name": "Tim Morgan",
@@ -95,7 +95,7 @@
         "demo_recording_url": "https://aviation-mcp.org/review/aviation-data-demo.mp4"
       },
       "publication": {
-        "release_notes": "Adds four Cirrus SF50 and SR22 performance tools (takeoff, landing, climb profile and takeoff limits) for 21 read-only tools in all, and seven skills that combine them with runway data, weather, NOTAMs, procedures, terrain and obstacles."
+        "release_notes": "Extends performance planning to the Cirrus SR22. takeoff_performance, landing_performance, climb_profile and takeoff_limits take an aircraft object that selects the SF50 or SR22 and replace the SF50-only tools, which remain as deprecated aliases. The seven skills cover both aircraft and call the new tools."
       }
     }
   }

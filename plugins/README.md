@@ -27,10 +27,13 @@ does not see the tools twice.
 As of November 9, 2026, [Claude's Aviation MCP connector](https://claude.ai/directory/manage/aviation-mcp)
 is published in Claude's directory under publisher Tim Morgan.
 
-[OpenAI's Aviation Data submission](https://platform.openai.com/plugins/manage/plugin_asdk_app_6ae2f4b563f88191a52bfbeed9663e5b)
-is **In review** for version 1.1.0 and not yet published. Until it is, ChatGPT users
-add the endpoint as a custom MCP server, and Codex users install the plugin from this
-repository's marketplace:
+[OpenAI's Aviation Data plugin](https://platform.openai.com/plugins/manage/plugin_asdk_app_6ae2f4b563f88191a52bfbeed9663e5b)
+version 1.1.0 is published in ChatGPT's plugin directory as of November 19, 2026. That
+release calls the SF50-only `sf50_*` tools, which the server keeps as deprecated aliases.
+Version 1.2.0 moves the skills and review cases to the aircraft-neutral tools and adds the
+SR22.
+
+Codex users can also install the plugin from this repository's marketplace:
 
 ```sh
 codex plugin marketplace add RISCfuture/Aviation-MCP
@@ -40,10 +43,10 @@ codex plugin add aviation-mcp@aviation-mcp
 Codex reads the repository's Claude marketplace and installs the MCP server and the
 skills.
 
-## Before submitting 1.1.0
+## Before submitting a release
 
-1. Deploy the server with the `performance` group, then run the four SF50 review cases
-   against <https://aviation-mcp.org/mcp>.
+1. Deploy the server, then run the review cases' tool calls against
+   <https://aviation-mcp.org/mcp> and record them in [verification](verification.md).
 2. Refresh `evals/mocks/aviation/_tools.json` from the deployed server so the eval mock
    matches its tools:
 
@@ -87,9 +90,8 @@ The review cases describe expected behavior. Tool-level probes are documented
 in [website verification](../site/examples-verification.md); those probes do not
 establish model behavior in ChatGPT or Claude. Run the review cases inside the
 clients before attesting to them. `extensions.com.openai.review.demo_recording_url`
-points to the 1.0.0 walkthrough; record a new client interaction that includes an SF50
-question and replace the URL before submitting 1.1.0. Do not substitute a simulated
-transcript.
+points to the 1.0.0 walkthrough; record a new client interaction that includes SF50 and
+SR22 questions and replace the URL. Do not substitute a simulated transcript.
 
 ## Claude plugin
 

@@ -1,6 +1,6 @@
 {
   "name": "aviation-mcp",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Query U.S. aviation data, worldwide terrain and Cirrus SF50 and SR22 performance with source cycles, provenance, and explicit coverage gaps.",
   "author": {
     "name": "Tim Morgan",
