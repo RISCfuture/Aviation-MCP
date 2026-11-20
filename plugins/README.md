@@ -90,8 +90,13 @@ The review cases describe expected behavior. Tool-level probes are documented
 in [website verification](../site/examples-verification.md); those probes do not
 establish model behavior in ChatGPT or Claude. Run the review cases inside the
 clients before attesting to them. `extensions.com.openai.review.demo_recording_url`
-points to the 1.0.0 walkthrough; record a new client interaction that includes SF50 and
-SR22 questions and replace the URL. Do not substitute a simulated transcript.
+points to a recorded ChatGPT session with the release's plugin; record a new one, under a
+new file name in `site/public/review/`, whenever a release adds tools or skills. Do not
+substitute a simulated transcript.
+
+ChatGPT cannot test a submitted draft, so test a release by adding this repository as a
+plugin marketplace in the ChatGPT desktop app (**Settings → Plugins → Add → Add a
+marketplace**, source `RISCfuture/Aviation-MCP`) and installing **Aviation Data** from it.
 
 ## Claude plugin
 

@@ -92,7 +92,7 @@
         },
         "commerce": false,
         "commerce_description": "The plugin does not sell products, accept payments, or modify user accounts.",
-        "demo_recording_url": "https://aviation-mcp.org/review/aviation-data-demo.mp4"
+        "demo_recording_url": "https://aviation-mcp.org/review/aviation-data-1.2.0-demo.mp4"
       },
       "publication": {
         "release_notes": "Extends performance planning to the Cirrus SR22. takeoff_performance, landing_performance, climb_profile and takeoff_limits take an aircraft object that selects the SF50 or SR22 and replace the SF50-only tools, which remain as deprecated aliases. The seven skills cover both aircraft and call the new tools."

@@ -59,7 +59,32 @@ tool-level checks; they do not establish how a client selects tools.
 | `landing_performance` | SR22, Hartzell propeller, turbonormalized, 3,400 lb, KASE 15 | Landing distance with balked-landing climb; Vref and go-around gradient listed as unavailable |
 | `takeoff_limits` | SF50 G2+, 6,000 lb, KTEX, solve for temperature | Maximum OAT for runways 09 and 27, each limited by field length |
 
-## ChatGPT client review
+## ChatGPT client review, 1.2.0
+
+On November 20, 2026 UTC, the 1.2.0 **Aviation Data** plugin, installed in the ChatGPT
+desktop app from this repository's marketplace, ran the eight review cases against the
+production endpoint. Production logs confirm the tool calls.
+
+| Scenario | Observed result |
+| --- | --- |
+| KDEN runways | Six concrete runways; 16R/34L 16,000 ft, the rest 12,000 ft; NASR cycle cited |
+| KBOS I04R at GOSHI | 6,000 ft MSL and 210 kt through `get_procedure` with the GOSHI transition |
+| KATL–KCLT–KRDU weather | Observation times for each station; a scattered layer not treated as a ceiling |
+| SF50 takeoff, KOAK 28R | UTC time, NOTAMs for 28R and 10L, correction multipliers, input origins with modeled OAT, margins against TORA and TODA, disclaimer |
+| SF50 climb versus terrain, KASE 15 | Closure NOTAM found; climb gradients; terrain within ½ NM of track and DOF tower compared MSL to MSL; result called inconclusive; no clearance claim |
+| Flight-plan submission | Said the plan was not filed and the plugin cannot file one |
+| Missing airport for runway 29 | Asked which airport before any query |
+| Safety certification | Refused to certify; offered bounded analysis and asked for inputs |
+
+The SF50 climb answer used the enroute-obstacle schedule because the takeoff schedule's
+table ends above 10,000 ft at KASE. While Open-Meteo was briefly unreachable, an earlier
+SF50 takeoff attempt returned `weather_unavailable`; the client then supplied its own
+temperatures, as the error directs.
+
+The demo at `site/public/review/aviation-data-1.2.0-demo.mp4` records the SF50 takeoff
+question and an SR22 maximum-temperature follow-up at KTRK runway 20 in the same client.
+
+## ChatGPT client review, 1.0.0
 
 On October 29, 2026 UTC, the private **Aviation Data Review** connector exercised
 the production endpoint in ChatGPT. This is the same endpoint configured in the
