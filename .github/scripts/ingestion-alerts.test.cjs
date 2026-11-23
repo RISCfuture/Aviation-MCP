@@ -156,7 +156,7 @@ test("alerts on failures and expiry, notifies on changes, and ignores parsing ga
   assert.match(issues[1].body, /job\/terrain \| failure/);
 });
 
-test("waits a day for a released DOF and ignores unattempted upcoming releases", async (t) => {
+test("lists published DOF coverage when its discovery fails, waits a day for a released DOF, and ignores unattempted upcoming releases", async (t) => {
   const directory = mkdtempSync(path.join(tmpdir(), "aviation-alert-"));
   const originalDirectory = process.cwd();
   t.after(() => {
@@ -180,17 +180,28 @@ test("waits a day for a released DOF and ignores unattempted upcoming releases",
     "reports/navigation.json",
     JSON.stringify([{ downloads: [next], status: "success" }]),
   );
+  const nasr = {
+    source: "nasr",
+    status: "available",
+    version: next,
+    nextVersion: following,
+  };
+  const dofDownload = {
+    source: "dof",
+    cycle: "2026-09-29",
+    effectiveFrom: "2026-09-29T00:00:00Z",
+    effectiveUntil: "2026-11-24T00:00:00Z",
+  };
   writePublished([
-    {
-      source: "nasr",
-      status: "available",
-      version: next,
-      nextVersion: following,
-    },
+    nasr,
     {
       source: "dof",
-      status: "unavailable",
-      reason: "dof release 20260927 expired.",
+      status: "available",
+      version: {
+        ...dofDownload,
+        cycle: "20260927",
+        validation: { download: dofDownload },
+      },
     },
   ]);
   const dofUnposted = {
@@ -201,14 +212,29 @@ test("waits a day for a released DOF and ignores unattempted upcoming releases",
     PURGE_RESULT: "skipped",
   };
 
+  await notify(dependencies, dofUnposted, Date.parse("2026-11-23T14:00:00Z"));
+  assert.equal(issues.length, 1);
+  assert.match(
+    issues[0].body,
+    /\| dof \| 2026-09-29 \| Current\/latest \| 2026-09-29T00:00:00Z \| 2026-11-24T00:00:00Z \| published; discovery failed \|/,
+  );
+
+  writePublished([
+    nasr,
+    {
+      source: "dof",
+      status: "unavailable",
+      reason: "dof release 20260927 expired.",
+    },
+  ]);
   await notify(dependencies, dofUnposted, Date.parse("2026-11-24T06:00:00Z"));
-  assert.equal(issues.length, 0);
+  assert.equal(issues[0].state, "closed");
 
   await notify(dependencies, dofUnposted, Date.parse("2026-11-25T06:00:00Z"));
-  assert.equal(issues.length, 1);
-  assert.match(issues[0].body, /dof\/coverage \| unavailable/);
-  assert.match(issues[0].body, /job\/check \| failure/);
-  assert.doesNotMatch(issues[0].body, /nasr\/2026-11-26 \|/);
+  assert.equal(issues.length, 2);
+  assert.match(issues[1].body, /dof\/coverage \| unavailable/);
+  assert.match(issues[1].body, /job\/check \| failure/);
+  assert.doesNotMatch(issues[1].body, /nasr\/2026-11-26 \|/);
 });
 
 function writeReports(releases, status) {

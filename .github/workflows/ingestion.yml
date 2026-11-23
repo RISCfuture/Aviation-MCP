@@ -24,6 +24,10 @@ on:
         description: Dispatch ingestion even for releases an earlier run already published
         type: boolean
         default: false
+      dof_poll:
+        description: Poll only for the scheduled DOF release, skipping terrain and purge
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -40,6 +44,7 @@ jobs:
       check: ${{ steps.decide.outputs.check }}
       ingest: ${{ steps.decide.outputs.ingest }}
       maintenance: ${{ steps.schedule.outputs.maintenance }}
+      dofWindow: ${{ steps.schedule.outputs.dofWindow }}
     steps:
       - uses: actions/checkout@v7.0.1
       - name: Plan this run
@@ -51,6 +56,7 @@ jobs:
             const decision = plan({
               eventName: context.eventName,
               schedule: context.payload.schedule,
+              inputs: context.payload.inputs,
               now: Date.now(),
             });
             for (const [name, value] of Object.entries(decision)) core.setOutput(name, String(value));
@@ -202,6 +208,38 @@ jobs:
           name: ingestion-results-${{ matrix.source }}
           path: reports/*.json
           retention-days: 7
+
+  poll-dof:
+    needs: [plan, ingest]
+    if: ${{ always() && !cancelled() && needs.plan.outputs.dofWindow != '' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      actions: write
+    steps:
+      - name: Look up the polled DOF release
+        id: published
+        uses: actions/cache/restore@v6.1.0
+        with:
+          path: reports/dof.json
+          key: dof-published-${{ needs.plan.outputs.dofWindow }}
+          lookup-only: true
+      - name: Dispatch the next poll for the unpublished DOF release
+        if: steps.published.outputs.cache-hit != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          POLL_INTERVAL: 1200
+        run: |
+          sleep "$POLL_INTERVAL"
+          waiting=$(gh run list --workflow ingestion.yml --json status,event --jq '
+            map(select(.status != "completed" and .status != "in_progress"
+              and (.event == "schedule" or .event == "workflow_dispatch"))) | length')
+          if (( waiting > 0 )); then
+            printf 'A waiting run polls next.\n'
+          else
+            gh workflow run ingestion.yml --ref main --raw-field dof_poll=true
+          fi
 
   terrain:
     needs: [plan, image]

@@ -163,7 +163,10 @@ deadlock with the publication transaction's `ANALYZE` lock.
 The ingestion workflow checks NASR, CIFP, DOF and aircraft independently every
 six hours and preloads available next-cycle releases. A second schedule polls
 every 20 minutes from two days before each DOF release, on the FAA's 56-day
-cadence, until that release is published. The newest linked DOF row is a
+cadence, until that release is published or two weeks have passed. GitHub
+delays and drops scheduled runs, so every ingesting run in that window waits
+20 minutes and dispatches the next poll (`dof_poll`) unless the release is
+published or another run is already waiting. The newest linked DOF row is a
 candidate as soon as the FAA links it; it expires at the next scheduled
 release, and discovery fails with a message naming an overdue release. Each
 ingest leg fingerprints its checked releases with the ingestion image and
@@ -172,7 +175,9 @@ at a time. Terrain publication and purge run once a day, and a manual run can
 force dispatch.
 The standalone Swift checker downloads metadata without database credentials.
 When a host rejects HEAD with HTTP 405, 501, or 503, it probes the first byte
-with a range GET and preserves the returned validators.
+with a range GET and preserves the returned validators. It makes up to three
+attempts, 15 seconds apart, for each request that times out, loses its
+connection, or receives a 5xx response.
 
 Each discovered release is attempted even when an earlier cycle fails. Ingestion
 result artifacts record success, failure, or an incomplete attempt for each cycle.
@@ -182,8 +187,9 @@ withheld or unconfirmed releases, unavailable sources, and NASR or CIFP
 releases expiring within a week with no successor staged. The FAA links each
 DOF only once it is released, so a missing DOF is reported only when it is
 still unposted a day after its scheduled release. Upcoming releases not yet
-attempted and parsing gaps are informational. The issue lists effective dates and links to the workflow and
-Fly ingestion logs. It gains a comment whenever a problem appears or changes
+attempted and parsing gaps are informational. The issue lists effective dates,
+including the published release of any source whose discovery failed, and
+links to the workflow and Fly ingestion logs. It gains a comment whenever a problem appears or changes
 status, and closes when none remain. GitHub
 delivers the assignment and mention notifications according to the user's account
 notification settings.

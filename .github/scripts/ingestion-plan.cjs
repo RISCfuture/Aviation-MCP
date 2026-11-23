@@ -2,7 +2,10 @@ const DAY = 86_400_000;
 
 /** The cron expression of the regular ingestion run. */
 const REGULAR_SCHEDULE = "17 */6 * * *";
-/** The cron expression of the frequent polling run around DOF releases. */
+/**
+ * The cron expression of the frequent polling run around DOF releases. GitHub delays and
+ * drops scheduled runs, so each polling run also dispatches its successor.
+ */
 const RELEASE_WINDOW_SCHEDULE = "7,27,47 * * * *";
 /** A DOF release date; the FAA releases a DOF every 56 days. */
 const DOF_REFERENCE_RELEASE = Date.UTC(2025, 8, 2);
@@ -39,25 +42,29 @@ function dofReleaseWindow(now) {
 /**
  * Decides what one workflow run does. `check` discovers releases, `ingest` dispatches
  * unpublished ones and raises alerts, and `maintenance` publishes terrain and purges.
- * A release-window run proceeds only while `dofRelease` is unpublished.
+ * A polling run proceeds only while `dofRelease` is unpublished. `dofWindow` names the
+ * scheduled DOF release whose polling window contains an ingesting run, so the run can
+ * schedule the next poll while that release is unpublished.
  */
-function plan({ eventName, schedule, now }) {
+function plan({ eventName, schedule, inputs, now }) {
+  const dofWindow = dofReleaseWindow(now);
   const run = (check, ingest, maintenance, dofRelease = "") => ({
     check,
     ingest,
     maintenance,
     dofRelease,
+    dofWindow: ingest ? dofWindow : "",
   });
+  const pollDofRelease = () =>
+    dofWindow ? run(true, true, false, dofWindow) : run(false, false, false);
   if (CHECK_ONLY_EVENTS.has(eventName)) return run(true, false, false);
-  if (eventName === "workflow_dispatch") return run(true, true, true);
+  if (eventName === "workflow_dispatch")
+    return String(inputs?.dof_poll) === "true"
+      ? pollDofRelease()
+      : run(true, true, true);
   if (schedule === REGULAR_SCHEDULE)
     return run(true, true, new Date(now).getUTCHours() < MAINTENANCE_HOUR);
-  if (schedule === RELEASE_WINDOW_SCHEDULE) {
-    const dofRelease = dofReleaseWindow(now);
-    return dofRelease
-      ? run(true, true, false, dofRelease)
-      : run(false, false, false);
-  }
+  if (schedule === RELEASE_WINDOW_SCHEDULE) return pollDofRelease();
   return run(false, false, false);
 }
 

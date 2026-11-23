@@ -5,6 +5,16 @@ import Foundation
 #endif
 
 enum SourceChecks {
+  /// How many times a request is attempted before a transient failure is reported.
+  private static let maxAttempts = 3
+  private static let retryDelay: Duration = .seconds(15)
+  private static let requestTimeout: TimeInterval = 45
+  private static let transientURLErrors: Set<Int> = Set(
+    [
+      URLError.Code.timedOut, .networkConnectionLost, .cannotConnectToHost, .cannotFindHost,
+      .dnsLookupFailed, .notConnectedToInternet
+    ].map(\.rawValue))
+
   static func check(_ source: String, at instant: Date = .now) async throws -> [SourceDownload] {
     let candidates: [SourceDownload]
     switch source {
@@ -39,11 +49,30 @@ enum SourceChecks {
     return available
   }
 
+  /// Requests `address`, retrying timeouts, dropped connections and server errors.
   private static func request(
-    _ address: String, method: String, allowMissing: Bool = false, rangeProbe: Bool = false
+    _ address: String, method: String, allowMissing: Bool = false, attempt: Int = 1
+  ) async throws -> (Data, HTTPURLResponse) {
+    do {
+      return try await attemptRequest(address, method: method, allowMissing: allowMissing)
+    } catch let error where attempt < maxAttempts && isTransient(error) {
+      try await Task.sleep(for: retryDelay)
+      return try await request(
+        address, method: method, allowMissing: allowMissing, attempt: attempt + 1)
+    }
+  }
+
+  private static func isTransient(_ error: any Error) -> Bool {
+    if let error = error as? ServerError { return error.isTransient }
+    let error = error as NSError
+    return error.domain == NSURLErrorDomain && transientURLErrors.contains(error.code)
+  }
+
+  private static func attemptRequest(
+    _ address: String, method: String, allowMissing: Bool, rangeProbe: Bool = false
   ) async throws -> (Data, HTTPURLResponse) {
     guard let url = URL(string: address) else { throw SourceDiscoveryError("Invalid source URL.") }
-    var request = URLRequest(url: url, timeoutInterval: 45)
+    var request = URLRequest(url: url, timeoutInterval: requestTimeout)
     request.httpMethod = method
     if rangeProbe { request.setValue("bytes=0-0", forHTTPHeaderField: "Range") }
     let (data, response) = try await URLSession.shared.data(for: request)
@@ -51,15 +80,26 @@ enum SourceChecks {
       throw SourceDiscoveryError("Source did not return HTTP metadata: \(address).")
     }
     if method == "HEAD", [405, 501, 503].contains(response.statusCode) {
-      return try await Self.request(
+      return try await attemptRequest(
         address, method: "GET", allowMissing: allowMissing, rangeProbe: true)
     }
     guard
       response.statusCode == 200 || (rangeProbe && response.statusCode == 206)
         || (allowMissing && response.statusCode == 404)
     else {
-      throw SourceDiscoveryError("Source check failed for \(address): HTTP \(response.statusCode).")
+      throw ServerError(address: address, statusCode: response.statusCode)
     }
     return (data, response)
   }
+}
+
+/// A source server answered with an unexpected HTTP status.
+private struct ServerError: LocalizedError {
+  let address: String
+  let statusCode: Int
+
+  var errorDescription: String? { "Source check failed for \(address): HTTP \(statusCode)." }
+
+  /// Whether the status is a server-side failure that a later attempt may not repeat.
+  var isTransient: Bool { (500..<600).contains(statusCode) }
 }

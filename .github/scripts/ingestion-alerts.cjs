@@ -59,11 +59,31 @@ function summarizeReleases(releases, reports, now, published = []) {
       source: release.source,
       cycle: release.cycle,
       effectiveFrom: release.effectiveFrom,
+      effectiveUntil: release.effectiveUntil,
       upcoming: Date.parse(release.effectiveFrom) > now,
       status,
       parseErrors,
     };
   });
+}
+
+/** Summarize the published versions of sources whose discovery produced no results. */
+function undiscoveredReleases(published, checked, now) {
+  return published
+    .filter(
+      (version) =>
+        CHECKED_SOURCES.includes(version.source) &&
+        !checked.includes(version.source),
+    )
+    .map((version) => ({
+      source: version.source,
+      cycle: version.validation?.download?.cycle ?? version.cycle,
+      effectiveFrom: version.effectiveFrom,
+      effectiveUntil: version.effectiveUntil,
+      upcoming: Date.parse(version.effectiveFrom) > now,
+      status: "published; discovery failed",
+      parseErrors: version.validation?.parse_errors?.count ?? 0,
+    }));
 }
 
 /** Whether a just-released DOF may still be awaiting its FAA posting. */
@@ -208,7 +228,7 @@ function issueBody({ problems: found, releases, run, environment }) {
   );
   const releaseRows = releases.map(
     (release) =>
-      `| ${release.source} | ${release.cycle} | ${release.upcoming ? "Upcoming" : "Current/latest"} | ${release.effectiveFrom} | ${release.status} | ${release.parseErrors} |`,
+      `| ${release.source} | ${release.cycle} | ${release.upcoming ? "Upcoming" : "Current/latest"} | ${release.effectiveFrom} | ${release.effectiveUntil ?? "—"} | ${release.status} | ${release.parseErrors} |`,
   );
   const fingerprint = found
     .map((problem) => `${problem.key}:${problem.status}`)
@@ -225,8 +245,8 @@ function issueBody({ problems: found, releases, run, environment }) {
       ...problemRows,
     ].join("\n"),
     [
-      "| Source | Cycle | Timing | Effective from (UTC) | Result | Parse errors |",
-      "| --- | --- | --- | --- | --- | --- |",
+      "| Source | Cycle | Timing | Effective from (UTC) | Effective until (UTC) | Result | Parse errors |",
+      "| --- | --- | --- | --- | --- | --- | --- |",
       ...releaseRows,
     ].join("\n"),
     "A withheld release was incomplete compared with the published release (a failed record family or a large drop in records) and was not published; the published release keeps serving only until it expires. Parsing gaps in published releases are informational and do not keep this issue open; inspect get_data_status for parser diagnostics.",
@@ -251,13 +271,8 @@ async function notify(
     now,
     published,
   );
-  const found = problems({
-    releases,
-    checked: checkedSources("checked"),
-    statuses,
-    environment,
-    now,
-  });
+  const checked = checkedSources("checked");
+  const found = problems({ releases, checked, statuses, environment, now });
   const repository = context.repo;
   const issues = await github.paginate(github.rest.issues.listForRepo, {
     ...repository,
@@ -283,7 +298,12 @@ async function notify(
   }
 
   const run = `${context.serverUrl}/${repository.owner}/${repository.repo}/actions/runs/${context.runId}`;
-  const body = issueBody({ problems: found, releases, run, environment });
+  const body = issueBody({
+    problems: found,
+    releases: [...releases, ...undiscoveredReleases(published, checked, now)],
+    run,
+    environment,
+  });
   const title = "Aviation data unavailable, withheld, or failing to ingest";
   if (existing) {
     const previous = JSON.parse(
