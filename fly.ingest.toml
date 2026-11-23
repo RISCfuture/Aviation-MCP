@@ -10,6 +10,6 @@ kill_timeout = "120s"
   APP_ROLE = "ingest"
 
 [[vm]]
-  memory = "8gb"
+  memory = "4gb"
   cpu_kind = "shared"
   cpus = 4

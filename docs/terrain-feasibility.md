@@ -234,8 +234,8 @@ The $1–5/$10–20 scenarios assume limited additional runtime; they are not fi
 monthly price caps.
 
 Initial mirroring and maxima construction are separate one-time work. At the
-existing 4-shared-CPU/8-GB worker estimate of about $0.084/hour, 10–100 worker-hours
-would cost $0.84–8.40 in compute. That is a sensitivity calculation, not a measured
+existing 4-shared-CPU/4-GB worker estimate of about $0.044/hour, 10–100 worker-hours
+would cost $0.44–4.40 in compute. That is a sensitivity calculation, not a measured
 processing duration. Temporary storage, uploads and internet egress from a Fly
 worker to R2 are additional: sending 600–1,000 GB from North America at $0.02/GB
 adds approximately $12–20. R2's free egress does not make Fly uploads free.

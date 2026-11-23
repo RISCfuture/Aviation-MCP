@@ -8,26 +8,28 @@ while stopped. Ingestion runs in temporary machines with separate credentials.
 ## Estimated monthly cost
 
 Estimates use [Fly pricing](https://docs.fly.io/about/pricing) checked October 31, 2026.
-San Jose applies a 1.192 multiplier to CPU and RAM. A shared CPU with 1 GB RAM
-costs approximately $8 per 30 days of continuous runtime, or $0.0111 per hour;
-the ingestion size of 4 shared CPUs with 8 GB costs about $0.084 per hour.
+San Jose applies a 1.192 multiplier to CPU and RAM. The serving machine, a
+shared CPU with 512 MB RAM, costs approximately $4.40 per 30 days of continuous
+runtime, or $0.0061 per hour; a shared CPU with 1 GB costs $7.99 per 30 days,
+or $0.0111 per hour. The ingestion size of 4 shared CPUs with 4 GB costs about
+$0.044 per hour.
 
 | Item | Assumption | Estimate |
 | --- | --- | --- |
-| Serving machine | 1 shared CPU, 1 GB, about 20 hours/month | $0.22 |
-| Database machine | Same size, about 25 hours/month | $0.28 |
+| Serving machine | 1 shared CPU, 512 MB, about 20 hours/month | $0.12 |
+| Database machine | 1 shared CPU, 1 GB, about 25 hours/month | $0.28 |
 | Database volume | 10 GB provisioned | $1.50 |
 | Terrain cache volume | 1 GB provisioned, no scheduled snapshots | $0.15 |
 | Stopped or suspended root filesystems | Approximately 1–1.7 GB combined | $0.15–0.25 |
 | Database volume snapshots | Daily, beyond the 10 GB free allowance | $0–0.40 |
 | Temporary ingestion machines | Short jobs; unchanged releases are skipped | $0.25–0.42 |
-| **Light-use total** | Excludes variable items below | **Approximately $2.60–3.20** |
+| **Light-use total** | Excludes variable items below | **Approximately $2.50–3.10** |
 
 Machine hours come from Fly's `fly_instance_up` metric over October 29–31,
 2026, extrapolated to a month; they include the idle interval before autostop.
 Ingestion only boots machines for releases it has not yet published, and each
-command gets its own machine size. Keeping an 8 GB ingestion worker running
-continuously would cost about $61/month.
+command gets its own machine size. Keeping a 4 GB ingestion worker running
+continuously would cost about $32/month.
 
 Volumes cost $0.15 per provisioned GB/month whether or not their machine runs.
 The database volume auto-extends by 2 GB at 80% use, up to 20 GB, which would
@@ -44,10 +46,10 @@ The largest cost risk is traffic that keeps machines awake. The Worker answers
 `/health`, non-POST `/mcp` and plain-HTTP requests at the edge, and `/ready` and
 `/metrics` are no longer public, so only MCP POSTs start the server. Requests
 more often than the idle-stop interval would keep both machines running, at
-roughly $16–19/month.
+roughly $12–15/month.
 
-At 300 runtime hours per serving/database machine, budget roughly $10–11/month
-before variable items. The always-on equivalent is roughly $20–25/month.
+At 300 runtime hours per serving/database machine, budget roughly $8.50–9.50/month
+before variable items. The always-on equivalent is roughly $16–21/month.
 An extra GB of RAM on an always-on San Jose machine adds about $7.15/month;
 on-demand machines pay only for its running hours.
 
